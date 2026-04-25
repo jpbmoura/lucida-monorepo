@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // Nome do cookie segue o cookiePrefix da BA (lucida) — ver auth.ts do api.
+// Em produção (HTTPS, cookie `secure: true`) a BA adiciona o prefixo `__Secure-`
+// — exigência do browser pra cookies com Secure. Checamos os dois nomes.
 const SESSION_COOKIE = "lucida.session_token";
+const SESSION_COOKIE_SECURE = `__Secure-${SESSION_COOKIE}`;
 
 // Rotas protegidas. Cada entry define o prefix e pra onde mandar o user
 // caso ele não tenha sessão — `/app` (professor) manda pro sign-in padrão;
@@ -32,7 +35,9 @@ export function middleware(request: NextRequest) {
   const match = PROTECTED.find((p) => pathname.startsWith(p.prefix));
   if (!match) return NextResponse.next();
 
-  const hasSession = request.cookies.has(SESSION_COOKIE);
+  const hasSession =
+    request.cookies.has(SESSION_COOKIE) ||
+    request.cookies.has(SESSION_COOKIE_SECURE);
   if (hasSession) return NextResponse.next();
 
   const signInUrl = new URL(match.signInPath, request.url);
