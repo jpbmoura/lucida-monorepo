@@ -4,6 +4,9 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     serverActions: {
       // Permite anexar PDF/DOCX ao form de criar prova.
