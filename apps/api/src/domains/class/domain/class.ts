@@ -1,0 +1,105 @@
+import { ClassId } from "./class-id.js";
+import {
+  ClassDescriptionInvalidError,
+  ClassNameInvalidError,
+} from "./class-errors.js";
+
+const NAME_MIN = 2;
+const NAME_MAX = 120;
+const DESCRIPTION_MAX = 200;
+
+export interface ClassProps {
+  id: ClassId;
+  name: string;
+  description: string;
+  ownerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export class Class {
+  private constructor(private props: ClassProps) {}
+
+  static create(input: {
+    id: ClassId;
+    name: string;
+    description?: string;
+    ownerId: string;
+    now?: Date;
+  }): Class {
+    const name = validateName(input.name);
+    const description = validateDescription(input.description ?? "");
+    const now = input.now ?? new Date();
+    return new Class({
+      id: input.id,
+      name,
+      description,
+      ownerId: input.ownerId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  static restore(props: ClassProps): Class {
+    return new Class({ ...props });
+  }
+
+  get id(): ClassId {
+    return this.props.id;
+  }
+
+  get name(): string {
+    return this.props.name;
+  }
+
+  get description(): string {
+    return this.props.description;
+  }
+
+  get ownerId(): string {
+    return this.props.ownerId;
+  }
+
+  get createdAt(): Date {
+    return this.props.createdAt;
+  }
+
+  get updatedAt(): Date {
+    return this.props.updatedAt;
+  }
+
+  rename(newName: string, now: Date = new Date()): void {
+    this.props.name = validateName(newName);
+    this.props.updatedAt = now;
+  }
+
+  updateDescription(newDescription: string, now: Date = new Date()): void {
+    this.props.description = validateDescription(newDescription);
+    this.props.updatedAt = now;
+  }
+
+  isOwnedBy(ownerId: string): boolean {
+    return this.props.ownerId === ownerId;
+  }
+}
+
+function validateName(value: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed.length < NAME_MIN) {
+    throw new ClassNameInvalidError(`Nome precisa ter ao menos ${NAME_MIN} caracteres.`);
+  }
+  if (trimmed.length > NAME_MAX) {
+    throw new ClassNameInvalidError(`Nome não pode passar de ${NAME_MAX} caracteres.`);
+  }
+  return trimmed;
+}
+
+function validateDescription(value: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed.length > DESCRIPTION_MAX) {
+    throw new ClassDescriptionInvalidError(
+      `Descrição não pode passar de ${DESCRIPTION_MAX} caracteres.`,
+    );
+  }
+  return trimmed;
+}

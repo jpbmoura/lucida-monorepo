@@ -1,0 +1,71 @@
+import { redirect } from "next/navigation";
+import { Sidebar } from "@/features/app/layout/sidebar";
+import { Topbar } from "@/features/app/layout/topbar";
+import { getServerSession } from "@/lib/get-server-session";
+import { buildDisplayUser } from "@/lib/user-display";
+import {
+  fetchActiveOrganization,
+  isOrgPayingForUser,
+} from "@/lib/active-organization";
+import { fetchImpersonateState } from "@/lib/impersonate-state";
+import {
+  fetchBalance,
+  fetchCurrentSubscription,
+} from "@/features/app/billing/data";
+import { LowBalanceAlert } from "@/features/app/billing/components/low-balance-alert";
+import { ImpersonateBanner } from "@/features/analytics/impersonate/components/impersonate-banner";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession();
+  if (!session) {
+    redirect("/sign-in?next=/app");
+  }
+
+  const display = buildDisplayUser({
+    name: session.user.name,
+    email: session.user.email,
+  });
+
+  // Billing + organização ativa + estado de impersonate carregam aqui pra
+  // alimentar topbar + alert + banner. Tolera falhas — qualquer endpoint
+  // que caia não deve quebrar a UI.
+  const [balance, subscription, activeOrg, impersonate] = await Promise.all([
+    fetchBalance().catch(() => null),
+    fetchCurrentSubscription().catch(() => null),
+    fetchActiveOrganization().catch(() => null),
+    fetchImpersonateState().catch(() => null),
+  ]);
+
+  const hasActiveSubscription =
+    subscription?.status === "active" || subscription?.status === "past_due";
+  const orgPays = isOrgPayingForUser(activeOrg?.billingMode);
+
+  return (
+    <div className="flex min-h-screen bg-white">
+      <Sidebar hasActiveSubscription={hasActiveSubscription} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        {impersonate?.isImpersonating && impersonate.actingAs && (
+          <ImpersonateBanner
+            actingAsName={impersonate.actingAs.name}
+            actingAsEmail={impersonate.actingAs.email}
+          />
+        )}
+        <Topbar
+          userName={display.name}
+          userEmail={display.email}
+          initials={display.initials}
+          initialBalance={balance?.total ?? null}
+          orgName={activeOrg?.name ?? null}
+          hideBalance={orgPays}
+        />
+        {/* LowBalanceAlert é sobre saldo pessoal — some quando a instituição
+            paga pela ação (pool/pay_per_use). O saldo pessoal fica congelado
+            e alertar sobre ele só confundiria. */}
+        {!orgPays && balance && (
+          <LowBalanceAlert balance={balance} subscription={subscription} />
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}

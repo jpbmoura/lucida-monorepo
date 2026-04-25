@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  /* ───────── Brand colors (Lucida Exam) ───────── */
+  --color-brand-primary: #007aff;
+  --color-brand-dark-01: #1d14ff;
+  --color-brand-dark-02: #150bbc;
+  --color-brand-light: #7fbdf4;
+  --color-brand-super-dark: #051e2c;
+  --color-brand-off-white: #f9f5ea;
+
+  /* ───────── Brand colors (Lucida Analytics — tom roxo) ─────────
+   * Usados no ambiente de instituições (/analytics/*). Tokens existem
+   * globalmente pra gerar utilitários Tailwind (bg-analytics-primary, etc),
+   * mas o que faz a paleta "virar roxa" automaticamente são as overrides
+   * em .theme-analytics lá embaixo — aplicadas num wrapper de layout. */
+  --color-analytics-primary: #6c3cfb;
+  --color-analytics-dark-01: #4d30ce;
+  --color-analytics-dark-02: #1e0a96;
+  --color-analytics-light: #927afc;
+
+  /* ───────── Neutral scale (aligned to dashboard spec) ───────── */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f4f4f4;
+  --color-gray-200: #e8e8e8;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #3f3f3f;
+  --color-gray-800: #262626;
+  --color-ink: #0a0a0a;
+
+  /* ───────── Semantic (shadcn mapping) ───────── */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-muted: #fafafa;
+  --color-muted-foreground: #737373;
+  --color-border: #e8e8e8;
+  --color-input: #e8e8e8;
+  --color-ring: #007aff;
+  --color-primary: #0a0a0a;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #007aff;
+  --color-accent-foreground: #ffffff;
+
+  /* ───────── Typography ───────── */
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  /* JetBrains Mono carregado via next/font (var --font-jetbrains-mono).
+     Compomos aqui com fallbacks do sistema pros casos onde a var não
+     está presente (ex.: rotas que não passam pelo root layout). */
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
+
+  /* ───────── Radii (dashboard spec — rounder than shadcn default) ───────── */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius: 0.75rem; /* 12px */
+  --radius-lg: 1.25rem; /* 20px */
+  --radius-xl: 1.75rem; /* 28px */
+  --radius-2xl: 2rem; /* 32px */
+  --radius-pill: 9999px;
+
+  /* ───────── Shadows ───────── */
+  --shadow-soft: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-pop: 0 30px 80px -20px rgb(10 10 10 / 0.18), 0 10px 30px -10px rgb(10 10 10 / 0.1);
+  --shadow-focus: 0 0 0 3px rgb(0 122 255 / 0.25);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: var(--color-brand-primary);
+    color: #ffffff;
+  }
+}
+
+/* Surface utilities from the brand manual */
+.surface-dark {
+  background-color: var(--color-brand-super-dark);
+  color: var(--color-brand-off-white);
+}
+
+/* ───────── Theme switch: Analytics (roxo) ─────────
+ * Aplicar num wrapper que envolva toda a árvore do ambiente de instituições
+ * (ex: <div className="theme-analytics"> no layout /analytics/*). Remapeia
+ * apenas as vars semânticas — os tokens de marca (--color-brand-*) ficam
+ * intactos, então componentes que referenciam brand-* (sidebar logo Exam,
+ * etc) continuam azul quando precisarem. Componentes "neutros" que usam
+ * --color-ring, --color-accent, ::selection, .pulse-dot herdam roxo. */
+.theme-analytics {
+  --color-ring: var(--color-analytics-primary);
+  --color-accent: var(--color-analytics-primary);
+  --color-accent-foreground: #ffffff;
+  --shadow-focus: 0 0 0 3px rgb(108 60 251 / 0.28);
+}
+
+.theme-analytics ::selection {
+  background: var(--color-analytics-primary);
+  color: #ffffff;
+}
+
+/* ───────── Theme switch: Kintal (grayscale) ─────────
+ * Backoffice interno da Lucida (/kintal/*). Sem cor de produto — paleta
+ * preto/branco/cinza. Aplicar num wrapper no layout /kintal/* pra que
+ * qualquer componente shadcn herde o look P&B sem precisar de variant
+ * dedicada. Como Exam e Analytics, só vars semânticas são trocadas — os
+ * tokens --color-brand-* e --color-analytics-* continuam intocados caso
+ * algum componente compartilhado precise das cores de produto. */
+.theme-kintal {
+  --color-ring: var(--color-gray-800);
+  --color-accent: var(--color-ink);
+  --color-accent-foreground: #ffffff;
+  --shadow-focus: 0 0 0 3px rgb(10 10 10 / 0.22);
+}
+
+.theme-kintal ::selection {
+  background: var(--color-ink);
+  color: #ffffff;
+}
+
+.theme-kintal .pulse-dot {
+  background: var(--color-ink);
+  box-shadow: 0 0 0 4px rgb(10 10 10 / 0.12);
+  animation: pulse-ring-kintal 2s ease-in-out infinite;
+}
+
+@keyframes pulse-ring-kintal {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(10 10 10 / 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(10 10 10 / 0.04);
+  }
+}
+
+/* Pulsing dot used in eyebrows (matches dashboard spec) */
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(0 122 255 / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(0 122 255 / 0.05);
+  }
+}
+
+@keyframes pulse-ring-analytics {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(108 60 251 / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(108 60 251 / 0.05);
+  }
+}
+
+.pulse-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--color-brand-primary);
+  box-shadow: 0 0 0 4px rgb(0 122 255 / 0.15);
+  animation: pulse-ring 2s ease-in-out infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.theme-analytics .pulse-dot {
+  background: var(--color-analytics-primary);
+  box-shadow: 0 0 0 4px rgb(108 60 251 / 0.15);
+  animation: pulse-ring-analytics 2s ease-in-out infinite;
+}
+
+/* ───────── Hero gradient (Analytics/docs) ─────────
+ * Aura sutil de luz roxa que entra pelo topo, some gradualmente. Usado
+ * como `background` em headers de página nas docs e no dashboard de
+ * instituição — quebra o branco puro sem concorrer com o conteúdo.
+ * Implementado como pseudo-element pra não exigir um wrapper extra. */
+.hero-aura-analytics {
+  position: relative;
+  isolation: isolate;
+}
+.hero-aura-analytics::before {
+  content: "";
+  position: absolute;
+  inset: -4rem -4rem auto -4rem;
+  height: 22rem;
+  background: radial-gradient(
+    ellipse 60% 100% at 50% 0%,
+    rgb(108 60 251 / 0.14),
+    rgb(108 60 251 / 0.04) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Scrollbar fina + discreta — aplicado em areas scrolláveis das docs. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* ───────── Print ─────────
+ * Usado pela rota /print/exams/[id]: o que aparece na tela já é o que sai
+ * impresso. Ctrl+P → Salvar como PDF é o fluxo oficial pra exportar PDF.
+ */
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--color-gray-50);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.print-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.5rem 3rem;
+}
+
+.print-page .page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+@page {
+  size: A4;
+  margin: 20mm;
+}
+
+@media print {
+  .print-toolbar {
+    display: none;
+  }
+  .print-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background: white;
+  }
+}

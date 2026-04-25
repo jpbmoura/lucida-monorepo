@@ -1,0 +1,50 @@
+{
+  "name": "@lucida/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate:legacy": "tsx scripts/migrate-from-legacy/index.ts",
+    "migrate:legacy-rename": "tsx scripts/rename-legacy-collections/index.ts",
+    "migrate:billing-scope": "tsx scripts/migrate-billing-scope/index.ts",
+    "seed:test-org": "tsx scripts/seed-test-org/index.ts",
+    "billing:add-org-credits": "tsx scripts/add-org-credits/index.ts"
+  },
+  "dependencies": {
+    "better-auth": "^1.6.7",
+    "cors": "^2.8.5",
+    "docx": "^9.6.1",
+    "dotenv": "^16.4.5",
+    "express": "^5.0.1",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "mongodb": "^7.2.0",
+    "mongoose": "^8.8.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.5",
+    "openai": "^6.34.0",
+    "pdf-parse": "^2.4.5",
+    "stripe": "^22.0.2",
+    "youtube-transcript": "^1.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.9.0",
+    "@types/nodemailer": "^8.0.0",
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
