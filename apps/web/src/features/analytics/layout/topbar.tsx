@@ -1,7 +1,7 @@
-import { Bell } from "lucide-react";
 import { AnalyticsProfileMenu } from "./profile-menu";
 import { ContextSwitcher } from "./context-switcher";
 import { OrganizationBadge } from "./organization-badge";
+import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
 
 interface AnalyticsTopbarProps {
   userName: string;
@@ -25,13 +25,7 @@ export function AnalyticsTopbar({
       </div>
 
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          aria-label="Notificações"
-          className="relative grid size-10 place-items-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-ink"
-        >
-          <Bell className="size-[18px]" />
-        </button>
+        <NotificationsBell inboxHref="/analytics/notificacoes" />
 
         <div className="mx-2 h-6 w-px bg-gray-200" />
 

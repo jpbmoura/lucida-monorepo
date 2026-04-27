@@ -12,6 +12,7 @@ import {
   Map,
   Users,
   KanbanSquare,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const ICONS = {
   map: Map,
   users: Users,
   board: KanbanSquare,
+  bell: Bell,
 } as const;
 
 export type KintalSidebarIcon = keyof typeof ICONS;

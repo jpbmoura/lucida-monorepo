@@ -16,6 +16,11 @@ const GERAL: AnalyticsSidebarNavItem[] = [
 const FERRAMENTAS: AnalyticsSidebarNavItem[] = [
   { label: "Análises", href: "/analytics/analises", icon: "chart", disabled: true },
   { label: "Convidar professor", icon: "invite", disabled: true },
+  {
+    label: "Enviar notificação",
+    href: "/analytics/notificacoes/enviar",
+    icon: "send",
+  },
 ];
 
 const CONTA: AnalyticsSidebarNavItem[] = [

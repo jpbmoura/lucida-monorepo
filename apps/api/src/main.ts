@@ -169,6 +169,24 @@ import { DeleteCardUseCase } from "@/domains/kanban/application/delete-card.js";
 import { KanbanController } from "@/domains/kanban/presentation/kanban-controller.js";
 import { makeKanbanRouter } from "@/domains/kanban/presentation/kanban-routes.js";
 
+import { MongooseNotificationRepository } from "@/domains/notifications/infrastructure/mongoose-notification-repository.js";
+import { MongoAudienceResolver } from "@/domains/notifications/infrastructure/mongo-audience-resolver.js";
+import { SendNotificationUseCase } from "@/domains/notifications/application/send-notification.js";
+import { ListInboxUseCase } from "@/domains/notifications/application/list-inbox.js";
+import { CountUnreadUseCase } from "@/domains/notifications/application/count-unread.js";
+import { MarkAsReadUseCase } from "@/domains/notifications/application/mark-as-read.js";
+import { MarkAllAsReadUseCase } from "@/domains/notifications/application/mark-all-as-read.js";
+import { DismissNotificationUseCase } from "@/domains/notifications/application/dismiss-notification.js";
+import { ListCampaignsUseCase } from "@/domains/notifications/application/list-campaigns.js";
+import { GetCampaignUseCase } from "@/domains/notifications/application/get-campaign.js";
+import { DeleteCampaignUseCase } from "@/domains/notifications/application/delete-campaign.js";
+import { NotificationReceiverController } from "@/domains/notifications/presentation/notification-receiver-controller.js";
+import { NotificationSenderController } from "@/domains/notifications/presentation/notification-sender-controller.js";
+import {
+  makeNotificationReceiverRouter,
+  makeNotificationSenderRouters,
+} from "@/domains/notifications/presentation/notification-routes.js";
+
 import { MongooseOrganizationPreferencesRepository } from "@/domains/organization-preferences/infrastructure/mongoose-organization-preferences-repository.js";
 import { GetOrganizationPreferencesUseCase } from "@/domains/organization-preferences/application/get-organization-preferences.js";
 import { UpdateOrganizationPreferencesUseCase } from "@/domains/organization-preferences/application/update-organization-preferences.js";
@@ -535,6 +553,27 @@ export async function buildApp(): Promise<Express> {
     deleteCard: new DeleteCardUseCase(cardRepository),
   });
 
+  // --- notifications (inbox + send para staff/org admin) ---
+  const notificationRepository = new MongooseNotificationRepository();
+  const audienceResolver = new MongoAudienceResolver(authDb);
+  const sendNotification = new SendNotificationUseCase(
+    notificationRepository,
+    audienceResolver,
+  );
+  const notificationReceiverController = new NotificationReceiverController({
+    listInbox: new ListInboxUseCase(notificationRepository),
+    countUnread: new CountUnreadUseCase(notificationRepository),
+    markAsRead: new MarkAsReadUseCase(notificationRepository),
+    markAllAsRead: new MarkAllAsReadUseCase(notificationRepository),
+    dismiss: new DismissNotificationUseCase(notificationRepository),
+  });
+  const notificationSenderController = new NotificationSenderController({
+    send: sendNotification,
+    listCampaigns: new ListCampaignsUseCase(notificationRepository),
+    getCampaign: new GetCampaignUseCase(notificationRepository),
+    deleteCampaign: new DeleteCampaignUseCase(notificationRepository),
+  });
+
   // --- organization preferences ---
   const orgPreferencesRepository =
     new MongooseOrganizationPreferencesRepository();
@@ -651,6 +690,19 @@ export async function buildApp(): Promise<Express> {
       requireStaff,
       controller: kanbanController,
     }),
+    makeNotificationReceiverRouter({
+      requireAuth,
+      controller: notificationReceiverController,
+    }),
+    ...(() => {
+      const senderRouters = makeNotificationSenderRouters({
+        requireAuth,
+        requireStaff,
+        requireOrgAdmin,
+        controller: notificationSenderController,
+      });
+      return [senderRouters.staff, senderRouters.orgAdmin];
+    })(),
     makeRoadmapRouter({
       optionalAuth,
       requireAuth,

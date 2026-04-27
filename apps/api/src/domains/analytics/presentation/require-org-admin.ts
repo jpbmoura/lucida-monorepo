@@ -12,13 +12,25 @@ class NotOrgAdminError extends DomainError {
   }
 }
 
+class MissingActiveOrganizationError extends DomainError {
+  readonly code = "MISSING_ACTIVE_ORGANIZATION";
+  readonly statusCode = 400;
+  constructor() {
+    super(
+      "Sessão sem instituição ativa. Selecione uma organização pra continuar.",
+    );
+  }
+}
+
 /**
  * Middleware que exige role `owner` ou `admin` na org ativa do user. Use
- * após `requireAuth`. Member comum recebe 403 NOT_ORG_ADMIN.
+ * após `requireAuth`.
  *
- * Se a sessão não tem org ativa, devolvemos 403 também — /analytics só
- * existe no contexto de uma org; se caiu aqui sem activeOrganizationId é
- * URL direta não autorizada.
+ * Distingue dois casos pra o frontend tratar separadamente:
+ *  - Sem org ativa na sessão → MISSING_ACTIVE_ORGANIZATION (400). Frontend
+ *    mostra NoActiveOrg / fluxo de seleção.
+ *  - Tem org ativa mas user é member comum → NOT_ORG_ADMIN (403). Acesso
+ *    realmente negado.
  */
 export function makeRequireOrgAdmin(
   orgMembersRepo: OrganizationMembersRepository,
@@ -28,7 +40,7 @@ export function makeRequireOrgAdmin(
       const auth = req.auth;
       if (!auth) throw new NotOrgAdminError();
       const orgId = auth.activeOrganizationId;
-      if (!orgId) throw new NotOrgAdminError();
+      if (!orgId) throw new MissingActiveOrganizationError();
 
       const role = await orgMembersRepo.findRole(orgId, auth.userId);
       if (role !== "owner" && role !== "admin") {

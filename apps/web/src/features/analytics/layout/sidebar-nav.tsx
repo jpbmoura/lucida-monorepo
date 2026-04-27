@@ -10,6 +10,7 @@ import {
   Settings,
   HelpCircle,
   Code2,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const ICONS = {
   settings: Settings,
   help: HelpCircle,
   code: Code2,
+  send: Send,
 } as const;
 
 export type AnalyticsSidebarIcon = keyof typeof ICONS;

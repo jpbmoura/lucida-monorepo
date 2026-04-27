@@ -1,7 +1,7 @@
-import { Bell } from "lucide-react";
 import { ProfileMenu } from "./profile-menu";
 import { InstitutionalEyebrow } from "./institutional-eyebrow";
 import { BalanceWidget } from "@/features/app/billing/components/balance-widget";
+import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
 
 interface TopbarProps {
   userName: string;
@@ -36,14 +36,7 @@ export function Topbar({
       <div className="flex items-center gap-4">
         {!hideBalance && <BalanceWidget initial={initialBalance} />}
 
-        <button
-          type="button"
-          aria-label="Notificações"
-          className="relative grid size-10 place-items-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 hover:text-ink"
-        >
-          <Bell className="size-[18px]" />
-          <span className="absolute right-2.5 top-2.5 size-1.5 rounded-full bg-brand-primary ring-2 ring-white" />
-        </button>
+        <NotificationsBell inboxHref="/app/notificacoes" />
 
         <div className="mx-2 h-6 w-px bg-gray-200" />
 
