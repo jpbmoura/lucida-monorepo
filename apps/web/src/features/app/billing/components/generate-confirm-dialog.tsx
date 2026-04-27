@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Building2, Coins, Sparkles } from "lucide-react";
+import { AlertCircle, Building2, Coins, Loader2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,23 +16,33 @@ import { Button } from "@/components/ui/button";
 interface GenerateConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Estimativa CLIENT-SIDE — o backend faz o check real com margem de segurança. */
-  estimate: number;
+  /**
+   * Estimativa em créditos vinda do backend (POST /v1/ai/estimate). `null`
+   * cobre dois casos: ainda carregando OU a chamada de estimativa falhou.
+   * Use `estimateLoading` pra distinguir.
+   */
+  estimate: number | null;
+  /** True enquanto o fetch de estimativa está em voo. */
+  estimateLoading: boolean;
   onConfirm: () => void | Promise<void>;
 }
 
 /**
- * Mostrado antes de gerar prova (ação de maior custo). Duas variantes:
+ * Mostrado antes de gerar prova. Duas variantes:
  *
  *   - Professor avulso: busca saldo pessoal e pré-valida contra a estimativa.
  *   - Professor institucional em pool/pay_per_use: esconde saldo pessoal
  *     (não é fonte do débito), mostra "Pago pela instituição". O check real
  *     continua no backend — aqui é só transparência.
+ *
+ * Quando a estimativa falha (estimate=null, !estimateLoading) ou está
+ * carregando, não bloqueamos por saldo — o backend faz o check definitivo.
  */
 export function GenerateConfirmDialog({
   open,
   onOpenChange,
   estimate,
+  estimateLoading,
   onConfirm,
 }: GenerateConfirmDialogProps) {
   const [balance, setBalance] = useState<number | null>(null);
@@ -67,9 +77,11 @@ export function GenerateConfirmDialog({
     };
   }, [open]);
 
-  // Em modo institucional não avaliamos saldo pessoal — ele está congelado
-  // e não vai ser usado. O check real acontece no backend.
-  const insufficient = !orgPays && balance !== null && balance < estimate;
+  // Só bloqueamos por saldo quando temos os dois números: estimativa
+  // confirmada (não nula) e saldo pessoal (não em modo institucional).
+  // Estimativa carregando ou indisponível → libera, backend pega.
+  const insufficient =
+    !orgPays && balance !== null && estimate !== null && balance < estimate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,8 +89,8 @@ export function GenerateConfirmDialog({
         <DialogHeader>
           <DialogTitle>Confirmar geração</DialogTitle>
           <DialogDescription>
-            Estimativa antes de chamar a IA. O débito final usa os tokens de
-            fato consumidos — pode variar um pouco.
+            Estimativa pré-cálculo. O custo final pode variar um pouco
+            conforme o tamanho do material e a profundidade das respostas.
           </DialogDescription>
         </DialogHeader>
 
@@ -88,10 +100,10 @@ export function GenerateConfirmDialog({
               Custo estimado
             </div>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-2xl font-medium tabular-nums text-ink">
-                ~{estimate}
-              </span>
-              <span className="text-xs text-gray-500">créditos</span>
+              <CostValue
+                estimate={estimate}
+                loading={estimateLoading}
+              />
             </div>
           </div>
           {orgPays ? (
@@ -123,7 +135,7 @@ export function GenerateConfirmDialog({
           )}
         </div>
 
-        {insufficient && (
+        {insufficient && estimate !== null && (
           <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <div>
@@ -131,6 +143,19 @@ export function GenerateConfirmDialog({
               <div className="mt-0.5 text-amber-700">
                 Você precisa de pelo menos {estimate} créditos pra gerar essa
                 prova.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!estimateLoading && estimate === null && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-[13px] text-gray-700">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-gray-500" />
+            <div>
+              <div className="font-medium">Estimativa indisponível</div>
+              <div className="mt-0.5 text-gray-600">
+                Não conseguimos pré-calcular o custo. Você ainda pode gerar
+                — o débito real usa os créditos de fato consumidos.
               </div>
             </div>
           </div>
@@ -155,12 +180,17 @@ export function GenerateConfirmDialog({
                 type="button"
                 variant="primary"
                 size="md"
+                disabled={estimateLoading}
                 onClick={() => {
                   onOpenChange(false);
                   void onConfirm();
                 }}
               >
-                <Sparkles className="size-4" strokeWidth={2.5} />
+                {estimateLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" strokeWidth={2.5} />
+                )}
                 Gerar
               </Button>
             </>
@@ -171,15 +201,37 @@ export function GenerateConfirmDialog({
   );
 }
 
-/**
- * Aproximação client-side da fórmula do backend. Overestima pra o dialog
- * não parecer otimista demais e o usuário se surpreender com o débito real.
- */
-export function estimateCreditsClient(input: {
-  materialChars: number;
-  questionCount: number;
-}): number {
-  const inputTokens = Math.ceil(input.materialChars / 4);
-  const outputTokens = input.questionCount * 150;
-  return Math.max(1, Math.ceil((inputTokens + outputTokens) / 100));
+function CostValue({
+  estimate,
+  loading,
+}: {
+  estimate: number | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <span className="inline-flex items-center gap-2 text-2xl font-medium tabular-nums text-gray-400">
+        <Loader2 className="size-4 animate-spin" />
+        calculando…
+      </span>
+    );
+  }
+  if (estimate === null) {
+    return (
+      <>
+        <span className="text-2xl font-medium tabular-nums text-gray-400">
+          —
+        </span>
+        <span className="text-xs text-gray-500">créditos</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="text-2xl font-medium tabular-nums text-ink">
+        ~{estimate}
+      </span>
+      <span className="text-xs text-gray-500">créditos</span>
+    </>
+  );
 }

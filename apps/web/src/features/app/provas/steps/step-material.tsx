@@ -25,7 +25,7 @@ export function StepMaterial({ classId }: StepMaterialProps) {
   const setStep = useWizardStore((s) => s.setStep);
 
   const canProceed = canProceedToConfig({ files, pastedText, youtubeUrls });
-  const approxTokens = estimateTokens(files, pastedText);
+  const summary = buildSummary(files, pastedText, youtubeUrls);
 
   return (
     <div className="flex flex-col gap-8">
@@ -75,10 +75,10 @@ export function StepMaterial({ classId }: StepMaterialProps) {
               Cancelar
             </Link>
           </Button>
-          {canProceed && approxTokens > 0 && (
+          {canProceed && summary && (
             <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 font-medium text-gray-600">
               <FileText className="size-3" />
-              ~{formatNumber(approxTokens)} tokens
+              {summary}
             </span>
           )}
         </div>
@@ -97,14 +97,28 @@ export function StepMaterial({ classId }: StepMaterialProps) {
   );
 }
 
-function estimateTokens(files: File[], pastedText: string): number {
-  // Estimativa leve só pra display — ~4 bytes/token em português.
-  // YouTube fica fora porque transcrição é baixada só na hora de gerar.
-  const fileBytes = files.reduce((acc, f) => acc + f.size, 0);
-  const pastedBytes = new Blob([pastedText]).size;
-  return Math.round((fileBytes + pastedBytes) / 4);
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("pt-BR");
+// Resumo neutro — sem fingir contar tokens. Antes da extração no servidor
+// não há como estimar texto a partir de bytes do PDF (binário comprimido).
+// O custo real aparece no confirm dialog, calculado server-side.
+function buildSummary(
+  files: File[],
+  pastedText: string,
+  youtubeUrls: string[],
+): string | null {
+  const parts: string[] = [];
+  if (files.length > 0) {
+    parts.push(`${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}`);
+  }
+  if (youtubeUrls.length > 0) {
+    parts.push(
+      `${youtubeUrls.length} ${youtubeUrls.length === 1 ? "vídeo" : "vídeos"}`,
+    );
+  }
+  const pastedChars = pastedText.trim().length;
+  if (pastedChars > 0) {
+    parts.push(
+      `${pastedChars.toLocaleString("pt-BR")} ${pastedChars === 1 ? "char" : "chars"} colados`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

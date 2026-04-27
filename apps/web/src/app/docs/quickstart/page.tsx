@@ -1,123 +1,123 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { Eyebrow } from "@/features/marketing/components/eyebrow";
 import { CodeBlock } from "@/features/docs/components/code-block";
 import { Callout } from "@/features/docs/components/callout";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Quickstart" };
+
+interface Step {
+  title: string;
+  body: React.ReactNode;
+}
 
 export default function QuickstartPage() {
   return (
     <main className="flex-1 px-6 py-10 md:px-12 md:py-14">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
-        <header className="hero-aura-analytics flex flex-col gap-4 border-b border-gray-100 pb-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-12">
+        <header className="flex flex-col gap-4 border-b border-gray-100 pb-10">
           <Eyebrow>Quickstart</Eyebrow>
-          <h1 className="text-4xl font-medium leading-[1.05] tracking-tighter text-ink md:text-[2.75rem]">
+          <h1 className="text-4xl font-medium leading-[1.02] tracking-tighter text-ink md:text-[3rem]">
             Da conta à primeira{" "}
             <span className="font-serif font-normal italic text-analytics-primary">
               chamada
             </span>
           </h1>
           <p className="max-w-2xl text-[15px] leading-relaxed text-gray-500">
-            Cinco passos pra sair do zero e ter uma resposta com dados
-            reais da sua instituição. Tempo esperado: 5 minutos.
+            Quatro passos pra sair do zero e ter uma resposta com dados
+            reais da sua instituição.
           </p>
         </header>
 
-        <Step
-          number={1}
-          title="Crie uma conta institucional"
-          description={
-            <p>
-              Se sua instituição ainda não tem conta na Lucida, comece
-              por{" "}
-              <Link
-                href="/organizacoes/entrar"
-                className="text-analytics-primary underline underline-offset-2 hover:text-analytics-dark-01"
-              >
-                Organizações · Entrar
-              </Link>
-              . Você precisa ser o <strong className="text-ink">owner</strong>{" "}
-              ou <strong className="text-ink">admin</strong> da organização
-              pra conseguir gerar chaves.
-            </p>
-          }
-        />
+        <Timeline steps={STEPS} />
+      </div>
+    </main>
+  );
+}
 
-        <Step
-          number={2}
-          title="Gere uma chave de API"
-          description={
-            <>
-              <p className="mb-3">
-                No painel institucional, vá em{" "}
-                <Link
-                  href="/analytics/desenvolvedores"
-                  className="text-analytics-primary underline underline-offset-2 hover:text-analytics-dark-01"
-                >
-                  Analytics → Desenvolvedores
-                </Link>{" "}
-                e clique em <strong className="text-ink">Nova chave</strong>.
-                Escolha:
-              </p>
-              <ul className="ml-4 flex list-disc flex-col gap-1.5 text-[13px]">
-                <li>
-                  <strong className="text-ink">Nome</strong>: identifica
-                  onde a chave é usada (ex.: "SIS Totvs", "CRM HubSpot").
-                </li>
-                <li>
-                  <strong className="text-ink">Ambiente</strong>:{" "}
-                  <code>test</code> pra explorar sem consumir créditos;{" "}
-                  <code>live</code> pra produção.
-                </li>
-                <li>
-                  <strong className="text-ink">Escopos</strong>: marque só
-                  o necessário (princípio do menor privilégio).
-                </li>
-              </ul>
-              <Callout tone="warning" className="mt-4">
-                A chave é exibida <strong>uma única vez</strong> logo após
-                a criação. Copie e guarde em um vault ou variável de
-                ambiente — nunca commit em repositório.
-              </Callout>
-            </>
-          }
-        />
-
-        <Step
-          number={3}
-          title="Faça a primeira chamada"
-          description={
-            <>
-              <p className="mb-3">
-                Substitua{" "}
-                <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[12px]">
-                  SEU_TOKEN
-                </code>{" "}
-                pela chave que você acabou de gerar:
-              </p>
-              <CodeBlock
-                language="curl"
-                code={`curl https://api.lucida.com.br/v1/public/classes \\
+const STEPS: Step[] = [
+  {
+    title: "Crie uma conta institucional",
+    body: (
+      <p>
+        Se sua instituição ainda não tem conta na Lucida, comece por{" "}
+        <Link
+          href="/organizacoes/entrar"
+          className="text-analytics-primary underline underline-offset-2 hover:text-analytics-dark-01"
+        >
+          Organizações · Entrar
+        </Link>
+        . Você precisa ser o <strong className="text-ink">owner</strong> ou{" "}
+        <strong className="text-ink">admin</strong> da organização pra
+        conseguir gerar chaves.
+      </p>
+    ),
+  },
+  {
+    title: "Gere uma chave de API",
+    body: (
+      <>
+        <p>
+          No painel institucional, vá em{" "}
+          <Link
+            href="/analytics/desenvolvedores"
+            className="text-analytics-primary underline underline-offset-2 hover:text-analytics-dark-01"
+          >
+            Analytics → Desenvolvedores
+          </Link>{" "}
+          e clique em <strong className="text-ink">Nova chave</strong>. Escolha:
+        </p>
+        <ul>
+          <li>
+            <strong className="text-ink">Nome</strong>: identifica onde a
+            chave é usada (ex.: "SIS Totvs", "CRM HubSpot").
+          </li>
+          <li>
+            <strong className="text-ink">Ambiente</strong>: <code>test</code>{" "}
+            pra explorar sem consumir créditos; <code>live</code> pra
+            produção.
+          </li>
+          <li>
+            <strong className="text-ink">Escopos</strong>: marque só o
+            necessário (princípio do menor privilégio).
+          </li>
+        </ul>
+        <Callout tone="warning">
+          A chave é exibida <strong>uma única vez</strong> logo após a
+          criação. Copie e guarde em um vault ou variável de ambiente —
+          nunca commit em repositório.
+        </Callout>
+      </>
+    ),
+  },
+  {
+    title: "Faça a primeira chamada",
+    body: (
+      <>
+        <p>
+          Substitua <code>SEU_TOKEN</code> pela chave que você acabou de
+          gerar:
+        </p>
+        <CodeBlock
+          language="curl"
+          code={`curl https://api.lucida.com.br/v1/public/classes \\
   -H "Authorization: Bearer SEU_TOKEN"`}
-              />
-            </>
-          }
         />
-
-        <Step
-          number={4}
-          title="Confira a resposta"
-          description={
-            <>
-              <p className="mb-3">
-                Em sucesso, a API devolve <code>200 OK</code> com um
-                array de turmas dentro de <code>data</code>:
-              </p>
-              <CodeBlock
-                language="json"
-                code={`{
+      </>
+    ),
+  },
+  {
+    title: "Confira a resposta",
+    body: (
+      <>
+        <p>
+          Em sucesso, a API devolve <code>200 OK</code> com um array de
+          turmas dentro de <code>data</code>:
+        </p>
+        <CodeBlock
+          language="json"
+          code={`{
   "data": [
     {
       "id": "cls_01HZX9FBTY8PV6K4G7M2W3RN8A",
@@ -132,92 +132,86 @@ export default function QuickstartPage() {
     "hasMore": false
   }
 }`}
-              />
-              <p className="mt-4 text-[13px] text-gray-500">
-                Se receber <code>401</code>, revise o header{" "}
-                <code>Authorization</code>. Se <code>403</code>, a chave
-                não tem o escopo <code>classes:read</code>.
-              </p>
-            </>
-          }
         />
+        <p>
+          Se receber <code>401</code>, revise o header{" "}
+          <code>Authorization</code>. Se <code>403</code>, a chave não tem
+          o escopo <code>classes:read</code>.
+        </p>
+      </>
+    ),
+  },
+];
 
-        <Step
-          number={5}
-          title="Próximos passos"
-          description={
-            <div className="grid gap-3 md:grid-cols-2">
-              <NextCard
-                href="/docs/autenticacao"
-                title="Autenticação"
-                description="Formatos, live vs test, escopos e boas práticas."
-              />
-              <NextCard
-                href="/docs/api/turmas"
-                title="Referência — Turmas"
-                description="Todos os parâmetros, tipos e respostas."
-              />
-              <NextCard
-                href="/docs/webhooks"
-                title="Webhooks"
-                description="Receba eventos em tempo real — não faça polling."
-              />
-              <NextCard
-                href="/docs/erros"
-                title="Erros"
-                description="Lista de códigos e como tratar cada um."
-              />
-            </div>
-          }
-        />
-      </div>
-    </main>
+/**
+ * Timeline com track vertical conectando os nós numerados. Cada step
+ * tem uma "bolinha" alinhada com seu heading + uma linha vertical que
+ * desce até a próxima — desenha uma trilha visual de progresso.
+ *
+ * Implementação:
+ *  - O <ol> tem `relative` pra ancorar a track.
+ *  - Cada <li> é grid `[40px_1fr]` (gutter pra coluna do nó).
+ *  - A track é um pseudo-element absolute na primeira coluna, com
+ *    `top` e `bottom` pra começar/terminar exatamente nas bolinhas
+ *    extremas (não atravessar a bolinha do primeiro/último).
+ *  - Os nós ficam `z-10` por cima da track.
+ */
+function Timeline({ steps }: { steps: Step[] }) {
+  return (
+    <ol className="relative flex flex-col gap-12">
+      {/* Track vertical — começa na metade da primeira bolinha,
+          termina na metade da última (top=20px, bottom: depende do
+          último). Usamos `inset-y-5` que mantém esse padding em
+          ambas pontas pra um track simétrico. */}
+      <span
+        aria-hidden
+        className="absolute left-[19px] top-5 bottom-5 w-px bg-gradient-to-b from-analytics-primary/30 via-gray-200 to-gray-100"
+      />
+
+      {steps.map((step, idx) => (
+        <li
+          key={step.title}
+          className="relative grid grid-cols-[40px_minmax(0,1fr)] gap-6"
+        >
+          <StepNode index={idx + 1} />
+          <StepBody title={step.title}>{step.body}</StepBody>
+        </li>
+      ))}
+    </ol>
   );
 }
 
-function Step({
-  number,
-  title,
-  description,
-}: {
-  number: number;
-  title: string;
-  description: React.ReactNode;
-}) {
+function StepNode({ index }: { index: number }) {
   return (
-    <section className="flex gap-5">
-      <div className="grid size-9 shrink-0 place-items-center rounded-full bg-analytics-primary/10 font-mono text-[13px] font-semibold text-analytics-primary">
-        {number}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <h2 className="text-xl font-medium text-ink">{title}</h2>
-        <div className="text-[14px] leading-relaxed text-gray-600 [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px]">
-          {description}
-        </div>
-      </div>
-    </section>
+    <div className="relative z-10 flex items-start justify-center">
+      <span
+        className={cn(
+          "grid size-10 place-items-center rounded-full border bg-white",
+          "border-analytics-primary/20 text-analytics-primary",
+          "shadow-[0_0_0_4px_rgb(255_255_255)]",
+        )}
+      >
+        <span className="font-serif text-lg italic leading-none">{index}</span>
+      </span>
+    </div>
   );
 }
 
-function NextCard({
-  href,
+function StepBody({
   title,
-  description,
+  children,
 }: {
-  href: string;
   title: string;
-  description: string;
+  children: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="group flex flex-col gap-1 rounded-xl border border-gray-100 bg-white p-4 transition-colors hover:border-gray-200 hover:bg-gray-50/40"
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-medium text-ink">{title}</h3>
-        <ArrowRight className="size-3.5 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+    <div className="flex min-w-0 flex-col gap-3 pt-1.5">
+      <h2 className="text-[1.35rem] font-medium tracking-tight text-ink">
+        {title}
+      </h2>
+      <div className="flex flex-col gap-3 text-[14px] leading-relaxed text-gray-600 [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_p]:m-0 [&_strong]:font-medium [&_strong]:text-ink [&_ul]:ml-4 [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5">
+        {children}
       </div>
-      <p className="text-[12.5px] text-gray-500">{description}</p>
-    </Link>
+    </div>
   );
 }

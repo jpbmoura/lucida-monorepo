@@ -37,6 +37,12 @@ interface WizardState {
   removeYoutubeUrl: (index: number) => void;
   setConfig: (patch: Partial<WizardConfig>) => void;
   setGenerationResult: (questions: GeneratedQuestion[], usage: GenerationUsage) => void;
+  /**
+   * Acumula consumo no `usage` existente (regenerar uma questão soma seus
+   * créditos/tokens ao total da geração inicial). Idempotência fica por
+   * conta do caller — só chamamos quando a API retornou sucesso.
+   */
+  addUsage: (delta: GenerationUsage) => void;
   setGenerationError: (error: string | null) => void;
   updateQuestion: (index: number, patch: Partial<GeneratedQuestion>) => void;
   replaceQuestion: (index: number, question: GeneratedQuestion) => void;
@@ -141,6 +147,17 @@ export const useWizardStore = create<WizardState>((set) => ({
       generationError: null,
       step: "review",
     }),
+
+  addUsage: (delta) =>
+    set((s) => ({
+      usage: s.usage
+        ? {
+            inputTokens: s.usage.inputTokens + delta.inputTokens,
+            outputTokens: s.usage.outputTokens + delta.outputTokens,
+            credits: s.usage.credits + delta.credits,
+          }
+        : delta,
+    })),
 
   setGenerationError: (error) =>
     set({

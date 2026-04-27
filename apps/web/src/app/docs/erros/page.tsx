@@ -119,7 +119,7 @@ const STATUS_CODES: StatusCode[] = [
 export default function ErrosPage() {
   return (
     <PageWithToc tocItems={TOC}>
-        <header className="hero-aura-analytics flex flex-col gap-4 border-b border-gray-100 pb-8">
+        <header className="flex flex-col gap-4 border-b border-gray-100 pb-8">
           <Eyebrow>Fundamentos</Eyebrow>
           <h1 className="text-4xl font-medium leading-[1.05] tracking-tighter text-ink md:text-[2.75rem]">
             Códigos e{" "}

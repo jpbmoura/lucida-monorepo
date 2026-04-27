@@ -1,20 +1,31 @@
 import type { RequestHandler } from "express";
 import {
   beginExamBody,
+  beginExamFromTokenBody,
   examIdParam,
   shareIdParam,
   submitExamBody,
 } from "./submission-schemas.js";
 import type { GetPublicExamUseCase } from "../application/get-public-exam.js";
 import type { BeginExamUseCase } from "../application/begin-exam.js";
+import type { BeginExamFromTokenUseCase } from "../application/begin-exam-from-token.js";
+import type { ResolveExamLinkTokenUseCase } from "../application/resolve-exam-link-token.js";
 import type { SubmitExamUseCase } from "../application/submit-exam.js";
 import type { ListSubmissionsByExamUseCase } from "../application/list-submissions-by-exam.js";
 
 interface Deps {
   getPublicExam: GetPublicExamUseCase;
   beginExam: BeginExamUseCase;
+  beginExamFromToken: BeginExamFromTokenUseCase;
+  resolveExamLinkToken: ResolveExamLinkTokenUseCase;
   submitExam: SubmitExamUseCase;
   listSubmissionsByExam: ListSubmissionsByExamUseCase;
+  /**
+   * Secret usado pra verificar a assinatura do token. Vem do
+   * `AUTH_SECRET` do api — controller é instanciado pelo composition
+   * root que sabe disso.
+   */
+  authSecret: string;
 }
 
 export class SubmissionController {
@@ -39,6 +50,36 @@ export class SubmissionController {
       const data = await this.deps.beginExam.execute({
         shareId,
         studentCode: body.studentCode,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resolveToken: RequestHandler = async (req, res, next) => {
+    try {
+      const { shareId } = shareIdParam.parse(req.params);
+      const token = typeof req.query.token === "string" ? req.query.token : "";
+      const data = await this.deps.resolveExamLinkToken.execute({
+        shareId,
+        token,
+        authSecret: this.deps.authSecret,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  beginFromToken: RequestHandler = async (req, res, next) => {
+    try {
+      const { shareId } = shareIdParam.parse(req.params);
+      const body = beginExamFromTokenBody.parse(req.body);
+      const data = await this.deps.beginExamFromToken.execute({
+        shareId,
+        token: body.token,
+        authSecret: this.deps.authSecret,
       });
       res.json({ data });
     } catch (err) {

@@ -32,5 +32,14 @@ export function makeAiRouter({
     upload.array("files"),
     controller.regenerateQuestion,
   );
+  // Pré-extrai material e devolve estimativa exata (mesma fórmula do
+  // pre-check do generate). Frontend usa pra mostrar custo confiável no
+  // confirm dialog. Sem chamada à OpenAI, sem débito.
+  router.post(
+    "/v1/ai/estimate",
+    requireAuth,
+    upload.array("files"),
+    controller.estimateExam,
+  );
   return router;
 }

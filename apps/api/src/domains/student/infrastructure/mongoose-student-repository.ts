@@ -17,6 +17,7 @@ export class MongooseStudentRepository implements StudentRepository {
         $set: {
           classId: student.classId,
           ownerId: student.ownerId,
+          organizationId: student.organizationId,
           code: student.code.toString(),
           name: student.name,
           matricula: student.matricula,
@@ -78,6 +79,50 @@ export class MongooseStudentRepository implements StudentRepository {
     }).exec();
     return doc !== null;
   }
+
+  async existsByOrganizationAndMatricula(
+    organizationId: string,
+    matricula: string,
+  ): Promise<boolean> {
+    const doc = await StudentModel.exists({
+      organizationId,
+      matricula,
+    }).exec();
+    return doc !== null;
+  }
+
+  async existsByOrganizationAndMatriculaExcluding(
+    organizationId: string,
+    matricula: string,
+    excludeId: StudentId,
+  ): Promise<boolean> {
+    const doc = await StudentModel.exists({
+      organizationId,
+      matricula,
+      _id: { $ne: excludeId.toString() },
+    }).exec();
+    return doc !== null;
+  }
+
+  async findByOrganizationAndMatricula(
+    organizationId: string,
+    matricula: string,
+  ): Promise<Student | null> {
+    const doc = await StudentModel.findOne({ organizationId, matricula })
+      .lean<StudentDoc>()
+      .exec();
+    return doc ? toEntity(doc) : null;
+  }
+
+  async findByOwnerAndMatricula(
+    ownerId: string,
+    matricula: string,
+  ): Promise<Student | null> {
+    const doc = await StudentModel.findOne({ ownerId, matricula })
+      .lean<StudentDoc>()
+      .exec();
+    return doc ? toEntity(doc) : null;
+  }
 }
 
 function toEntity(doc: StudentDoc): Student {
@@ -85,6 +130,7 @@ function toEntity(doc: StudentDoc): Student {
     id: StudentId.of(doc._id),
     classId: doc.classId,
     ownerId: doc.ownerId,
+    organizationId: doc.organizationId ?? null,
     code: StudentCode.of(doc.code),
     name: doc.name,
     matricula: doc.matricula,

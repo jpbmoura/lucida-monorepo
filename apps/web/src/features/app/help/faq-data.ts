@@ -17,7 +17,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "O que são créditos e como funcionam?",
     answer:
-      "Cada ação de IA (gerar prova, regenerar questão) consome créditos proporcionais à complexidade — 1 crédito equivale a 100 tokens processados. Você recebe créditos todo mês com a assinatura, pode comprar pacotes avulsos e ganha um bônus de boas-vindas no cadastro. Veja saldo e histórico em “Saldo e assinatura”.",
+      "Créditos são a unidade de uso das ferramentas de IA da Lucida. Cada ação consome créditos proporcionais ao tamanho do material e à complexidade — uma prova de 10 questões custa em média ~700 créditos, regerar uma questão custa ~70. Você recebe créditos todo mês com a assinatura, pode comprar pacotes avulsos e ganha um bônus de boas-vindas no cadastro. Veja saldo e histórico em “Saldo e assinatura”.",
   },
   {
     question: "Como compartilho uma prova com meus alunos?",

@@ -187,30 +187,6 @@
   animation: pulse-ring-analytics 2s ease-in-out infinite;
 }
 
-/* ───────── Hero gradient (Analytics/docs) ─────────
- * Aura sutil de luz roxa que entra pelo topo, some gradualmente. Usado
- * como `background` em headers de página nas docs e no dashboard de
- * instituição — quebra o branco puro sem concorrer com o conteúdo.
- * Implementado como pseudo-element pra não exigir um wrapper extra. */
-.hero-aura-analytics {
-  position: relative;
-  isolation: isolate;
-}
-.hero-aura-analytics::before {
-  content: "";
-  position: absolute;
-  inset: -4rem -4rem auto -4rem;
-  height: 22rem;
-  background: radial-gradient(
-    ellipse 60% 100% at 50% 0%,
-    rgb(108 60 251 / 0.14),
-    rgb(108 60 251 / 0.04) 40%,
-    transparent 70%
-  );
-  pointer-events: none;
-  z-index: -1;
-}
-
 /* Scrollbar fina + discreta — aplicado em areas scrolláveis das docs. */
 .scrollbar-thin {
   scrollbar-width: thin;

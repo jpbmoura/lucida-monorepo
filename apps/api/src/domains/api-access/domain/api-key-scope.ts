@@ -1,10 +1,11 @@
 /**
  * Permissões de uma API key. Cada escopo cobre um par (recurso, verbo).
  * A chave carrega uma lista de escopos concedidos na criação — rotas
- * públicas (Fase B) validam presença antes de permitir a ação.
+ * públicas validam presença antes de permitir a ação.
  *
  * Novos escopos podem ser adicionados sem migração: chaves existentes
- * simplesmente não ganham o escopo novo até serem recriadas.
+ * simplesmente não ganham o escopo novo até serem recriadas. Escopos
+ * removidos viram no-op nas chaves antigas (não há rota pra honrá-los).
  */
 export type ApiKeyScope =
   | "classes:read"
@@ -12,8 +13,7 @@ export type ApiKeyScope =
   | "students:read"
   | "students:write"
   | "exams:read"
-  | "exams:write"
-  | "submissions:read"
+  | "exams:share"
   | "webhooks:manage";
 
 export const ALL_API_KEY_SCOPES: readonly ApiKeyScope[] = [
@@ -22,8 +22,7 @@ export const ALL_API_KEY_SCOPES: readonly ApiKeyScope[] = [
   "students:read",
   "students:write",
   "exams:read",
-  "exams:write",
-  "submissions:read",
+  "exams:share",
   "webhooks:manage",
 ] as const;
 

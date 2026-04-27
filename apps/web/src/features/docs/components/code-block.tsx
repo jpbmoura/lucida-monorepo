@@ -62,13 +62,19 @@ export async function CodeBlock({
         //   - padding pra bater com o design
         //   - font via --font-mono (JetBrains Mono)
         //   - rolagem horizontal
+        //
+        // Defesa: o `<code>` interno é zerado (bg/padding/border) pra
+        // não herdar estilos de `[&_code]:bg-...` que pais usam pra
+        // estilar code inline em prosa. Sem isso, o gray-100 inline
+        // vaza por cima do tema escuro (mancha branca atrás dos tokens).
         className={cn(
           "font-mono text-[12.5px] leading-relaxed",
-          "[&_pre]:!bg-transparent [&_pre]:overflow-x-auto [&_pre]:px-4 [&_pre]:py-3.5",
+          "[&_pre]:bg-transparent! [&_pre]:overflow-x-auto [&_pre]:px-4 [&_pre]:py-3.5",
+          "[&_pre_code]:bg-transparent! [&_pre_code]:p-0! [&_pre_code]:rounded-none! [&_pre_code]:text-inherit!",
           // Shiki aplica `color` inline em cada <span>; só precisamos
           // garantir que o texto sem span (edge case) herde claro.
           "[&_pre]:text-white/90",
-          scrollable && "max-h-[480px] overflow-y-auto",
+          scrollable && "max-h-120 overflow-y-auto",
         )}
         dangerouslySetInnerHTML={{ __html: html }}
       />

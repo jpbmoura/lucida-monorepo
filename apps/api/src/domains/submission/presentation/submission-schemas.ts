@@ -7,6 +7,11 @@ export const beginExamBody = z.object({
   studentCode: z.string().regex(/^[0-9]{7}$/, "Código precisa ter 7 dígitos."),
 });
 
+export const beginExamFromTokenBody = z.object({
+  /** Token assinado emitido por POST /v1/public/exams/:id/share-link. */
+  token: z.string().min(1),
+});
+
 const integrityFlagsSchema = z
   .object({
     tabSwitches: z.number().int().nonnegative().default(0),

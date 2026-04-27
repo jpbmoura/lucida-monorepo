@@ -5,7 +5,7 @@ export function buildOutputContract(spec: StyleSpec): string {
   const contextField =
     spec.contextPolicy === "required"
       ? `"context" é OBRIGATÓRIO (veja a seção ESTILO deste prompt).`
-      : `"context" DEVE SER null (este estilo não usa contexto).`;
+      : `"context" DEVE SER string vazia "" (este estilo não usa contexto).`;
 
   return `Retorne JSON no formato EXATO:
 {
@@ -13,7 +13,7 @@ export function buildOutputContract(spec: StyleSpec): string {
     {
       "type": "multipleChoice" | "trueFalse",
       "statement": "enunciado da questão",
-      "context": "contexto quando aplicável, senão null",
+      "context": "contexto quando aplicável, senão string vazia",
       "options": ["opção 1", "opção 2", ...],
       "correctAnswer": 0,
       "explanation": "por que a correta é correta",

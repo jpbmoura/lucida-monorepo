@@ -5,8 +5,12 @@ import {
   type KintalSidebarNavItem,
 } from "./sidebar-nav";
 
-const VISAO_GERAL: KintalSidebarNavItem[] = [
+// Itens "soltos" — sem header de grupo, posicionados no topo da sidebar.
+// Dashboard e Roadmap ficam fora dos grupos por serem páginas de uso
+// frequente e independentes de qualquer área (financeiro/comercial/etc.).
+const SOLO: KintalSidebarNavItem[] = [
   { label: "Dashboard", href: "/kintal", icon: "layout" },
+  { label: "Roadmap", href: "/roadmap", icon: "map" },
 ];
 
 const FINANCEIRO: KintalSidebarNavItem[] = [
@@ -28,6 +32,8 @@ const ATENDIMENTO: KintalSidebarNavItem[] = [
 ];
 
 const OPERACOES: KintalSidebarNavItem[] = [
+  { label: "Board", href: "/kintal/board", icon: "board" },
+  { label: "Usuários", href: "/kintal/usuarios", icon: "users" },
   { label: "Exames", icon: "ops", disabled: true },
   { label: "Integrações", icon: "ops", disabled: true },
 ];
@@ -51,7 +57,7 @@ export function KintalSidebar() {
       </Link>
 
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto">
-        <Section label="Visão geral" items={VISAO_GERAL} />
+        <KintalSidebarNav items={SOLO} />
         <Section label="Financeiro" items={FINANCEIRO} />
         <Section label="Comercial" items={COMERCIAL} />
         <Section label="Atendimento" items={ATENDIMENTO} />

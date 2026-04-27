@@ -67,7 +67,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     creditsPerCycle: 60_000,
     cycleDurationDays: 365,
     marketingHighlights: [
-      "60.000 créditos no ano (~5.000/mês)",
+      "60.000 créditos no ano",
       "Economia de 20% vs mensal",
       "Alunos e provas ilimitados",
       "Suporte padrão",
@@ -99,7 +99,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     creditsPerCycle: 180_000,
     cycleDurationDays: 365,
     marketingHighlights: [
-      "180.000 créditos no ano (~15.000/mês)",
+      "180.000 créditos no ano",
       "Economia de 20% vs mensal",
       "Alunos e provas ilimitados",
       "Suporte prioritário",

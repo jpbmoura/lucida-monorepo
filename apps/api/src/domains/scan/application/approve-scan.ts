@@ -3,6 +3,7 @@ import { ExamNotFoundError } from "@/domains/exam/domain/exam-errors.js";
 import type { ExamRepository } from "@/domains/exam/domain/exam-repository.js";
 import { Submission } from "@/domains/submission/domain/submission.js";
 import type { SubmissionRepository } from "@/domains/submission/domain/submission-repository.js";
+import type { SubmissionEventDispatcher } from "@/domains/submission/application/submit-exam.js";
 import type { ScanRepository } from "../domain/scan-repository.js";
 import { ScanId } from "../domain/scan-id.js";
 import {
@@ -27,6 +28,8 @@ export class ApproveScanUseCase {
     private readonly exams: ExamRepository,
     private readonly scans: ScanRepository,
     private readonly submissions: SubmissionRepository,
+    /** Opcional — dispara webhook `submission.completed` ao aprovar. */
+    private readonly dispatcher?: SubmissionEventDispatcher,
   ) {}
 
   async execute(input: Input): Promise<void> {
@@ -81,6 +84,12 @@ export class ApproveScanUseCase {
     });
 
     await this.submissions.save(submission);
+
+    // Fire-and-forget — não bloqueia a aprovação se o endpoint do
+    // parceiro estiver lento.
+    if (this.dispatcher) {
+      this.dispatcher.dispatch(submission).catch(() => undefined);
+    }
 
     scan.markApproved();
     await this.scans.save(scan);

@@ -11,6 +11,7 @@ const PRODUCT = [
   { label: "Como funciona", href: "/#how-it-works" },
   { label: "Recursos", href: "/#features" },
   { label: "Preços", href: "/precos" },
+  { label: "Roadmap", href: "/roadmap" },
 ];
 
 const COMPANY = [

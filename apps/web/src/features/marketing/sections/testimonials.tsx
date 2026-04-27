@@ -21,21 +21,21 @@ const FEATURED: Testimonial = {
 const SECONDARY: Testimonial[] = [
   {
     quote:
-      "Ganhei horas toda semana. O que eu levava uma tarde inteira para montar, a Lulu entrega em minutos.",
-    name: "Ana Beatriz",
-    role: "Professora · Ensino Médio",
+      "Eu sempre quis aplicar simulado certinho na mentoria, mas a correção me travava. Testei a Lucida com uma turma piloto e na semana seguinte passei o curso inteiro pra cá.",
+    name: "Felipe Andrade",
+    role: "Infoprodutor · Mentoria de redação",
   },
   {
     quote:
-      "A correção automática mudou o jogo para mim. Consigo dar feedback na hora para a turma.",
-    name: "Luís Henrique",
-    role: "Coordenador pedagógico",
+      "Antes eu chegava em casa na quinta sabendo que ia perder o sábado montando prova pra cada cursinho. Agora deixo tudo pronto no intervalo das aulas e nem penso mais nisso.",
+    name: "Marina Tavares",
+    role: "Professora · Pré-vestibular",
   },
   {
     quote:
-      "Uso a Lucida em todas as turmas do fundamental. Os pais percebem a diferença nos relatórios.",
-    name: "Ester Lima",
-    role: "Professora · Fundamental II",
+      "Uma das nossas professoras já usava por conta e veio me mostrar o que conseguia fazer com a ferramenta. Liberei numa unidade pra testar e em pouco tempo as outras coordenações vieram pedir.",
+    name: "Camila Resende",
+    role: "Diretora pedagógica · Rede de escolas",
   },
 ];
 

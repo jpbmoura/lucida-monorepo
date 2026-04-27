@@ -26,3 +26,21 @@ export class ClassDescriptionInvalidError extends DomainError {
     super(reason);
   }
 }
+
+export class ClassSubjectInvalidError extends DomainError {
+  readonly code = "CLASS_SUBJECT_INVALID";
+  readonly statusCode = 400;
+
+  constructor(reason: string) {
+    super(reason);
+  }
+}
+
+export class ClassGradeInvalidError extends DomainError {
+  readonly code = "CLASS_GRADE_INVALID";
+  readonly statusCode = 400;
+
+  constructor(reason: string) {
+    super(reason);
+  }
+}

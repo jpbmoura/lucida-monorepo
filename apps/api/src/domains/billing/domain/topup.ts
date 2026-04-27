@@ -28,7 +28,7 @@ export const TOPUPS: Record<TopupId, TopupDefinition> = {
     priceCents: 2990,
     currency: "BRL",
     credits: 2_000,
-    tagline: "~80 provas de 10 questões",
+    tagline: "~3 provas de 10 questões",
   },
   topup_5k: {
     id: "topup_5k",
@@ -36,16 +36,16 @@ export const TOPUPS: Record<TopupId, TopupDefinition> = {
     priceCents: 5990,
     currency: "BRL",
     credits: 5_000,
-    tagline: "~200 provas de 10 questões",
+    tagline: "~7 provas de 10 questões",
     highlight: "popular",
   },
   topup_15k: {
     id: "topup_15k",
     name: "Power",
-    priceCents: 13990,
+    priceCents: 14990,
     currency: "BRL",
     credits: 15_000,
-    tagline: "~600 provas de 10 questões",
+    tagline: "~21 provas de 10 questões",
     highlight: "best-value",
   },
 };

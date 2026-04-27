@@ -6,11 +6,12 @@ import { StepMaterial } from "./steps/step-material";
 import { StepConfig } from "./steps/step-config";
 import { StepGenerating } from "./steps/step-generating";
 import { StepReview } from "./steps/step-review";
-import type { GeneratedQuestion, GenerationResult } from "./types";
-import {
-  GenerateConfirmDialog,
-  estimateCreditsClient,
-} from "@/features/app/billing/components/generate-confirm-dialog";
+import type {
+  GeneratedQuestion,
+  GenerationResult,
+  GenerationUsage,
+} from "./types";
+import { GenerateConfirmDialog } from "@/features/app/billing/components/generate-confirm-dialog";
 import { notifyBalanceChanged } from "@/features/app/billing/components/balance-widget";
 
 interface WizardProps {
@@ -27,9 +28,12 @@ export function Wizard({ classId, turmaName }: WizardProps) {
   const setStep = useWizardStore((s) => s.setStep);
   const setGenerationResult = useWizardStore((s) => s.setGenerationResult);
   const setGenerationError = useWizardStore((s) => s.setGenerationError);
+  const addUsage = useWizardStore((s) => s.addUsage);
   const reset = useWizardStore((s) => s.reset);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [estimate, setEstimate] = useState<number | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -37,8 +41,42 @@ export function Wizard({ classId, turmaName }: WizardProps) {
     };
   }, [reset]);
 
+  // Dispara estimativa real (server-side) ao abrir o confirm. O backend
+  // extrai o material com os mesmos extractors do generate, então o número
+  // bate com o débito final dentro da margem de variação dos tokens da IA.
+  // Falha silenciosa: o dialog mostra "estimativa indisponível" e segue.
   function openConfirm() {
+    setEstimate(null);
+    setEstimateLoading(true);
     setConfirmOpen(true);
+
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    formData.append(
+      "config",
+      JSON.stringify({
+        questionCount: config.questionCount,
+        difficulty: config.difficulty,
+        style: config.style,
+        questionTypes: config.questionTypes,
+        pastedText,
+        youtubeUrls,
+      }),
+    );
+
+    fetch("/v1/ai/estimate", { method: "POST", body: formData })
+      .then(async (r) => {
+        if (!r.ok) return null;
+        const body = (await r.json()) as {
+          data?: { estimatedCredits?: number };
+        };
+        return body.data?.estimatedCredits ?? null;
+      })
+      .catch(() => null)
+      .then((value) => {
+        setEstimate(value);
+        setEstimateLoading(false);
+      });
   }
 
   async function doGenerate() {
@@ -129,22 +167,18 @@ export function Wizard({ classId, turmaName }: WizardProps) {
         }
         throw new Error(err?.message ?? "Falha ao regerar a questão.");
       }
+      // Backend devolve usage do regenerate junto da questão. Acumula no
+      // store pra o badge "X créditos usados" do step-review somar o custo
+      // total da geração + cada regeneração.
       const { data } = (await response.json()) as {
-        data: { question: GeneratedQuestion };
+        data: { question: GeneratedQuestion; usage: GenerationUsage };
       };
+      addUsage(data.usage);
       notifyBalanceChanged();
       return data.question;
     },
-    [files, pastedText, youtubeUrls, config],
+    [files, pastedText, youtubeUrls, config, addUsage],
   );
-
-  // Aproximação grosseira — apenas pra o diálogo. O check real é no backend.
-  const estimatedMaterialChars =
-    pastedText.length + files.reduce((sum, f) => sum + f.size, 0) / 3;
-  const estimate = estimateCreditsClient({
-    materialChars: estimatedMaterialChars,
-    questionCount: config.questionCount,
-  });
 
   // Review usa split view (questões + preview do aluno), precisa mais largura.
   // Os outros steps são forms estreitos.
@@ -170,6 +204,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         estimate={estimate}
+        estimateLoading={estimateLoading}
         onConfirm={doGenerate}
       />
     </div>

@@ -16,6 +16,9 @@
     "migrate:legacy-rename": "tsx scripts/rename-legacy-collections/index.ts",
     "migrate:billing-scope": "tsx scripts/migrate-billing-scope/index.ts",
     "seed:test-org": "tsx scripts/seed-test-org/index.ts",
+    "seed:roadmap": "tsx scripts/seed-roadmap/index.ts",
+    "backfill:student-org": "tsx scripts/backfill-student-org/index.ts",
+    "backfill:class-org": "tsx scripts/backfill-class-org/index.ts",
     "billing:add-org-credits": "tsx scripts/add-org-credits/index.ts"
   },
   "dependencies": {

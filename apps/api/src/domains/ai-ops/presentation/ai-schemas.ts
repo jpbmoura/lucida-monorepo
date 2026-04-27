@@ -23,7 +23,19 @@ export const regenerateQuestionConfigSchema = z.object({
   avoidStatements: z.array(z.string()).default([]),
 });
 
+// Mesmos campos do generate — precisa de style/difficulty/types pra
+// construir o prompt real e estimar tokens com precisão.
+export const estimateExamConfigSchema = z.object({
+  questionCount: z.coerce.number().int().min(1).max(50),
+  difficulty: z.enum(["fácil", "médio", "difícil", "misto"]),
+  style: z.enum(["simple", "contextual", "analytical", "reflective"]),
+  questionTypes: questionTypesSchema,
+  pastedText: z.string().optional(),
+  youtubeUrls: z.array(z.string().url()).optional(),
+});
+
 export type GenerateExamConfigInput = z.infer<typeof generateExamConfigSchema>;
 export type RegenerateQuestionConfigInput = z.infer<
   typeof regenerateQuestionConfigSchema
 >;
+export type EstimateExamConfigInput = z.infer<typeof estimateExamConfigSchema>;

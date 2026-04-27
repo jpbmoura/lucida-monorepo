@@ -54,10 +54,14 @@ export class RegenerateQuestionUseCase {
     );
 
     // Pré-check com margem. Regenerar 1 questão é barato mas ainda custa.
-    const material = sources.map((s) => s.text).join("\n\n");
+    // Usa o mesmo formato de material do generator pra estimativa bater.
+    const material = sources
+      .map((s) => `### ${s.sourceLabel}\n${s.text}`)
+      .join("\n\n");
     const estimate = estimateCreditsBeforeGeneration({
+      config: { ...input.config, questionCount: 1 },
       material,
-      expectedQuestionCount: 1,
+      avoidStatements: input.avoidStatements,
     });
     await this.billing.ensureSufficientBalance({
       userId: input.ownerId,

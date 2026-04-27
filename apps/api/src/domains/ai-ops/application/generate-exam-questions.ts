@@ -49,10 +49,14 @@ export class GenerateExamQuestionsUseCase {
 
     // Pré-check com margem de segurança (SAFETY_MARGIN lá dentro). Bloqueia
     // com 402 se o saldo não cobre um possível estouro do output da IA.
-    const material = sources.map((s) => s.text).join("\n\n");
+    // O material precisa do mesmo formato que o generator usa (### label\n
+    // text\n\n…) pra a estimativa de tokens bater com o que vai pra IA.
+    const material = sources
+      .map((s) => `### ${s.sourceLabel}\n${s.text}`)
+      .join("\n\n");
     const estimate = estimateCreditsBeforeGeneration({
+      config: input.config,
       material,
-      expectedQuestionCount: input.config.questionCount,
     });
     await this.billing.ensureSufficientBalance({
       userId: input.ownerId,

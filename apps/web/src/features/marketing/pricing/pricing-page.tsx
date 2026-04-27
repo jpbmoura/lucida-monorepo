@@ -298,11 +298,11 @@ function FAQ() {
   const items = [
     {
       q: "O que é um crédito?",
-      a: "Unidade de uso das ferramentas de IA. Cada ação consome créditos proporcionais ao tamanho do material e à complexidade. 1 crédito = 100 tokens processados.",
+      a: "Unidade de uso das ferramentas de IA. Cada ação consome créditos proporcionais ao tamanho do material e à complexidade — uma prova de 10 questões custa em média ~700 créditos, regerar uma questão custa ~70.",
     },
     {
       q: "Quantas provas faço com 5.000 créditos?",
-      a: "Em média ~200 provas de 10 questões. Varia conforme o tamanho do material enviado.",
+      a: "Cerca de 7 provas de 10 questões — equivalente a um mês de uso médio do plano Básico. Varia conforme o estilo (contextual consome mais que simples) e o tamanho do material enviado.",
     },
     {
       q: "Créditos acumulam entre meses?",

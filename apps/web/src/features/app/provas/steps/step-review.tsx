@@ -114,7 +114,7 @@ export function StepReview({ classId, onRegenerate }: StepReviewProps) {
         {usage && (
           <div className="mt-5 inline-flex items-center gap-2 rounded-pill bg-brand-primary/10 px-3 py-1.5 text-xs font-medium text-brand-primary">
             <Sparkles className="size-3.5" />
-            {usage.credits} créditos usados · {usage.inputTokens + usage.outputTokens} tokens
+            {usage.credits} {usage.credits === 1 ? "crédito usado" : "créditos usados"}
           </div>
         )}
       </header>

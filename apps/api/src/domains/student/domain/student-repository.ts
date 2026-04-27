@@ -7,6 +7,23 @@ export interface StudentRepository {
   save(student: Student): Promise<void>;
   findById(id: StudentId): Promise<Student | null>;
   findByClassId(classId: string): Promise<Student[]>;
+  /**
+   * Busca alunos da org pela matrícula. Usado pelo flow do link de prova
+   * (matrícula → studentId) quando `matriculaScope === "organization"`,
+   * e pra dedup em batch nesse mesmo modo.
+   */
+  findByOrganizationAndMatricula(
+    organizationId: string,
+    matricula: string,
+  ): Promise<Student | null>;
+  /**
+   * Busca alunos do professor pela matrícula. Usado pelo flow de link
+   * quando `matriculaScope === "teacher"`.
+   */
+  findByOwnerAndMatricula(
+    ownerId: string,
+    matricula: string,
+  ): Promise<Student | null>;
   countByClassId(classId: string): Promise<number>;
   delete(id: StudentId): Promise<void>;
   deleteByClassId(classId: string): Promise<void>;
@@ -14,6 +31,15 @@ export interface StudentRepository {
   existsByOwnerAndMatricula(ownerId: string, matricula: string): Promise<boolean>;
   existsByOwnerAndMatriculaExcluding(
     ownerId: string,
+    matricula: string,
+    excludeId: StudentId,
+  ): Promise<boolean>;
+  existsByOrganizationAndMatricula(
+    organizationId: string,
+    matricula: string,
+  ): Promise<boolean>;
+  existsByOrganizationAndMatriculaExcluding(
+    organizationId: string,
     matricula: string,
     excludeId: StudentId,
   ): Promise<boolean>;

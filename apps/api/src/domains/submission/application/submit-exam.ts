@@ -3,6 +3,7 @@ import type { SubmissionRepository } from "../domain/submission-repository.js";
 import { SubmissionId } from "../domain/submission-id.js";
 import type {
   IntegrityFlags,
+  Submission,
   SubmissionEndReason,
 } from "../domain/submission.js";
 import {
@@ -11,6 +12,16 @@ import {
   InvalidAnswersError,
   SubmissionSessionNotFoundError,
 } from "../domain/submission-errors.js";
+
+/**
+ * Hook fire-and-forget pra eventos de submissão. Implementação real é o
+ * `DispatchSubmissionCompletedUseCase` do domain `webhook-dispatch`. O
+ * use case fica desacoplado: aceita undefined em ambientes de teste/dev
+ * sem webhook. NÃO bloqueia a request — chame sem await.
+ */
+export interface SubmissionEventDispatcher {
+  dispatch(submission: Submission): Promise<void>;
+}
 
 // Grace de 30s pra compensar latência de rede no auto-submit quando o tempo estoura.
 const TIME_GRACE_SECONDS = 30;
@@ -45,6 +56,8 @@ export class SubmitExamUseCase {
   constructor(
     private readonly exams: ExamRepository,
     private readonly submissions: SubmissionRepository,
+    /** Opcional pra preservar testes existentes; em produção sempre wired. */
+    private readonly dispatcher?: SubmissionEventDispatcher,
   ) {}
 
   async execute(input: Input): Promise<SubmitExamOutput> {
@@ -88,6 +101,12 @@ export class SubmitExamUseCase {
     });
 
     await this.submissions.save(submission);
+
+    // Fire-and-forget: erros do dispatcher não devem afetar a resposta
+    // ao aluno. O dispatcher loga internamente.
+    if (this.dispatcher) {
+      this.dispatcher.dispatch(submission).catch(() => undefined);
+    }
 
     return {
       id: submission.id.toString(),

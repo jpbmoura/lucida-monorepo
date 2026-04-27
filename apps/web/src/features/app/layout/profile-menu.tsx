@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Map, Settings } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +70,15 @@ export function ProfileMenu({ name, email, initials }: ProfileMenuProps) {
               >
                 <Settings className="size-4" />
                 Configurações
+              </Link>
+              <Link
+                href="/roadmap"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-ink"
+              >
+                <Map className="size-4" />
+                Roadmap
               </Link>
               <button
                 type="button"

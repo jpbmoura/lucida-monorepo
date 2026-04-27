@@ -100,8 +100,9 @@ function BalanceHero({
           <span className="text-lg text-white/50">créditos</span>
         </div>
         <p className="mt-3 max-w-md text-[13px] text-white/60">
-          Cada 100 tokens processados pela IA = 1 crédito. Uma prova de 10
-          questões consome em média ~25 créditos.
+          Uma prova de 10 questões consome em média ~700 créditos. Regerar
+          uma questão custa ~70. Quanto maior e mais complexo o material,
+          mais créditos.
         </p>
       </div>
 
@@ -149,9 +150,6 @@ function LedgerTable({ items }: { items: LedgerItemDTO[] }) {
           <tr className="border-b border-gray-100 bg-gray-50/60 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500">
             <th className="px-5 py-2.5">Motivo</th>
             <th className="hidden px-5 py-2.5 md:table-cell">Origem</th>
-            <th className="hidden px-5 py-2.5 text-right md:table-cell">
-              Tokens
-            </th>
             <th className="px-5 py-2.5 text-right">Créditos</th>
             <th className="px-5 py-2.5 text-right">Quando</th>
           </tr>
@@ -195,9 +193,6 @@ function LedgerTable({ items }: { items: LedgerItemDTO[] }) {
               </td>
               <td className="hidden px-5 py-3 md:table-cell">
                 <SourceBadge source={item.walletSource as CreditSource} inline />
-              </td>
-              <td className="hidden px-5 py-3 text-right text-[11px] text-gray-500 tabular-nums md:table-cell">
-                {item.tokensUsed !== null ? item.tokensUsed.toLocaleString("pt-BR") : "—"}
               </td>
               <td className="px-5 py-3 text-right">
                 <span

@@ -14,6 +14,16 @@ export interface StudentProps {
   id: StudentId;
   classId: string;
   ownerId: string;
+  /**
+   * Organização à qual o aluno pertence. `null` pra contas individuais
+   * (professor sem org). Snapshot do momento da criação — não é
+   * recalculado se o professor mudar de org depois.
+   *
+   * Usado quando `OrganizationPreferences.matriculaScope === "organization"`
+   * pra garantir matrícula única em toda a org. Backfill via
+   * `scripts/backfill-student-org/`.
+   */
+  organizationId: string | null;
   code: StudentCode;
   name: string;
   matricula: string;
@@ -29,6 +39,7 @@ export class Student {
     id: StudentId;
     classId: string;
     ownerId: string;
+    organizationId?: string | null;
     code: StudentCode;
     name: string;
     matricula: string;
@@ -43,6 +54,7 @@ export class Student {
       id: input.id,
       classId: input.classId,
       ownerId: input.ownerId,
+      organizationId: input.organizationId ?? null,
       code: input.code,
       name,
       matricula,
@@ -64,6 +76,9 @@ export class Student {
   }
   get ownerId(): string {
     return this.props.ownerId;
+  }
+  get organizationId(): string | null {
+    return this.props.organizationId;
   }
   get code(): StudentCode {
     return this.props.code;

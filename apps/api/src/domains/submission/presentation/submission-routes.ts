@@ -10,7 +10,15 @@ export function makePublicSubmissionRouter({
 }): Router {
   const router = Router();
   router.get("/v1/public/exams/:shareId", controller.getPublicExam);
+  router.get(
+    "/v1/public/exams/:shareId/resolve-token",
+    controller.resolveToken,
+  );
   router.post("/v1/public/exams/:shareId/begin", controller.begin);
+  router.post(
+    "/v1/public/exams/:shareId/begin-from-token",
+    controller.beginFromToken,
+  );
   router.post("/v1/public/exams/:shareId/submissions", controller.submit);
   return router;
 }

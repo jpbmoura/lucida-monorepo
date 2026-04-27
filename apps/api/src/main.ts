@@ -11,6 +11,7 @@ import { createApp } from "@/app.js";
 import { createAuth } from "@/domains/iam/infrastructure/better-auth/auth.js";
 import { getAuthDb } from "@/domains/iam/infrastructure/better-auth/mongo-client.js";
 import { makeRequireAuth } from "@/domains/iam/presentation/middleware/require-auth.js";
+import { makeOptionalAuth } from "@/domains/iam/presentation/middleware/optional-auth.js";
 import { makeIamRouter } from "@/domains/iam/presentation/routes.js";
 
 import { MongooseClassRepository } from "@/domains/class/infrastructure/mongoose-class-repository.js";
@@ -48,12 +49,15 @@ import { YoutubeTranscriptFetcher } from "@/domains/ai-ops/infrastructure/extrac
 import { OpenAiQuestionGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-question-generator.js";
 import { GenerateExamQuestionsUseCase } from "@/domains/ai-ops/application/generate-exam-questions.js";
 import { RegenerateQuestionUseCase } from "@/domains/ai-ops/application/regenerate-question.js";
+import { EstimateExamGenerationUseCase } from "@/domains/ai-ops/application/estimate-exam-generation.js";
 import { AiController } from "@/domains/ai-ops/presentation/ai-controller.js";
 import { makeAiRouter } from "@/domains/ai-ops/presentation/ai-routes.js";
 
 import { MongooseSubmissionRepository } from "@/domains/submission/infrastructure/mongoose-submission-repository.js";
 import { GetPublicExamUseCase } from "@/domains/submission/application/get-public-exam.js";
 import { BeginExamUseCase } from "@/domains/submission/application/begin-exam.js";
+import { BeginExamFromTokenUseCase } from "@/domains/submission/application/begin-exam-from-token.js";
+import { ResolveExamLinkTokenUseCase } from "@/domains/submission/application/resolve-exam-link-token.js";
 import { SubmitExamUseCase } from "@/domains/submission/application/submit-exam.js";
 import { ListSubmissionsByExamUseCase } from "@/domains/submission/application/list-submissions-by-exam.js";
 import { SubmissionController } from "@/domains/submission/presentation/submission-controller.js";
@@ -141,14 +145,64 @@ import { makeApiAccessRouter } from "@/domains/api-access/presentation/api-acces
 
 import { MongoKintalReadRepository } from "@/domains/kintal/infrastructure/mongo-kintal-read-repository.js";
 import { MongoStaffRepository } from "@/domains/kintal/infrastructure/mongo-staff-repository.js";
+import { MongoKintalUsersRepository } from "@/domains/kintal/infrastructure/mongo-kintal-users-repository.js";
 import { GetDashboardMetricsUseCase } from "@/domains/kintal/application/get-dashboard-metrics.js";
 import { ListStaffUseCase } from "@/domains/kintal/application/list-staff.js";
 import { PromoteToStaffUseCase } from "@/domains/kintal/application/promote-to-staff.js";
 import { RevokeStaffUseCase } from "@/domains/kintal/application/revoke-staff.js";
+import { ListKintalUsersUseCase } from "@/domains/kintal/application/list-kintal-users.js";
+import { GetKintalUserUseCase } from "@/domains/kintal/application/get-kintal-user.js";
+import { UpdateKintalUserUseCase } from "@/domains/kintal/application/update-kintal-user.js";
+import { AdjustUserCreditsUseCase } from "@/domains/kintal/application/adjust-user-credits.js";
 import { KintalController } from "@/domains/kintal/presentation/kintal-controller.js";
 import { KintalStaffController } from "@/domains/kintal/presentation/kintal-staff-controller.js";
+import { KintalUsersController } from "@/domains/kintal/presentation/kintal-users-controller.js";
 import { makeKintalRouter } from "@/domains/kintal/presentation/kintal-routes.js";
 import { makeRequireStaff } from "@/domains/kintal/presentation/require-staff.js";
+
+import { MongooseCardRepository } from "@/domains/kanban/infrastructure/mongoose-card-repository.js";
+import { ListCardsUseCase } from "@/domains/kanban/application/list-cards.js";
+import { CreateCardUseCase } from "@/domains/kanban/application/create-card.js";
+import { UpdateCardUseCase } from "@/domains/kanban/application/update-card.js";
+import { MoveCardUseCase } from "@/domains/kanban/application/move-card.js";
+import { DeleteCardUseCase } from "@/domains/kanban/application/delete-card.js";
+import { KanbanController } from "@/domains/kanban/presentation/kanban-controller.js";
+import { makeKanbanRouter } from "@/domains/kanban/presentation/kanban-routes.js";
+
+import { MongooseOrganizationPreferencesRepository } from "@/domains/organization-preferences/infrastructure/mongoose-organization-preferences-repository.js";
+import { GetOrganizationPreferencesUseCase } from "@/domains/organization-preferences/application/get-organization-preferences.js";
+import { UpdateOrganizationPreferencesUseCase } from "@/domains/organization-preferences/application/update-organization-preferences.js";
+import { OrganizationPreferencesController } from "@/domains/organization-preferences/presentation/organization-preferences-controller.js";
+import { makeOrganizationPreferencesRouter } from "@/domains/organization-preferences/presentation/organization-preferences-routes.js";
+
+import { makeRequireApiKey } from "@/domains/api-access/presentation/middleware/require-api-key.js";
+import { ListPublicClassesUseCase } from "@/domains/public-api/application/list-public-classes.js";
+import { CreatePublicClassUseCase } from "@/domains/public-api/application/create-public-class.js";
+import { ListPublicStudentsByClassUseCase } from "@/domains/public-api/application/list-public-students.js";
+import { CreatePublicStudentsBatchUseCase } from "@/domains/public-api/application/create-public-students-batch.js";
+import { IssueExamLinkUseCase } from "@/domains/public-api/application/issue-exam-link.js";
+import { GetPublicExamResultsUseCase } from "@/domains/public-api/application/get-public-exam-results.js";
+import { PublicClassesController } from "@/domains/public-api/presentation/public-classes-controller.js";
+import { PublicStudentsController } from "@/domains/public-api/presentation/public-students-controller.js";
+import { PublicExamsController } from "@/domains/public-api/presentation/public-exams-controller.js";
+import { makePublicApiRouter } from "@/domains/public-api/presentation/public-api-routes.js";
+
+import { DispatchSubmissionCompletedUseCase } from "@/domains/webhook-dispatch/application/dispatch-submission-completed.js";
+import { FetchWebhookEventSender } from "@/domains/webhook-dispatch/infrastructure/fetch-webhook-event-sender.js";
+import { BaTeacherInfoLookup } from "@/domains/webhook-dispatch/infrastructure/ba-teacher-info-lookup.js";
+
+import { MongooseRoadmapItemRepository } from "@/domains/roadmap/infrastructure/mongoose-roadmap-item-repository.js";
+import { MongooseRoadmapVoteRepository } from "@/domains/roadmap/infrastructure/mongoose-roadmap-vote-repository.js";
+import { ListRoadmapUseCase } from "@/domains/roadmap/application/list-roadmap.js";
+import { SuggestFeatureUseCase } from "@/domains/roadmap/application/suggest-feature.js";
+import { VoteOnItemUseCase } from "@/domains/roadmap/application/vote-on-item.js";
+import { UnvoteItemUseCase } from "@/domains/roadmap/application/unvote-item.js";
+import { CreateRoadmapItemUseCase } from "@/domains/roadmap/application/create-roadmap-item.js";
+import { UpdateRoadmapItemUseCase } from "@/domains/roadmap/application/update-roadmap-item.js";
+import { DeleteRoadmapItemUseCase } from "@/domains/roadmap/application/delete-roadmap-item.js";
+import { RoadmapController } from "@/domains/roadmap/presentation/roadmap-controller.js";
+import { RoadmapStaffController } from "@/domains/roadmap/presentation/roadmap-staff-controller.js";
+import { makeRoadmapRouter } from "@/domains/roadmap/presentation/roadmap-routes.js";
 
 export async function buildApp(): Promise<Express> {
   await connectMongo(env.MONGODB_URI);
@@ -255,7 +309,25 @@ export async function buildApp(): Promise<Express> {
       questionGenerator,
       billingService,
     ),
+    estimateExamGeneration: new EstimateExamGenerationUseCase(
+      extractors,
+      transcriptFetcher,
+    ),
   });
+
+  // --- webhook dispatcher (precisa existir antes do submission/scan
+  // pra ser injetado nos use cases que finalizam submissões) ---
+  const webhookEndpointRepositoryForDispatch =
+    new MongooseWebhookEndpointRepository();
+  const submissionCompletedDispatcher =
+    new DispatchSubmissionCompletedUseCase(
+      examRepository,
+      classRepository,
+      studentRepository,
+      webhookEndpointRepositoryForDispatch,
+      new BaTeacherInfoLookup(authDb),
+      new FetchWebhookEventSender(),
+    );
 
   // --- submission domain ---
   const submissionController = new SubmissionController({
@@ -265,7 +337,22 @@ export async function buildApp(): Promise<Express> {
       studentRepository,
       submissionRepository,
     ),
-    submitExam: new SubmitExamUseCase(examRepository, submissionRepository),
+    beginExamFromToken: new BeginExamFromTokenUseCase(
+      examRepository,
+      studentRepository,
+      submissionRepository,
+    ),
+    resolveExamLinkToken: new ResolveExamLinkTokenUseCase(
+      examRepository,
+      studentRepository,
+      submissionRepository,
+    ),
+    authSecret: env.AUTH_SECRET,
+    submitExam: new SubmitExamUseCase(
+      examRepository,
+      submissionRepository,
+      submissionCompletedDispatcher,
+    ),
     listSubmissionsByExam: new ListSubmissionsByExamUseCase(
       examRepository,
       submissionRepository,
@@ -281,6 +368,7 @@ export async function buildApp(): Promise<Express> {
     examRepository,
     scanRepository,
     submissionRepository,
+    submissionCompletedDispatcher,
   );
   const scanController = new ScanController({
     scanSheet: new ScanSheetUseCase(
@@ -411,6 +499,7 @@ export async function buildApp(): Promise<Express> {
   // --- kintal (backoffice interno) ---
   const kintalReadRepository = new MongoKintalReadRepository(authDb);
   const kintalStaffRepository = new MongoStaffRepository(authDb);
+  const kintalUsersRepository = new MongoKintalUsersRepository(authDb);
   const kintalController = new KintalController({
     getDashboardMetrics: new GetDashboardMetricsUseCase(kintalReadRepository),
   });
@@ -419,7 +508,114 @@ export async function buildApp(): Promise<Express> {
     promoteToStaff: new PromoteToStaffUseCase(kintalStaffRepository),
     revokeStaff: new RevokeStaffUseCase(kintalStaffRepository),
   });
+  const kintalUsersController = new KintalUsersController({
+    listUsers: new ListKintalUsersUseCase(kintalUsersRepository),
+    getUser: new GetKintalUserUseCase(kintalUsersRepository),
+    updateUser: new UpdateKintalUserUseCase(kintalUsersRepository),
+    adjustCredits: new AdjustUserCreditsUseCase(
+      kintalUsersRepository,
+      walletRepository,
+      ledgerRepository,
+      new DebitCreditsUseCase(
+        walletRepository,
+        ledgerRepository,
+        atomicDebitService,
+      ),
+    ),
+  });
   const requireStaff = makeRequireStaff();
+
+  // --- kanban (board interno staff-only) ---
+  const cardRepository = new MongooseCardRepository();
+  const kanbanController = new KanbanController({
+    listCards: new ListCardsUseCase(cardRepository),
+    createCard: new CreateCardUseCase(cardRepository),
+    updateCard: new UpdateCardUseCase(cardRepository),
+    moveCard: new MoveCardUseCase(cardRepository),
+    deleteCard: new DeleteCardUseCase(cardRepository),
+  });
+
+  // --- organization preferences ---
+  const orgPreferencesRepository =
+    new MongooseOrganizationPreferencesRepository();
+  const getOrgPreferencesUseCase = new GetOrganizationPreferencesUseCase(
+    orgPreferencesRepository,
+  );
+  const orgPreferencesController = new OrganizationPreferencesController({
+    getPreferences: getOrgPreferencesUseCase,
+    updatePreferences: new UpdateOrganizationPreferencesUseCase(
+      orgPreferencesRepository,
+    ),
+  });
+
+  // --- public API (rotas /v1/public/*) ---
+  // Bearer middleware centralizado — todas as rotas públicas reusam.
+  const requireApiKey = makeRequireApiKey({
+    repo: apiKeyRepository,
+    authSecret: env.AUTH_SECRET,
+  });
+  const publicClassesController = new PublicClassesController({
+    listClasses: new ListPublicClassesUseCase(classRepository, studentRepository),
+    createClass: new CreatePublicClassUseCase(
+      classRepository,
+      orgMembersRepository,
+    ),
+  });
+  const publicStudentsController = new PublicStudentsController({
+    listStudents: new ListPublicStudentsByClassUseCase(
+      classRepository,
+      studentRepository,
+    ),
+    createStudentsBatch: new CreatePublicStudentsBatchUseCase(
+      classRepository,
+      studentRepository,
+      getOrgPreferencesUseCase,
+    ),
+  });
+  const publicExamsController = new PublicExamsController({
+    issueExamLink: new IssueExamLinkUseCase(
+      examRepository,
+      studentRepository,
+      classRepository,
+      getOrgPreferencesUseCase,
+    ),
+    getResults: new GetPublicExamResultsUseCase(
+      examRepository,
+      classRepository,
+      studentRepository,
+      submissionRepository,
+    ),
+    webOrigin: env.WEB_ORIGIN,
+    authSecret: env.AUTH_SECRET,
+  });
+
+  // --- roadmap (público + auth + staff no mesmo router) ---
+  const roadmapItemRepository = new MongooseRoadmapItemRepository();
+  const roadmapVoteRepository = new MongooseRoadmapVoteRepository();
+  const optionalAuth = makeOptionalAuth(auth);
+  const roadmapController = new RoadmapController({
+    listRoadmap: new ListRoadmapUseCase(
+      roadmapItemRepository,
+      roadmapVoteRepository,
+    ),
+    suggestFeature: new SuggestFeatureUseCase(roadmapItemRepository),
+    voteOnItem: new VoteOnItemUseCase(
+      roadmapItemRepository,
+      roadmapVoteRepository,
+    ),
+    unvoteItem: new UnvoteItemUseCase(
+      roadmapItemRepository,
+      roadmapVoteRepository,
+    ),
+  });
+  const roadmapStaffController = new RoadmapStaffController({
+    createRoadmapItem: new CreateRoadmapItemUseCase(roadmapItemRepository),
+    updateRoadmapItem: new UpdateRoadmapItemUseCase(roadmapItemRepository),
+    deleteRoadmapItem: new DeleteRoadmapItemUseCase(
+      roadmapItemRepository,
+      roadmapVoteRepository,
+    ),
+  });
 
   const routers = [
     makeIamRouter(auth),
@@ -448,6 +644,30 @@ export async function buildApp(): Promise<Express> {
       requireStaff,
       controller: kintalController,
       staffController: kintalStaffController,
+      usersController: kintalUsersController,
+    }),
+    makeKanbanRouter({
+      requireAuth,
+      requireStaff,
+      controller: kanbanController,
+    }),
+    makeRoadmapRouter({
+      optionalAuth,
+      requireAuth,
+      requireStaff,
+      controller: roadmapController,
+      staffController: roadmapStaffController,
+    }),
+    makeOrganizationPreferencesRouter({
+      requireAuth,
+      requireOrgAdmin,
+      controller: orgPreferencesController,
+    }),
+    makePublicApiRouter({
+      requireApiKey,
+      classesController: publicClassesController,
+      studentsController: publicStudentsController,
+      examsController: publicExamsController,
     }),
   ];
 

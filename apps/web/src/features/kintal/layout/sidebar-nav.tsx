@@ -9,6 +9,9 @@ import {
   Headphones,
   Wrench,
   ShieldCheck,
+  Map,
+  Users,
+  KanbanSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +23,9 @@ const ICONS = {
   support: Headphones,
   ops: Wrench,
   shield: ShieldCheck,
+  map: Map,
+  users: Users,
+  board: KanbanSquare,
 } as const;
 
 export type KintalSidebarIcon = keyof typeof ICONS;

@@ -30,9 +30,10 @@ const envSchema = z.object({
   OMR_SERVICE_URL: z.string().url().optional(),
   OMR_SERVICE_TIMEOUT_MS: z.coerce.number().default(60_000),
 
-  // Créditos concedidos a cada novo usuário no signup. Consome ~25 créditos
-  // por prova de 10 questões, então 150 dá ~6 provas pro teste inicial.
-  WELCOME_CREDITS: z.coerce.number().int().min(0).default(150),
+  // Créditos concedidos a cada novo usuário no signup. Consome ~700 créditos
+  // por prova contextual de 10 questões, então 2.000 dá ~3 provas pro teste
+  // inicial — espaço pra avaliar a ferramenta antes de pagar.
+  WELCOME_CREDITS: z.coerce.number().int().min(0).default(2000),
 
   // Stripe — todos opcionais. Sem STRIPE_SECRET_KEY, o módulo de assinaturas
   // devolve 503 em qualquer tentativa de checkout/portal, mas o resto da api

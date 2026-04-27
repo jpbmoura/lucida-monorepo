@@ -6,6 +6,7 @@ const LINKS = [
   { label: "Como funciona", href: "/#how-it-works" },
   { label: "Recursos", href: "/#features" },
   { label: "Preços", href: "/precos" },
+  { label: "Roadmap", href: "/roadmap" },
   { label: "Para instituições", href: "/contact/institutions" },
 ];
 

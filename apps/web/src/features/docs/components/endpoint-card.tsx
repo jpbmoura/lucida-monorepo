@@ -5,15 +5,15 @@ import { ScopeBadge } from "./scope-badge";
 import { ParamTable, type Param } from "./param-table";
 import { CodeBlock } from "./code-block";
 
-// Faixa lateral colorida por verbo — mesma paleta do MethodBadge mas em
-// saturação mais alta pra funcionar como indicador visual rápido.
-// Ajuda o leitor a "escanear" páginas com muitos endpoints.
+// Faixa lateral colorida por verbo — mesma paleta do MethodBadge.
+// Deliberadamente sem o roxo do Analytics: POST usa sky pra não competir
+// com o tema da própria documentação.
 const METHOD_STRIPE: Record<HttpMethod, string> = {
   GET: "before:bg-emerald-400",
-  POST: "before:bg-analytics-primary",
+  POST: "before:bg-sky-500",
   PATCH: "before:bg-amber-400",
   PUT: "before:bg-amber-400",
-  DELETE: "before:bg-red-400",
+  DELETE: "before:bg-rose-400",
 };
 
 interface EndpointCardProps {
