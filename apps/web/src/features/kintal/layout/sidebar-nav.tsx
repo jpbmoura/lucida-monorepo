@@ -13,6 +13,7 @@ import {
   Users,
   KanbanSquare,
   Bell,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const ICONS = {
   users: Users,
   board: KanbanSquare,
   bell: Bell,
+  building: Building2,
 } as const;
 
 export type KintalSidebarIcon = keyof typeof ICONS;

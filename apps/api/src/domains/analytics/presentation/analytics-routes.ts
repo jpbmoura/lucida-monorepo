@@ -1,10 +1,12 @@
 import { Router, type RequestHandler } from "express";
 import type { AnalyticsController } from "./analytics-controller.js";
+import type { AssistantController } from "@/domains/iam/presentation/assistant-controller.js";
 
 export function makeAnalyticsRouter({
   requireAuth,
   requireOrgAdmin,
   controller,
+  assistantController,
 }: {
   requireAuth: RequestHandler;
   /**
@@ -13,6 +15,12 @@ export function makeAnalyticsRouter({
    */
   requireOrgAdmin: RequestHandler;
   controller: AnalyticsController;
+  /**
+   * Opcional. Quando provido, expõe os endpoints de gestão de auxiliares
+   * sob `/v1/analytics/teachers/:id/assistants` — protegidos por
+   * requireOrgAdmin igual o resto da gestão institucional.
+   */
+  assistantController?: AssistantController;
 }): Router {
   const router = Router();
   router.get("/v1/analytics/overview", requireAuth, controller.overview);
@@ -96,5 +104,27 @@ export function makeAnalyticsRouter({
     controller.studentOverview,
   );
   router.get("/v1/analytics/exams/:id", requireAuth, controller.examOverview);
+
+  // ─── Gestão de auxiliares (admin org → professores da org) ─────────
+  if (assistantController) {
+    router.get(
+      "/v1/analytics/teachers/:teacherId/assistants",
+      requireAuth,
+      requireOrgAdmin,
+      assistantController.listForTeacher,
+    );
+    router.post(
+      "/v1/analytics/teachers/:teacherId/assistants",
+      requireAuth,
+      requireOrgAdmin,
+      assistantController.create,
+    );
+    router.delete(
+      "/v1/analytics/assistants/:linkId",
+      requireAuth,
+      requireOrgAdmin,
+      assistantController.revoke,
+    );
+  }
   return router;
 }

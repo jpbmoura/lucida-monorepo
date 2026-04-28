@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import type { KintalController } from "./kintal-controller.js";
 import type { KintalStaffController } from "./kintal-staff-controller.js";
 import type { KintalUsersController } from "./kintal-users-controller.js";
+import type { KintalInstitutionsController } from "./kintal-institutions-controller.js";
 
 interface MakeKintalRouterDeps {
   requireAuth: RequestHandler;
@@ -9,6 +10,7 @@ interface MakeKintalRouterDeps {
   controller: KintalController;
   staffController: KintalStaffController;
   usersController: KintalUsersController;
+  institutionsController: KintalInstitutionsController;
 }
 
 export function makeKintalRouter({
@@ -17,6 +19,7 @@ export function makeKintalRouter({
   controller,
   staffController,
   usersController,
+  institutionsController,
 }: MakeKintalRouterDeps): Router {
   const router = Router();
   // Todas as rotas do Kintal são staff-only — encadeia requireAuth +
@@ -70,6 +73,50 @@ export function makeKintalRouter({
     requireAuth,
     requireStaff,
     usersController.adjustCredits,
+  );
+
+  // ─── Institutions ──────────────────────────────────────────────────
+  router.get(
+    "/api/kintal/institutions",
+    requireAuth,
+    requireStaff,
+    institutionsController.list,
+  );
+  router.post(
+    "/api/kintal/institutions",
+    requireAuth,
+    requireStaff,
+    institutionsController.create,
+  );
+  router.get(
+    "/api/kintal/institutions/:orgId",
+    requireAuth,
+    requireStaff,
+    institutionsController.getOne,
+  );
+  router.patch(
+    "/api/kintal/institutions/:orgId/billing",
+    requireAuth,
+    requireStaff,
+    institutionsController.updateBilling,
+  );
+  router.post(
+    "/api/kintal/institutions/:orgId/archive",
+    requireAuth,
+    requireStaff,
+    institutionsController.archive,
+  );
+  router.post(
+    "/api/kintal/institutions/:orgId/unarchive",
+    requireAuth,
+    requireStaff,
+    institutionsController.unarchive,
+  );
+  router.post(
+    "/api/kintal/institutions/:orgId/credits",
+    requireAuth,
+    requireStaff,
+    institutionsController.adjustCredits,
   );
 
   return router;

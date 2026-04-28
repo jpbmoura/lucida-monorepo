@@ -44,6 +44,22 @@ export class OrganizationBillingSettings {
     return new OrganizationBillingSettings({ ...props });
   }
 
+  /**
+   * Muda o modo de cobrança. Setter explícito (em vez de exposição direta
+   * dos props) porque a transição pode ganhar efeitos colaterais — ex.:
+   * sair de `pool` zerar wallet, entrar em `unlimited` registrar acordo.
+   */
+  changeBillingMode(mode: OrgBillingMode): void {
+    if (this.props.billingMode === mode) return;
+    this.props.billingMode = mode;
+    this.props.updatedAt = new Date();
+  }
+
+  /** Cortesia / acordo fora-da-plataforma — pula checagem de saldo. */
+  isUnlimited(): boolean {
+    return this.props.billingMode === "unlimited";
+  }
+
   get organizationId(): string {
     return this.props.organizationId;
   }

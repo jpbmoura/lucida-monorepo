@@ -31,6 +31,7 @@ export function makeOptionalAuth(auth: Auth): RequestHandler {
           realEmail,
           realUserRole,
           isImpersonating: false,
+          isAssistant: false,
           sessionId: session.session.id,
           activeOrganizationId,
         };

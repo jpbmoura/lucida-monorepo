@@ -6,7 +6,12 @@ import {
   IMPERSONATE_COOKIE_NAME,
   parseImpersonateCookieValue,
 } from "../../infrastructure/impersonate-cookie.js";
+import {
+  ASSISTANT_TARGET_COOKIE_NAME,
+  parseAssistantTargetCookieValue,
+} from "../../infrastructure/assistant-target-cookie.js";
 import type { OrganizationMembersRepository } from "@/domains/analytics/application/ports/organization-members-repository.js";
+import type { TeacherAssistantRepository } from "../../domain/teacher-assistant-repository.js";
 
 export interface AuthContext {
   /**
@@ -27,6 +32,13 @@ export interface AuthContext {
   realUserRole: string | null;
   /** True quando userId !== realUserId. */
   isImpersonating: boolean;
+  /**
+   * True quando a sessão é de um auxiliar atendendo um professor (modo
+   * "atuação delegada"). Implica `isImpersonating: true`. Distingue do
+   * impersonate de admin org via cookie pra que `denyAssistant` consiga
+   * bloquear ações sensíveis sem afetar admins.
+   */
+  isAssistant: boolean;
   sessionId: string;
   activeOrganizationId: string | null;
 }
@@ -48,6 +60,15 @@ interface MakeRequireAuthDeps {
    * clássico (sem impersonate).
    */
   orgMembersRepository?: OrganizationMembersRepository;
+  /**
+   * Opcional. Quando provido, ativa o "modo auxiliar": quando o user
+   * logado é assistente delegado de um professor, o middleware lê o
+   * cookie `lucida.assistant_target`, valida o vínculo e seta `userId`
+   * = teacherId + override do `activeOrganizationId` pro contexto do
+   * professor. Sem este repo, auxiliares logam mas operam como o
+   * próprio user (sem delegação).
+   */
+  teacherAssistantsRepository?: TeacherAssistantRepository;
   /** Secret pra validar o HMAC do cookie. Default `process.env.AUTH_SECRET`. */
   authSecret?: string;
 }
@@ -57,6 +78,7 @@ export function makeRequireAuth(
   deps: MakeRequireAuthDeps = {},
 ): RequestHandler {
   const orgMembers = deps.orgMembersRepository;
+  const teacherAssistants = deps.teacherAssistantsRepository;
   const secret = deps.authSecret ?? process.env.AUTH_SECRET ?? "";
 
   return async (req, _res, next) => {
@@ -76,7 +98,7 @@ export function makeRequireAuth(
       const rawRole = (session.user as { role?: unknown }).role;
       const realUserRole =
         typeof rawRole === "string" && rawRole.length > 0 ? rawRole : null;
-      const activeOrganizationId =
+      let activeOrganizationId =
         "activeOrganizationId" in session.session
           ? (session.session.activeOrganizationId as string | null)
           : null;
@@ -85,9 +107,46 @@ export function makeRequireAuth(
       let userId = realUserId;
       let email = realEmail;
       let isImpersonating = false;
+      let isAssistant = false;
 
-      // Modo impersonate só ativa se temos o repo + secret + cookie.
-      if (orgMembers && secret) {
+      // Modo auxiliar tem precedência sobre o impersonate de admin —
+      // um auxiliar não tem porque ter cookie de impersonate, e os dois
+      // caminhos não se misturam. Se o cookie do auxiliar resolve um
+      // vínculo válido, paramos por aqui.
+      if (teacherAssistants && secret) {
+        const targetTeacherId = readAssistantTarget(req, secret);
+        if (targetTeacherId && targetTeacherId !== realUserId) {
+          const link = await teacherAssistants.findActiveLink({
+            assistantUserId: realUserId,
+            teacherUserId: targetTeacherId,
+          });
+          if (link) {
+            userId = link.teacherUserId;
+            // Override pra que BillingTargetResolver mande pro scope=org
+            // certo, mesmo o auxiliar não sendo member da BA.
+            activeOrganizationId = link.organizationId;
+            // Email do "userId atuante" — preenchido só se org repo
+            // estiver disponível; senão fica "" (clientes do AuthContext
+            // que precisam de email do teacher devem ler do user store).
+            if (orgMembers) {
+              const members = await orgMembers.listMembers(
+                link.organizationId,
+              );
+              email =
+                members.find((m) => m.userId === link.teacherUserId)?.email ??
+                "";
+            } else {
+              email = "";
+            }
+            isImpersonating = true;
+            isAssistant = true;
+          }
+        }
+      }
+
+      // Impersonate de admin org — só ativa se ainda não estamos em
+      // modo auxiliar.
+      if (!isAssistant && orgMembers && secret) {
         const teacherId = readImpersonateTarget(req, secret);
         if (teacherId && activeOrganizationId && teacherId !== realUserId) {
           // Valida: real user é owner/admin da org E teacherId é member.
@@ -118,6 +177,7 @@ export function makeRequireAuth(
         realEmail,
         realUserRole,
         isImpersonating,
+        isAssistant,
         sessionId: session.session.id,
         activeOrganizationId,
       };
@@ -128,6 +188,16 @@ export function makeRequireAuth(
   };
 }
 
+function readAssistantTarget(
+  req: { headers: { cookie?: string } },
+  secret: string,
+): string | null {
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const value = cookies[ASSISTANT_TARGET_COOKIE_NAME];
+  if (typeof value !== "string") return null;
+  return parseAssistantTargetCookieValue(value, secret);
+}
+
 /**
  * Extrai o `lucida.impersonate` do header Cookie. Não usa lib externa pra
  * evitar dep nova; o parser é simples (split por `;` + trim).
@@ -136,9 +206,15 @@ function readImpersonateTarget(
   req: { headers: { cookie?: string } },
   secret: string,
 ): string | null {
-  const raw = req.headers.cookie;
-  if (!raw) return null;
-  const cookies = Object.fromEntries(
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const value = cookies[IMPERSONATE_COOKIE_NAME];
+  if (typeof value !== "string") return null;
+  return parseImpersonateCookieValue(value, secret);
+}
+
+function parseCookieHeader(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  return Object.fromEntries(
     raw
       .split(";")
       .map((c) => c.trim())
@@ -149,7 +225,4 @@ function readImpersonateTarget(
         return [c.slice(0, eq), decodeURIComponent(c.slice(eq + 1))];
       }),
   );
-  const value = cookies[IMPERSONATE_COOKIE_NAME];
-  if (typeof value !== "string") return null;
-  return parseImpersonateCookieValue(value, secret);
 }

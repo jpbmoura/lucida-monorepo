@@ -11,6 +11,8 @@ import { TeacherClassesList } from "@/features/analytics/teachers/components/tea
 import { TeacherExamsList } from "@/features/analytics/teachers/components/teacher-exams-list";
 import { TeacherStudentsList } from "@/features/analytics/teachers/components/teacher-students-list";
 import { TeacherLedgerSection } from "@/features/analytics/teachers/components/teacher-ledger-section";
+import { AssistantsSection } from "@/features/analytics/teachers/components/assistants-section";
+import { fetchTeacherAssistants } from "@/features/analytics/teachers/assistants-data";
 import { InvitationErrorCard } from "@/features/accept-invite/components/invitation-error-card";
 
 export const metadata: Metadata = {
@@ -35,7 +37,13 @@ export default async function TeacherDetailPage({
   const sp = await searchParams;
   const period = parsePeriod(sp.period);
 
-  const data = await fetchTeacherOverview(id, period);
+  // Fetch em paralelo: overview + auxiliares. Auxiliares pode falhar se
+  // o user real não é admin (404/403 do backend) — tratamos como lista
+  // vazia no catch pra não derrubar a página inteira.
+  const [data, assistants] = await Promise.all([
+    fetchTeacherOverview(id, period),
+    fetchTeacherAssistants(id).catch(() => []),
+  ]);
 
   if (!data) {
     return (
@@ -67,6 +75,12 @@ export default async function TeacherDetailPage({
         <TeacherStudentsList students={data.students} />
 
         <TeacherLedgerSection ledger={data.ledger} />
+
+        <AssistantsSection
+          teacherId={data.teacher.id}
+          teacherName={data.teacher.name}
+          initialAssistants={assistants}
+        />
       </div>
     </main>
   );

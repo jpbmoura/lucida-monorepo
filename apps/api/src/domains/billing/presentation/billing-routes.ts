@@ -1,5 +1,15 @@
 import express, { Router, type RequestHandler } from "express";
 import type { BillingController } from "./billing-controller.js";
+import { denyAssistant } from "@/domains/iam/presentation/middleware/deny-assistant.js";
+
+/**
+ * Auxiliares NÃO compram créditos em nome do professor — gating só nas
+ * rotas que iniciam um checkout. Leituras (balance, ledger, subscription)
+ * permanecem abertas pra que o auxiliar acompanhe consumo.
+ */
+const denyAssistantBuy = denyAssistant(
+  "Compra de créditos só pelo professor titular.",
+);
 
 /**
  * Rotas PÚBLICAS — webhooks dos provedores de pagamento.
@@ -54,21 +64,25 @@ export function makeBillingAuthedRouter({
   router.post(
     "/v1/billing/subscription/checkout",
     requireAuth,
+    denyAssistantBuy,
     controller.checkout,
   );
   router.post(
     "/v1/billing/subscription/portal",
     requireAuth,
+    denyAssistantBuy,
     controller.portal,
   );
   router.post(
     "/v1/billing/topup/checkout",
     requireAuth,
+    denyAssistantBuy,
     controller.topupCheckout,
   );
   router.post(
     "/v1/billing/topup/pix",
     requireAuth,
+    denyAssistantBuy,
     controller.pixTopup,
   );
   router.get(

@@ -35,6 +35,7 @@ const ATENDIMENTO: KintalSidebarNavItem[] = [
 const OPERACOES: KintalSidebarNavItem[] = [
   { label: "Board", href: "/kintal/board", icon: "board" },
   { label: "Usuários", href: "/kintal/usuarios", icon: "users" },
+  { label: "Instituições", href: "/kintal/instituicoes", icon: "building" },
   { label: "Exames", icon: "ops", disabled: true },
   { label: "Integrações", icon: "ops", disabled: true },
 ];

@@ -11,6 +11,14 @@ import { createApp } from "@/app.js";
 import { createAuth } from "@/domains/iam/infrastructure/better-auth/auth.js";
 import { getAuthDb } from "@/domains/iam/infrastructure/better-auth/mongo-client.js";
 import { makeRequireAuth } from "@/domains/iam/presentation/middleware/require-auth.js";
+import { denyAssistant } from "@/domains/iam/presentation/middleware/deny-assistant.js";
+import { MongoTeacherAssistantRepository } from "@/domains/iam/infrastructure/mongo-teacher-assistant-repository.js";
+import { CreateAssistantUseCase } from "@/domains/iam/application/create-assistant.js";
+import { ListAssistantsForTeacherUseCase } from "@/domains/iam/application/list-assistants-for-teacher.js";
+import { ListTeachersForAssistantUseCase } from "@/domains/iam/application/list-teachers-for-assistant.js";
+import { RevokeAssistantUseCase } from "@/domains/iam/application/revoke-assistant.js";
+import { SelectAssistantTargetUseCase } from "@/domains/iam/application/select-assistant-target.js";
+import { AssistantController } from "@/domains/iam/presentation/assistant-controller.js";
 import { makeOptionalAuth } from "@/domains/iam/presentation/middleware/optional-auth.js";
 import { makeIamRouter } from "@/domains/iam/presentation/routes.js";
 
@@ -155,6 +163,7 @@ import { makeApiAccessRouter } from "@/domains/api-access/presentation/api-acces
 import { MongoKintalReadRepository } from "@/domains/kintal/infrastructure/mongo-kintal-read-repository.js";
 import { MongoStaffRepository } from "@/domains/kintal/infrastructure/mongo-staff-repository.js";
 import { MongoKintalUsersRepository } from "@/domains/kintal/infrastructure/mongo-kintal-users-repository.js";
+import { MongoKintalInstitutionsRepository } from "@/domains/kintal/infrastructure/mongo-kintal-institutions-repository.js";
 import { GetDashboardMetricsUseCase } from "@/domains/kintal/application/get-dashboard-metrics.js";
 import { ListStaffUseCase } from "@/domains/kintal/application/list-staff.js";
 import { PromoteToStaffUseCase } from "@/domains/kintal/application/promote-to-staff.js";
@@ -163,9 +172,19 @@ import { ListKintalUsersUseCase } from "@/domains/kintal/application/list-kintal
 import { GetKintalUserUseCase } from "@/domains/kintal/application/get-kintal-user.js";
 import { UpdateKintalUserUseCase } from "@/domains/kintal/application/update-kintal-user.js";
 import { AdjustUserCreditsUseCase } from "@/domains/kintal/application/adjust-user-credits.js";
+import { ListInstitutionsUseCase } from "@/domains/kintal/application/list-institutions.js";
+import { GetInstitutionUseCase } from "@/domains/kintal/application/get-institution.js";
+import { CreateInstitutionUseCase } from "@/domains/kintal/application/create-institution.js";
+import { UpdateInstitutionBillingUseCase } from "@/domains/kintal/application/update-institution-billing.js";
+import {
+  ArchiveInstitutionUseCase,
+  UnarchiveInstitutionUseCase,
+} from "@/domains/kintal/application/archive-institution.js";
+import { AdjustInstitutionCreditsUseCase } from "@/domains/kintal/application/adjust-institution-credits.js";
 import { KintalController } from "@/domains/kintal/presentation/kintal-controller.js";
 import { KintalStaffController } from "@/domains/kintal/presentation/kintal-staff-controller.js";
 import { KintalUsersController } from "@/domains/kintal/presentation/kintal-users-controller.js";
+import { KintalInstitutionsController } from "@/domains/kintal/presentation/kintal-institutions-controller.js";
 import { makeKintalRouter } from "@/domains/kintal/presentation/kintal-routes.js";
 import { makeRequireStaff } from "@/domains/kintal/presentation/require-staff.js";
 
@@ -258,6 +277,8 @@ export async function buildApp(): Promise<Express> {
       atomicDebitService,
     ),
     new DefaultBillingTargetResolver(orgBillingSettingsRepo),
+    orgBillingSettingsRepo,
+    ledgerRepository,
   );
 
   const auth = createAuth(authDb, {
@@ -274,8 +295,14 @@ export async function buildApp(): Promise<Express> {
   const orgInvitationsRepository = new BaOrganizationInvitationsRepository(
     authDb,
   );
+  // teacher_assistants alimenta o "modo auxiliar" no requireAuth — sem
+  // o repo, auxiliares logam mas não têm override do userId.
+  const teacherAssistantsRepository = new MongoTeacherAssistantRepository(
+    authDb,
+  );
   const requireAuth = makeRequireAuth(auth, {
     orgMembersRepository,
+    teacherAssistantsRepository,
     authSecret: env.AUTH_SECRET,
   });
 
@@ -570,6 +597,34 @@ export async function buildApp(): Promise<Express> {
       ),
     ),
   });
+
+  // --- kintal institutions (gestão de orgs no backoffice) ---
+  const kintalInstitutionsRepository = new MongoKintalInstitutionsRepository(
+    authDb,
+    auth,
+  );
+  const kintalInstitutionsController = new KintalInstitutionsController({
+    list: new ListInstitutionsUseCase(kintalInstitutionsRepository),
+    get: new GetInstitutionUseCase(kintalInstitutionsRepository),
+    create: new CreateInstitutionUseCase(kintalInstitutionsRepository),
+    updateBilling: new UpdateInstitutionBillingUseCase(
+      kintalInstitutionsRepository,
+      orgBillingSettingsRepo,
+    ),
+    archive: new ArchiveInstitutionUseCase(kintalInstitutionsRepository),
+    unarchive: new UnarchiveInstitutionUseCase(kintalInstitutionsRepository),
+    adjustCredits: new AdjustInstitutionCreditsUseCase(
+      kintalInstitutionsRepository,
+      walletRepository,
+      ledgerRepository,
+      new DebitCreditsUseCase(
+        walletRepository,
+        ledgerRepository,
+        atomicDebitService,
+      ),
+    ),
+  });
+
   const requireStaff = makeRequireStaff();
 
   // --- kanban (board interno staff-only) ---
@@ -685,8 +740,24 @@ export async function buildApp(): Promise<Express> {
     ),
   });
 
+  // --- assistant (delegação auxiliar→professor) ---
+  const assistantController = new AssistantController({
+    listTeachers: new ListTeachersForAssistantUseCase(teacherAssistantsRepository),
+    selectTarget: new SelectAssistantTargetUseCase(teacherAssistantsRepository),
+    createAssistant: new CreateAssistantUseCase(
+      teacherAssistantsRepository,
+      orgMembersRepository,
+      auth,
+      authDb,
+    ),
+    listAssistantsForTeacher: new ListAssistantsForTeacherUseCase(
+      teacherAssistantsRepository,
+    ),
+    revokeAssistant: new RevokeAssistantUseCase(teacherAssistantsRepository),
+  });
+
   const routers = [
-    makeIamRouter(auth),
+    makeIamRouter(auth, { requireAuth, assistantController, authDb }),
     makeClassRouter({ requireAuth, controller: classController }),
     makeStudentRouter({ requireAuth, controller: studentController }),
     makeExamRouter({ requireAuth, controller: examController }),
@@ -698,6 +769,7 @@ export async function buildApp(): Promise<Express> {
       requireAuth,
       requireOrgAdmin,
       controller: analyticsController,
+      assistantController,
     }),
     makeApiAccessRouter({
       requireAuth,
@@ -713,6 +785,7 @@ export async function buildApp(): Promise<Express> {
       controller: kintalController,
       staffController: kintalStaffController,
       usersController: kintalUsersController,
+      institutionsController: kintalInstitutionsController,
     }),
     makeKanbanRouter({
       requireAuth,

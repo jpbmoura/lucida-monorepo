@@ -19,7 +19,7 @@ const settingsSchema = new Schema<OrganizationBillingSettingsDoc>(
     billingMode: {
       type: String,
       required: true,
-      enum: ["pool", "per_teacher", "pay_per_use"],
+      enum: ["pool", "per_teacher", "pay_per_use", "unlimited"],
       default: "pool",
     },
     perTeacherLimit: { type: Number, default: null },

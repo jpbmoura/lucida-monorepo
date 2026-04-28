@@ -53,6 +53,12 @@ export class DefaultBillingTargetResolver implements BillingTargetResolver {
     if (settings.billingMode === "pay_per_use") {
       return { scope: "org", id: input.activeOrganizationId };
     }
+    if (settings.billingMode === "unlimited") {
+      // Modo cortesia: scope=org pra que o ledger registre o consumo
+      // institucional; o BillingService curto-circuita ensure/debit antes
+      // de tocar em wallet, evitando o erro de "sem saldo".
+      return { scope: "org", id: input.activeOrganizationId };
+    }
     // per_teacher usa wallet pessoal do user (seeded pela org no futuro).
     return { scope: "user", id: input.userId };
   }

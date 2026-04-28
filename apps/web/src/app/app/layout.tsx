@@ -8,12 +8,14 @@ import {
   isOrgPayingForUser,
 } from "@/lib/active-organization";
 import { fetchImpersonateState } from "@/lib/impersonate-state";
+import { fetchAssistantState } from "@/lib/assistant-state";
 import {
   fetchBalance,
   fetchCurrentSubscription,
 } from "@/features/app/billing/data";
 import { LowBalanceAlert } from "@/features/app/billing/components/low-balance-alert";
 import { ImpersonateBanner } from "@/features/analytics/impersonate/components/impersonate-banner";
+import { AssistantBanner } from "@/features/auth/assistant/assistant-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
@@ -25,6 +27,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     name: session.user.name,
     email: session.user.email,
   });
+
+  // Antes de tudo: se o user é auxiliar (tem vínculos teacher_assistants
+  // ativos) mas NÃO escolheu um professor pra atender ainda, redireciona
+  // pro seletor. Mesma chamada serve pra montar o banner depois.
+  const assistant = await fetchAssistantState().catch(() => null);
+  if (
+    assistant &&
+    assistant.availableTeachers > 0 &&
+    !assistant.activeTarget
+  ) {
+    redirect("/auxiliar/escolher");
+  }
 
   // Billing + organização ativa + estado de impersonate carregam aqui pra
   // alimentar topbar + alert + banner. Tolera falhas — qualquer endpoint
@@ -44,12 +58,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-white">
       <Sidebar hasActiveSubscription={hasActiveSubscription} />
       <div className="flex min-w-0 flex-1 flex-col">
-        {impersonate?.isImpersonating && impersonate.actingAs && (
-          <ImpersonateBanner
-            actingAsName={impersonate.actingAs.name}
-            actingAsEmail={impersonate.actingAs.email}
+        {assistant?.activeTarget && (
+          <AssistantBanner
+            teacherName={assistant.activeTarget.teacherName}
+            teacherEmail={assistant.activeTarget.teacherEmail}
+            canSwitch={assistant.availableTeachers > 1}
           />
         )}
+        {!assistant?.activeTarget &&
+          impersonate?.isImpersonating &&
+          impersonate.actingAs && (
+            <ImpersonateBanner
+              actingAsName={impersonate.actingAs.name}
+              actingAsEmail={impersonate.actingAs.email}
+            />
+          )}
         <Topbar
           userName={display.name}
           userEmail={display.email}

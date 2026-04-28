@@ -4,6 +4,7 @@ import { AnalyticsTopbar } from "@/features/analytics/layout/topbar";
 import { getServerSession } from "@/lib/get-server-session";
 import { buildDisplayUser } from "@/lib/user-display";
 import { fetchActiveOrganization } from "@/lib/active-organization";
+import { fetchAssistantState } from "@/lib/assistant-state";
 
 /**
  * Shell do ambiente de instituições. `theme-analytics` no wrapper aplica a
@@ -19,6 +20,13 @@ export default async function AnalyticsLayout({
   const session = await getServerSession();
   if (!session) {
     redirect("/organizacoes/entrar?next=/analytics");
+  }
+
+  // Auxiliares NÃO acessam o /analytics — redireciona pro /app, que se
+  // encarrega de mandar pro seletor caso ainda não tenha cookie de target.
+  const assistant = await fetchAssistantState().catch(() => null);
+  if (assistant && assistant.availableTeachers > 0) {
+    redirect("/app");
   }
 
   const display = buildDisplayUser({

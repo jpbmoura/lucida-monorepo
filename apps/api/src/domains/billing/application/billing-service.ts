@@ -3,7 +3,9 @@ import type {
   DebitCreditsUseCase,
   DebitResult,
 } from "./debit-credits.js";
-import type { LedgerReason } from "../domain/ledger-entry.js";
+import { LedgerEntry, type LedgerReason } from "../domain/ledger-entry.js";
+import type { LedgerRepository } from "../domain/ledger-repository.js";
+import type { OrganizationBillingSettingsRepository } from "../domain/organization-billing-settings-repository.js";
 import type { BillingTargetResolver } from "./billing-target-resolver.js";
 import {
   InstitutionOutOfCreditsError,
@@ -43,6 +45,8 @@ export class DefaultBillingService implements BillingService {
     private readonly ensure: EnsureSufficientBalanceUseCase,
     private readonly debitUc: DebitCreditsUseCase,
     private readonly resolver: BillingTargetResolver,
+    private readonly orgSettings: OrganizationBillingSettingsRepository,
+    private readonly ledger: LedgerRepository,
   ) {}
 
   async ensureSufficientBalance(input: {
@@ -54,6 +58,10 @@ export class DefaultBillingService implements BillingService {
       userId: input.userId,
       activeOrganizationId: input.activeOrganizationId,
     });
+    // Cortesia: sem checagem de saldo. Ledger é gravado só no debit.
+    if (await this.isUnlimited(input.activeOrganizationId, target.scope)) {
+      return;
+    }
     try {
       await this.ensure.execute({
         ownerId: target.id,
@@ -81,6 +89,39 @@ export class DefaultBillingService implements BillingService {
       userId: input.userId,
       activeOrganizationId: input.activeOrganizationId,
     });
+
+    // Cortesia: grava ledger entry pra auditoria, sem mexer em wallet.
+    // walletId é simbólico (`unlimited:<orgId>`) — não aponta pra doc real
+    // mas mantém auditoria coerente. WalletSource fica `admin_grant` por
+    // analogia de fonte (acordo administrativo).
+    if (await this.isUnlimited(input.activeOrganizationId, target.scope)) {
+      const entry = LedgerEntry.create({
+        id: this.ledger.nextId(),
+        scope: target.scope,
+        ownerId: target.id,
+        actorUserId: input.userId,
+        walletId: pseudoWalletId(target.id),
+        walletSource: "admin_grant",
+        type: "debit",
+        amount: input.amount,
+        reason: input.reason,
+        relatedAction: input.relatedAction,
+        tokensUsed: input.tokensUsed ?? null,
+        metadata: { ...(input.metadata ?? {}), billingMode: "unlimited" },
+      });
+      await this.ledger.save(entry);
+      return {
+        amountDebited: input.amount,
+        breakdown: [
+          {
+            walletId: entry.walletId.toString(),
+            source: "admin_grant",
+            taken: input.amount,
+          },
+        ],
+      };
+    }
+
     try {
       return await this.debitUc.execute({
         ownerId: target.id,
@@ -102,4 +143,24 @@ export class DefaultBillingService implements BillingService {
       throw err;
     }
   }
+
+  /**
+   * Resolve em runtime se a org ativa está em modo unlimited. Retorna
+   * `false` quando o target final é `user` — o modo unlimited só faz
+   * sentido pra scope=org (é a org que teve cortesia atribuída).
+   */
+  private async isUnlimited(
+    activeOrganizationId: string | null,
+    targetScope: "user" | "org",
+  ): Promise<boolean> {
+    if (targetScope !== "org" || !activeOrganizationId) return false;
+    const settings = await this.orgSettings.findByOrg(activeOrganizationId);
+    return settings?.isUnlimited() ?? false;
+  }
+}
+
+// Import e helper localizados pra não inflar o topo do arquivo.
+import { WalletId } from "../domain/wallet-id.js";
+function pseudoWalletId(orgId: string): WalletId {
+  return WalletId.of(`unlimited:${orgId}`);
 }
