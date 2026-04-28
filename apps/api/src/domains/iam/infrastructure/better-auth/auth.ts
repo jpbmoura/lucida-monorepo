@@ -50,6 +50,14 @@ export function createAuth(db: Db, hooks: AuthHooks = {}) {
         staffSince: { type: "date", required: false },
 
         whatsapp: { type: "string", required: false },
+        // CPF (11 dígitos) ou CNPJ (14 dígitos), sem máscara. Persistido só
+        // em dígitos pra facilitar comparação; UI aplica máscara.
+        // Obrigatório no momento de qualquer checkout (cartão Stripe ou PIX
+        // AbacatePay) — AbacatePay exige no `customer.taxId`, e a gente
+        // espelha pro Stripe via `customer_data.tax_id_data` por consistência
+        // contábil/NFe. Se o user ainda não tem, o front coleta antes do
+        // checkout e salva via authClient.updateUser.
+        taxId: { type: "string", required: false },
         institutionType: { type: "string", required: false },
         gender: { type: "string", required: false },
         teachingLevels: { type: "string[]", required: false },

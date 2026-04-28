@@ -2,10 +2,16 @@ import { getStripeClient } from "../infrastructure/stripe/stripe-client.js";
 import { topupToStripePriceId } from "../infrastructure/stripe/topup-price-mapping.js";
 import type { SubscriptionRepository } from "../domain/subscription-repository.js";
 import { getTopup, type TopupId } from "../domain/topup.js";
+import { TaxIdRequiredError } from "../domain/billing-errors.js";
 
 interface Input {
   ownerId: string;
   ownerEmail: string;
+  /**
+   * CPF/CNPJ só dígitos. Obrigatório por consistência com o caminho PIX —
+   * a coleta passa a ser uniforme em todo checkout.
+   */
+  taxId: string;
   topupId: TopupId;
   successUrl: string;
   cancelUrl: string;
@@ -24,6 +30,10 @@ export class CreateTopupCheckoutSessionUseCase {
   constructor(private readonly subscriptions: SubscriptionRepository) {}
 
   async execute(input: Input): Promise<CreateTopupCheckoutOutput> {
+    if (!isValidTaxId(input.taxId)) {
+      throw new TaxIdRequiredError();
+    }
+
     const stripe = getStripeClient();
     const topup = getTopup(input.topupId);
     const priceId = topupToStripePriceId(input.topupId);
@@ -49,6 +59,7 @@ export class CreateTopupCheckoutSessionUseCase {
         ownerId: input.ownerId,
         topupId: input.topupId,
         credits: String(topup.credits),
+        taxId: input.taxId,
       },
       // Pra PJ: NFe pedida no portal depois. Por enquanto deixa o Stripe
       // só capturar o e-mail/CNPJ via collect_tax se habilitado na conta.
@@ -61,4 +72,8 @@ export class CreateTopupCheckoutSessionUseCase {
     }
     return { url: session.url };
   }
+}
+
+function isValidTaxId(value: string): boolean {
+  return /^\d{11}$|^\d{14}$/.test(value);
 }

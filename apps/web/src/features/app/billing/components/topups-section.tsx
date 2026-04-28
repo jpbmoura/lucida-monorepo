@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, Package, Sparkles, Zap } from "lucide-react";
+import { Check, CreditCard, Loader2, Package, QrCode, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { isValidTaxId, normalizeTaxId } from "@/lib/tax-id";
 import { formatBRL } from "../plans";
 import {
   TOPUP_LIST,
@@ -11,18 +13,42 @@ import {
   type TopupDefinition,
   type TopupId,
 } from "../topups";
+import { TaxIdPromptDialog } from "./tax-id-prompt-dialog";
+import { PixCheckoutDialog } from "./pix-checkout-dialog";
+
+type PaymentMethod = "card" | "pix";
 
 /**
- * Grid de 3 cards de top-up. Pode ser mostrado em qualquer lugar — hoje fica
- * na /app/billing. Cada clique abre Stripe Checkout em mode=payment.
+ * Grid de cards de top-up. Cada card oferece dois métodos:
+ *  - Cartão → Stripe Checkout (redirect).
+ *  - PIX    → modal com QR + polling.
+ *
+ * Ambos exigem `taxId` no perfil. Se o user ainda não tem, abre
+ * `TaxIdPromptDialog` antes — depois reentra no fluxo escolhido.
  */
 export function TopupsSection() {
-  const [loading, setLoading] = useState<TopupId | null>(null);
+  const session = authClient.useSession();
+  const persistedTaxId = readTaxIdFromSession(session.data?.user);
+
+  const [loading, setLoading] = useState<{
+    topupId: TopupId;
+    method: PaymentMethod;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function startCheckout(id: TopupId) {
+  // Quando o user clica num botão sem taxId, guardamos a intenção aqui
+  // e abrimos o prompt. Depois que ele salva, retomamos automaticamente.
+  const [pendingAction, setPendingAction] = useState<{
+    topupId: TopupId;
+    method: PaymentMethod;
+  } | null>(null);
+
+  // Modal PIX — null = fechado.
+  const [pixTopup, setPixTopup] = useState<TopupId | null>(null);
+
+  async function startCardCheckout(id: TopupId) {
     setError(null);
-    setLoading(id);
+    setLoading({ topupId: id, method: "card" });
     try {
       const res = await fetch("/v1/billing/topup/checkout", {
         method: "POST",
@@ -30,7 +56,9 @@ export function TopupsSection() {
         body: JSON.stringify({ topupId: id }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
+        const body = (await res.json().catch(() => null)) as
+          | { code?: string; message?: string }
+          | null;
         throw new Error(body?.message ?? "Não foi possível iniciar a compra.");
       }
       const { data } = (await res.json()) as { data: { url: string } };
@@ -40,6 +68,47 @@ export function TopupsSection() {
       setLoading(null);
     }
   }
+
+  function startPixCheckout(id: TopupId) {
+    setError(null);
+    setPixTopup(id);
+  }
+
+  function start(topupId: TopupId, method: PaymentMethod) {
+    if (!persistedTaxId || !isValidTaxId(persistedTaxId)) {
+      setPendingAction({ topupId, method });
+      return;
+    }
+    if (method === "card") {
+      void startCardCheckout(topupId);
+    } else {
+      startPixCheckout(topupId);
+    }
+  }
+
+  function handleTaxIdSaved(savedTaxId: string) {
+    if (!pendingAction) return;
+    const { topupId, method } = pendingAction;
+    setPendingAction(null);
+    // O hook useSession pode demorar a re-fetch; usamos o valor salvo
+    // direto pra não esperar o invalidate.
+    if (method === "card") {
+      void startCardCheckout(topupId);
+    } else {
+      // PIX precisa do taxId no body — passa direto via state, sem
+      // depender do session refresh.
+      setPixTopup(topupId);
+      // savedTaxId é usado pelo modal via `taxId={savedTaxId}` quando
+      // session ainda não carregou; ver resolveTaxIdForPix abaixo.
+      setOptimisticTaxId(savedTaxId);
+    }
+  }
+
+  // Se o user acabou de salvar, usamos o valor "optimistic" enquanto a
+  // session do BetterAuth não revalida. Depois disso, passamos a usar
+  // `persistedTaxId`.
+  const [optimisticTaxId, setOptimisticTaxId] = useState<string | null>(null);
+  const taxIdForPix = persistedTaxId ?? optimisticTaxId ?? "";
 
   return (
     <section className="mb-12">
@@ -70,12 +139,26 @@ export function TopupsSection() {
           <TopupCard
             key={topup.id}
             topup={topup}
-            loading={loading === topup.id}
-            disabled={loading !== null && loading !== topup.id}
-            onSelect={() => startCheckout(topup.id)}
+            loading={loading?.topupId === topup.id ? loading.method : null}
+            disabledByOther={loading !== null && loading.topupId !== topup.id}
+            onSelect={(method) => start(topup.id, method)}
           />
         ))}
       </div>
+
+      <TaxIdPromptDialog
+        open={pendingAction !== null}
+        onOpenChange={(v) => {
+          if (!v) setPendingAction(null);
+        }}
+        onSaved={handleTaxIdSaved}
+      />
+
+      <PixCheckoutDialog
+        topupId={pixTopup}
+        taxId={normalizeTaxId(taxIdForPix)}
+        onClose={() => setPixTopup(null)}
+      />
     </section>
   );
 }
@@ -83,13 +166,13 @@ export function TopupsSection() {
 function TopupCard({
   topup,
   loading,
-  disabled,
+  disabledByOther,
   onSelect,
 }: {
   topup: TopupDefinition;
-  loading: boolean;
-  disabled: boolean;
-  onSelect: () => void;
+  loading: PaymentMethod | null;
+  disabledByOther: boolean;
+  onSelect(method: PaymentMethod): void;
 }) {
   const isPopular = topup.highlight === "popular";
   const isBestValue = topup.highlight === "best-value";
@@ -160,25 +243,46 @@ function TopupCard({
         <Bullet>Sem renovação automática</Bullet>
       </ul>
 
-      <Button
-        variant={isPopular ? "primary" : "outline"}
-        size="md"
-        onClick={onSelect}
-        disabled={disabled || loading}
-        className={cn(
-          "mt-auto",
-          !isPopular && !isBestValue && "border-gray-200",
-        )}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Abrindo...
-          </>
-        ) : (
-          <>Comprar {topup.name}</>
-        )}
-      </Button>
+      <div className="mt-auto flex flex-col gap-2">
+        <Button
+          variant={isPopular ? "primary" : "outline"}
+          size="md"
+          onClick={() => onSelect("card")}
+          disabled={disabledByOther || loading !== null}
+          className={cn(!isPopular && !isBestValue && "border-gray-200")}
+        >
+          {loading === "card" ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Abrindo...
+            </>
+          ) : (
+            <>
+              <CreditCard className="size-4" />
+              Cartão
+            </>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="md"
+          onClick={() => onSelect("pix")}
+          disabled={disabledByOther || loading !== null}
+          className="border-gray-200"
+        >
+          {loading === "pix" ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Abrindo...
+            </>
+          ) : (
+            <>
+              <QrCode className="size-4" />
+              PIX
+            </>
+          )}
+        </Button>
+      </div>
     </article>
   );
 }
@@ -192,4 +296,16 @@ function Bullet({ children }: { children: React.ReactNode }) {
       {children}
     </li>
   );
+}
+
+/**
+ * Lê `taxId` da session BetterAuth. additionalFields é dinâmico em
+ * runtime; o cast localizado evita poluir o tipo público.
+ */
+function readTaxIdFromSession(user: unknown): string | null {
+  if (typeof user !== "object" || user === null) return null;
+  const value = (user as { taxId?: unknown }).taxId;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
 }

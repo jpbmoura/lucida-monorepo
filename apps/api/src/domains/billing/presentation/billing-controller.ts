@@ -8,13 +8,29 @@ import type { CreateTopupCheckoutSessionUseCase } from "../application/create-to
 import type { CreatePortalSessionUseCase } from "../application/create-portal-session.js";
 import type { HandleStripeWebhookUseCase } from "../application/handle-stripe-webhook.js";
 import type { ExpireStaleWalletsUseCase } from "../application/expire-stale-wallets.js";
+import type { CreatePixTopupUseCase } from "../application/create-pix-topup.js";
+import type { GetPixTopupStatusUseCase } from "../application/get-pix-topup-status.js";
+import type { HandleAbacatePayWebhookUseCase } from "../application/handle-abacatepay-webhook.js";
 import type { Auth } from "@/domains/iam/infrastructure/better-auth/auth.js";
-import { checkoutBody, ledgerQuery, topupBody } from "./billing-schemas.js";
+import {
+  checkoutBody,
+  ledgerQuery,
+  pixTopupBody,
+  pixTopupParam,
+  topupBody,
+} from "./billing-schemas.js";
 import {
   getStripeClient,
   isStripeConfigured,
 } from "../infrastructure/stripe/stripe-client.js";
+import { isAbacatePayConfigured } from "../infrastructure/abacatepay/abacatepay-client.js";
+import { abacatePayEventSchema } from "../infrastructure/abacatepay/abacatepay-event-schema.js";
+import { verifyAbacatePayWebhook } from "../infrastructure/abacatepay/abacatepay-webhook-verify.js";
 import { DomainError } from "@/shared/errors/domain-error.js";
+import {
+  AbacatePayNotConfiguredError,
+  TaxIdRequiredError,
+} from "../domain/billing-errors.js";
 
 interface Deps {
   getBalance: GetBalanceUseCase;
@@ -25,6 +41,9 @@ interface Deps {
   createPortalSession: CreatePortalSessionUseCase;
   handleStripeWebhook: HandleStripeWebhookUseCase;
   expireStaleWallets: ExpireStaleWalletsUseCase;
+  createPixTopup: CreatePixTopupUseCase;
+  getPixTopupStatus: GetPixTopupStatusUseCase;
+  handleAbacatePayWebhook: HandleAbacatePayWebhookUseCase;
   auth: Auth;
 }
 
@@ -81,18 +100,21 @@ export class BillingController {
       const { planId } = checkoutBody.parse(req.body);
       const ownerId = req.auth!.userId;
 
-      // Pega email+name do user via BetterAuth — necessário pro Stripe Customer.
+      // Pega email+name+taxId do user via BetterAuth — necessário pro Stripe Customer.
       const session = await this.deps.auth.api.getSession({
         headers: req.headers as unknown as Headers,
       });
       if (!session) {
         throw new Error("Sessão não encontrada.");
       }
+      const taxId = readTaxIdFromUser(session.user);
+      if (!taxId) throw new TaxIdRequiredError();
 
       const { url } = await this.deps.createCheckoutSession.execute({
         ownerId,
         ownerEmail: session.user.email,
         ownerName: session.user.name ?? null,
+        taxId,
         planId,
         successUrl: `${env.WEB_ORIGIN}/app/billing?checkout=success`,
         cancelUrl: `${env.WEB_ORIGIN}/precos?checkout=canceled`,
@@ -115,10 +137,13 @@ export class BillingController {
       if (!session) {
         throw new Error("Sessão não encontrada.");
       }
+      const taxId = readTaxIdFromUser(session.user);
+      if (!taxId) throw new TaxIdRequiredError();
 
       const { url } = await this.deps.createTopupCheckoutSession.execute({
         ownerId,
         ownerEmail: session.user.email,
+        taxId,
         topupId,
         successUrl: `${env.WEB_ORIGIN}/app/billing?checkout=success`,
         cancelUrl: `${env.WEB_ORIGIN}/app/billing?checkout=canceled`,
@@ -137,6 +162,71 @@ export class BillingController {
         returnUrl: `${env.WEB_ORIGIN}/app/billing`,
       });
       res.json({ data: { url } });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /v1/billing/topup/pix — gera QR PIX via AbacatePay.
+   * O body traz `taxId` explícito; a gente valida que bate com o do user
+   * (ou salva, se ainda não tinha) pra manter session e doc consistentes.
+   */
+  pixTopup: RequestHandler = async (req, res, next) => {
+    try {
+      if (!isAbacatePayConfigured()) throw new AbacatePayNotConfiguredError();
+      const { topupId, taxId } = pixTopupBody.parse(req.body);
+      const ownerId = req.auth!.userId;
+
+      const session = await this.deps.auth.api.getSession({
+        headers: req.headers as unknown as Headers,
+      });
+      if (!session) {
+        throw new Error("Sessão não encontrada.");
+      }
+
+      const data = await this.deps.createPixTopup.execute({
+        ownerId,
+        ownerEmail: session.user.email,
+        ownerName: session.user.name ?? null,
+        taxId,
+        topupId,
+      });
+      res.json({
+        data: {
+          abacateId: data.abacateId,
+          brCode: data.brCode,
+          brCodeBase64: data.brCodeBase64,
+          expiresAt: data.expiresAt.toISOString(),
+          amountCents: data.amountCents,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * GET /v1/billing/topup/pix/:abacateId — espelho local do status.
+   * Front polla esse endpoint enquanto o modal PIX está aberto.
+   */
+  pixTopupStatus: RequestHandler = async (req, res, next) => {
+    try {
+      const { abacateId } = pixTopupParam.parse(req.params);
+      const data = await this.deps.getPixTopupStatus.execute({
+        abacateId,
+        ownerId: req.auth!.userId,
+      });
+      res.json({
+        data: {
+          abacateId: data.abacateId,
+          status: data.status,
+          effectiveStatus: data.effectiveStatus,
+          amountCents: data.amountCents,
+          expiresAt: data.expiresAt.toISOString(),
+          paidAt: data.paidAt?.toISOString() ?? null,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -181,6 +271,50 @@ export class BillingController {
   };
 
   /**
+   * Webhook AbacatePay — autenticado por `?webhookSecret=` na query.
+   * Aceita JSON parseado normalmente (não precisa de raw body em v2,
+   * já que não há HMAC sobre o corpo).
+   *
+   * Sempre devolve 200 quando o secret bate; falhas internas viram log
+   * mas não voltam pra AbacatePay como 5xx (evita cascata de retries em
+   * problemas que não são culpa do remetente). Erros de schema/secret
+   * sim voltam 4xx pro provedor não tentar de novo com o mesmo payload.
+   */
+  abacatepayWebhook: RequestHandler = async (req, res) => {
+    if (!env.ABACATEPAY_WEBHOOK_SECRET) {
+      res.status(503).end();
+      return;
+    }
+
+    const ok = verifyAbacatePayWebhook(req, env.ABACATEPAY_WEBHOOK_SECRET);
+    if (!ok) {
+      res.status(401).json({ error: "Invalid webhook secret." });
+      return;
+    }
+
+    const parsed = abacatePayEventSchema.safeParse(req.body);
+    if (!parsed.success) {
+      console.error(
+        "[billing/abacatepay] payload inválido:",
+        parsed.error.message,
+      );
+      res.status(400).json({ error: "Invalid payload." });
+      return;
+    }
+
+    try {
+      await this.deps.handleAbacatePayWebhook.execute(parsed.data);
+    } catch (err) {
+      // Loga mas devolve 200 — o evento é guardado pra inspeção e a
+      // gente prefere não fazer AbacatePay reentregar indefinidamente
+      // por bug nosso. Se for transitório (Mongo down), o webhook é
+      // recriado quando o user reabrir o modal e o front re-pollar.
+      console.error("[billing/abacatepay] handler error", err);
+    }
+    res.status(200).json({ received: true });
+  };
+
+  /**
    * Endpoint interno pra cron externo (Railway Cron Jobs, GitHub Actions etc).
    * Protegido por `x-cron-secret` — sem o header correto devolve 404
    * (não 401 pra não dar dica de existência).
@@ -205,4 +339,18 @@ export class BillingController {
       next(err);
     }
   };
+}
+
+/**
+ * Lê `taxId` do user da BetterAuth. O additionalFields adiciona o campo
+ * dinamicamente, mas o tipo do session.user em runtime ainda é genérico —
+ * por isso o cast localizado.
+ */
+function readTaxIdFromUser(user: unknown): string | null {
+  if (typeof user !== "object" || user === null) return null;
+  const value = (user as { taxId?: unknown }).taxId;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!/^\d{11}$|^\d{14}$/.test(trimmed)) return null;
+  return trimmed;
 }

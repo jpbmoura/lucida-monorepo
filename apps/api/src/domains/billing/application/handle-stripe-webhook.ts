@@ -14,7 +14,7 @@ import {
   TOPUP_VALIDITY_DAYS,
 } from "../domain/topup.js";
 import { stripePriceIdToPlan } from "../infrastructure/stripe/plan-price-mapping.js";
-import { markEventProcessed } from "../infrastructure/stripe/webhook-idempotency.js";
+import { markEventProcessed } from "../infrastructure/webhook-idempotency.js";
 import type { BillingMailer } from "./billing-mailer.js";
 
 interface Deps {
@@ -44,7 +44,8 @@ export class HandleStripeWebhookUseCase {
 
   async execute(event: Stripe.Event): Promise<void> {
     const { isNew } = await markEventProcessed({
-      eventId: event.id,
+      provider: "stripe",
+      eventKey: event.id,
       eventType: event.type,
     });
     if (!isNew) return;

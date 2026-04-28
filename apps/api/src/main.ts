@@ -113,6 +113,15 @@ import { CreateTopupCheckoutSessionUseCase } from "@/domains/billing/application
 import { CreatePortalSessionUseCase } from "@/domains/billing/application/create-portal-session.js";
 import { HandleStripeWebhookUseCase } from "@/domains/billing/application/handle-stripe-webhook.js";
 import { ExpireStaleWalletsUseCase } from "@/domains/billing/application/expire-stale-wallets.js";
+import { CreatePixTopupUseCase } from "@/domains/billing/application/create-pix-topup.js";
+import { GetPixTopupStatusUseCase } from "@/domains/billing/application/get-pix-topup-status.js";
+import { HandleAbacatePayWebhookUseCase } from "@/domains/billing/application/handle-abacatepay-webhook.js";
+import { MongoosePixTopupIntentRepository } from "@/domains/billing/infrastructure/mongoose-pix-topup-intent-repository.js";
+import {
+  getAbacatePayClient,
+  isAbacatePayConfigured,
+  type AbacatePayClient,
+} from "@/domains/billing/infrastructure/abacatepay/abacatepay-client.js";
 import { SmtpBillingMailer } from "@/domains/billing/infrastructure/smtp-billing-mailer.js";
 import { BillingController } from "@/domains/billing/presentation/billing-controller.js";
 import {
@@ -452,6 +461,15 @@ export async function buildApp(): Promise<Express> {
 
   // --- billing controller (precisa do auth pra recuperar email do user no
   // checkout; por isso fica aqui embaixo) ---
+  // AbacatePay (PIX) é opcional — sem env, o client não é instanciado
+  // e o controller devolve 503 nas rotas /pix. Use cases ainda são
+  // construídos com um stub pra simplificar a injeção.
+  const pixIntentRepository = new MongoosePixTopupIntentRepository();
+  const abacatePayClient = isAbacatePayConfigured()
+    ? getAbacatePayClient()
+    : new UnavailableAbacatePayClient();
+  const billingMailer = new SmtpBillingMailer();
+
   const billingController = new BillingController({
     getBalance: new GetBalanceUseCase(walletRepository),
     listLedger: new ListLedgerUseCase(ledgerRepository),
@@ -465,12 +483,23 @@ export async function buildApp(): Promise<Express> {
       subscriptions: subscriptionsRepo,
       wallets: walletRepository,
       ledger: ledgerRepository,
-      mailer: new SmtpBillingMailer(),
+      mailer: billingMailer,
     }),
     expireStaleWallets: new ExpireStaleWalletsUseCase(
       walletRepository,
       ledgerRepository,
     ),
+    createPixTopup: new CreatePixTopupUseCase(
+      abacatePayClient,
+      pixIntentRepository,
+    ),
+    getPixTopupStatus: new GetPixTopupStatusUseCase(pixIntentRepository),
+    handleAbacatePayWebhook: new HandleAbacatePayWebhookUseCase({
+      intents: pixIntentRepository,
+      wallets: walletRepository,
+      ledger: ledgerRepository,
+      mailer: billingMailer,
+    }),
     auth,
   });
 
@@ -739,6 +768,20 @@ class UnavailableOmrClient implements OmrServiceClient {
   async process(): Promise<never> {
     throw new OmrServiceError(
       "Serviço OMR não configurado. Defina OMR_SERVICE_URL pra habilitar o scanner.",
+    );
+  }
+}
+
+/**
+ * Stub usado quando ABACATEPAY_API_KEY não está configurado. Não é
+ * acessível via rota — o controller checa `isAbacatePayConfigured()`
+ * antes e devolve 503. Existe só pra satisfazer o tipo do use case sem
+ * ramificar a construção condicionalmente.
+ */
+class UnavailableAbacatePayClient implements AbacatePayClient {
+  async createPixQrCode(): Promise<never> {
+    throw new Error(
+      "AbacatePay não configurado. Defina ABACATEPAY_API_KEY pra habilitar PIX.",
     );
   }
 }

@@ -50,6 +50,15 @@ const envSchema = z.object({
   STRIPE_TOPUP_5K_PRICE_ID: z.string().optional(),
   STRIPE_TOPUP_15K_PRICE_ID: z.string().optional(),
 
+  // AbacatePay — PIX para top-ups. Stripe segue como provedor de cartão;
+  // AbacatePay entra só no caminho PIX porque o Stripe não libera PIX pra
+  // nossa conta. Sem ABACATEPAY_API_KEY a rota POST /v1/billing/topup/pix
+  // devolve 503 — igual ao gating do Stripe.
+  ABACATEPAY_API_KEY: z.string().optional(),
+  // Secret enviado como query param ?webhookSecret=... pelo painel da
+  // AbacatePay. É o único mecanismo de verificação documentado em v2.
+  ABACATEPAY_WEBHOOK_SECRET: z.string().min(16).optional(),
+
   // Secret do cron que roda POST /v1/internal/expire-credits diariamente.
   // Se não configurado, o endpoint devolve 503 — protege contra calls sem
   // intenção explícita.

@@ -30,6 +30,7 @@ export function makeIamRouter(auth: Auth): Router {
           image: u.image ?? null,
           activeOrganizationId: req.auth!.activeOrganizationId,
           whatsapp: (u.whatsapp as string | undefined) ?? "",
+          taxId: (u.taxId as string | null | undefined) ?? null,
           institutionType: (u.institutionType as string | null | undefined) ?? null,
           gender: (u.gender as string | null | undefined) ?? null,
           teachingLevels: (u.teachingLevels as string[] | undefined) ?? [],

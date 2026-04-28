@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Check, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { formatTaxId } from "@/lib/tax-id";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,28 @@ import {
   type Option,
 } from "../profile-options";
 
+/**
+ * CPF (11 dígitos) ou CNPJ (14). Aceita máscara comum (`.`, `-`, `/`) e
+ * normaliza pra dígitos antes de salvar — o backend exige só dígitos.
+ * Vazio é permitido aqui (campo opcional no perfil); a obrigatoriedade
+ * acontece só no momento do checkout (Stripe ou PIX).
+ */
+const taxIdField = z
+  .string()
+  .optional()
+  .refine(
+    (value) => {
+      if (!value) return true;
+      const digits = value.replace(/\D/g, "");
+      return digits.length === 0 || digits.length === 11 || digits.length === 14;
+    },
+    { message: "CPF (11 dígitos) ou CNPJ (14 dígitos)." },
+  );
+
 const profileFormSchema = z.object({
   name: z.string().max(120).optional(),
   whatsapp: z.string().max(40).optional(),
+  taxId: taxIdField,
   institutionType: z.string().optional(),
   gender: z.string().optional(),
   teachingLevels: z.array(z.string()).optional(),
@@ -49,6 +69,7 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
     defaultValues: {
       name: profile.name ?? "",
       whatsapp: profile.whatsapp ?? "",
+      taxId: formatTaxId(profile.taxId ?? ""),
       institutionType: profile.institutionType ?? "",
       gender: profile.gender ?? "",
       teachingLevels: profile.teachingLevels ?? [],
@@ -69,6 +90,7 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
     const payload: Record<string, unknown> = {};
     if (values.name && values.name.trim()) payload.name = values.name.trim();
     if (values.whatsapp !== undefined) payload.whatsapp = values.whatsapp.trim();
+    if (values.taxId !== undefined) payload.taxId = values.taxId.replace(/\D/g, "");
     if (values.institutionType !== undefined)
       payload.institutionType = values.institutionType;
     if (values.gender !== undefined) payload.gender = values.gender;
@@ -125,6 +147,29 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
             autoComplete="tel"
             {...form.register("whatsapp")}
           />
+        </Field>
+        <Field
+          label="CPF ou CNPJ"
+          hint="Obrigatório no momento de qualquer pagamento (cartão ou PIX)"
+        >
+          <Controller
+            control={form.control}
+            name="taxId"
+            render={({ field }) => (
+              <Input
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                value={field.value ?? ""}
+                onChange={(e) => field.onChange(formatTaxId(e.target.value))}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
+          {form.formState.errors.taxId && (
+            <p className="mt-1 text-xs text-red-600">
+              {form.formState.errors.taxId.message}
+            </p>
+          )}
         </Field>
       </Section>
 
@@ -402,3 +447,4 @@ function ChipsMulti({
     </div>
   );
 }
+

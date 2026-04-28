@@ -8,6 +8,8 @@ export interface UserProfileDTO {
   image: string | null;
   activeOrganizationId: string | null;
   whatsapp: string;
+  /** CPF (11) ou CNPJ (14), só dígitos. Null = ainda não cadastrou. */
+  taxId: string | null;
   institutionType: string | null;
   gender: string | null;
   teachingLevels: string[];

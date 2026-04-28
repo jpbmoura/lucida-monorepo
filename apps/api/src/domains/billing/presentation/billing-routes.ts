@@ -2,9 +2,17 @@ import express, { Router, type RequestHandler } from "express";
 import type { BillingController } from "./billing-controller.js";
 
 /**
- * Rotas PÚBLICAS — apenas o webhook Stripe.
- * IMPORTANTE: esse router precisa ser montado ANTES do express.json() global
- * em app.ts. A verificação de assinatura Stripe exige o body bruto.
+ * Rotas PÚBLICAS — webhooks dos provedores de pagamento.
+ *
+ * Stripe webhook precisa do body BRUTO pra `stripe.webhooks.constructEvent`
+ * verificar a assinatura — por isso o `express.raw({ type: 'application/json' })`
+ * inline. Esse router precisa ser montado ANTES do `express.json()` global
+ * (ver `app.ts → rawBodyRouters`).
+ *
+ * AbacatePay webhook NÃO usa HMAC sobre raw body (v2 só tem o
+ * `?webhookSecret=` na query), então aceita JSON parseado normalmente.
+ * A gente adiciona um `express.json` localmente já que o router é
+ * montado antes do parser global.
  */
 export function makeBillingPublicRouter({
   controller,
@@ -12,11 +20,19 @@ export function makeBillingPublicRouter({
   controller: BillingController;
 }): Router {
   const router = Router();
+
   router.post(
     "/v1/billing/webhook",
     express.raw({ type: "application/json" }),
     controller.webhook,
   );
+
+  router.post(
+    "/v1/billing/abacatepay/webhook",
+    express.json({ limit: "1mb" }),
+    controller.abacatepayWebhook,
+  );
+
   return router;
 }
 
@@ -49,6 +65,16 @@ export function makeBillingAuthedRouter({
     "/v1/billing/topup/checkout",
     requireAuth,
     controller.topupCheckout,
+  );
+  router.post(
+    "/v1/billing/topup/pix",
+    requireAuth,
+    controller.pixTopup,
+  );
+  router.get(
+    "/v1/billing/topup/pix/:abacateId",
+    requireAuth,
+    controller.pixTopupStatus,
   );
   return router;
 }
