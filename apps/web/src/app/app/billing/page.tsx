@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   fetchBalance,
+  fetchInvoices,
   fetchLedger,
   fetchCurrentSubscription,
 } from "@/features/app/billing/data";
@@ -16,10 +17,11 @@ interface PageProps {
 
 export default async function BillingRoute({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const [balance, ledger, subscription] = await Promise.all([
+  const [balance, ledger, subscription, invoices] = await Promise.all([
     fetchBalance().catch(() => ({ total: 0, breakdown: [] })),
     fetchLedger(50).catch(() => []),
     fetchCurrentSubscription().catch(() => null),
+    fetchInvoices().catch(() => []),
   ]);
 
   return (
@@ -27,6 +29,7 @@ export default async function BillingRoute({ searchParams }: PageProps) {
       balance={balance}
       ledger={ledger}
       subscription={subscription}
+      invoices={invoices}
       checkoutSuccess={sp.checkout === "success"}
     />
   );

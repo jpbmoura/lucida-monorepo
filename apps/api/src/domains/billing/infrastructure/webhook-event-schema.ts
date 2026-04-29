@@ -3,15 +3,16 @@ import mongoose, { Schema, type Model } from "mongoose";
 /**
  * Registro de eventos de webhook já processados — idempotência cross-provider.
  *
- * O `_id` é prefixado por provider (`stripe:evt_xxx`, `abacate:transparent.completed:char_yyy:PAID`)
- * pra evitar colisão no espaço de IDs e deixar claro de onde veio a entrada.
+ * O `_id` é prefixado por provider (`stripe:evt_xxx`, `abacate:transparent.completed:char_yyy:PAID`,
+ * `nfeio:<event-id>`) pra evitar colisão no espaço de IDs e deixar claro de
+ * onde veio a entrada.
  *
- * TTL de 30 dias: tanto Stripe quanto AbacatePay limitam retries a poucos
- * dias; depois disso é seguro esquecer.
+ * TTL de 30 dias: Stripe/AbacatePay/NFE.io limitam retries a poucos dias;
+ * depois disso é seguro esquecer.
  */
 export interface WebhookEventDoc {
   _id: string;
-  provider: "stripe" | "abacatepay";
+  provider: "stripe" | "abacatepay" | "nfeio";
   type: string;
   processedAt: Date;
 }

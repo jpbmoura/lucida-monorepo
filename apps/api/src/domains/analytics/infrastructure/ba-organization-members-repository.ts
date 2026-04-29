@@ -82,7 +82,7 @@ export class BaOrganizationMembersRepository
     }
 
     const doc = await this.authDb
-      .collection<{ _id: ObjectId; name?: string; slug?: string }>("organization")
+      .collection<OrganizationDoc>("organization")
       .findOne({ _id: oid });
     if (!doc) return null;
 
@@ -90,6 +90,18 @@ export class BaOrganizationMembersRepository
       id: String(doc._id),
       name: doc.name ?? "",
       slug: doc.slug ?? "",
+      taxId: doc.taxId ?? null,
+      legalName: doc.legalName ?? null,
+      municipalRegistration: doc.municipalRegistration ?? null,
+      addressPostalCode: doc.addressPostalCode ?? null,
+      addressStreet: doc.addressStreet ?? null,
+      addressNumber: doc.addressNumber ?? null,
+      addressComplement: doc.addressComplement ?? null,
+      addressDistrict: doc.addressDistrict ?? null,
+      addressCityCode: doc.addressCityCode ?? null,
+      addressCityName: doc.addressCityName ?? null,
+      addressStateUf: doc.addressStateUf ?? null,
+      addressCountry: doc.addressCountry ?? null,
     };
   }
 
@@ -114,4 +126,28 @@ export class BaOrganizationMembersRepository
       );
     return doc?.role ?? null;
   }
+}
+
+/**
+ * Shape do documento `organization` no BA MongoDB. Inclui os campos
+ * `additionalFields` configurados em `auth.ts` (taxId + legalName +
+ * endereço estruturado). Tudo opcional porque BetterAuth não força
+ * default — orgs criadas antes da feature ficam sem.
+ */
+interface OrganizationDoc {
+  _id: ObjectId;
+  name?: string;
+  slug?: string;
+  taxId?: string | null;
+  legalName?: string | null;
+  municipalRegistration?: string | null;
+  addressPostalCode?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  addressDistrict?: string | null;
+  addressCityCode?: string | null;
+  addressCityName?: string | null;
+  addressStateUf?: string | null;
+  addressCountry?: string | null;
 }

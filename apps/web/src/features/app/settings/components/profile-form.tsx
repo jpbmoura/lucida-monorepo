@@ -9,6 +9,7 @@ import { Check, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { formatTaxId } from "@/lib/tax-id";
+import { formatCep, lookupCep } from "@/lib/viacep";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,38 @@ const taxIdField = z
     { message: "CPF (11 dígitos) ou CNPJ (14 dígitos)." },
   );
 
+/**
+ * Dados fiscais — todos opcionais aqui (settings é livre). A obrigatoriedade
+ * acontece no momento do checkout: o backend devolve 422 se taxId é CNPJ
+ * e algum desses campos está vazio. UI explica isso na descrição da seção.
+ *
+ * `addressCityCode` aceita string vazia ou 7 dígitos (IBGE). Se o user
+ * digitar parcial, o submit vai falhar — bom feedback.
+ */
+const optionalIbgeField = z
+  .string()
+  .optional()
+  .refine(
+    (v) => !v || /^\d{7}$/.test(v),
+    "Código IBGE precisa ter 7 dígitos.",
+  );
+
+const optionalUfField = z
+  .string()
+  .optional()
+  .refine(
+    (v) => !v || /^[A-Za-z]{2}$/.test(v),
+    "UF: 2 letras (ex: SP).",
+  );
+
+const optionalCepField = z
+  .string()
+  .optional()
+  .refine(
+    (v) => !v || v.replace(/\D/g, "").length === 8,
+    "CEP precisa ter 8 dígitos.",
+  );
+
 const profileFormSchema = z.object({
   name: z.string().max(120).optional(),
   whatsapp: z.string().max(40).optional(),
@@ -55,6 +88,18 @@ const profileFormSchema = z.object({
   stateUf: z.string().optional(),
   studentsRange: z.string().optional(),
   teachingYears: z.string().optional(),
+
+  // Dados fiscais PJ — opcionais aqui, exigidos no checkout pra CNPJ.
+  legalName: z.string().max(200).optional(),
+  municipalRegistration: z.string().max(40).optional(),
+  addressPostalCode: optionalCepField,
+  addressStreet: z.string().max(200).optional(),
+  addressNumber: z.string().max(20).optional(),
+  addressComplement: z.string().max(120).optional(),
+  addressDistrict: z.string().max(120).optional(),
+  addressCityCode: optionalIbgeField,
+  addressCityName: z.string().max(120).optional(),
+  addressStateUf: optionalUfField,
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -78,8 +123,45 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
       stateUf: profile.stateUf ?? "",
       studentsRange: profile.studentsRange ?? "",
       teachingYears: profile.teachingYears ?? "",
+      legalName: profile.legalName ?? "",
+      municipalRegistration: profile.municipalRegistration ?? "",
+      addressPostalCode: profile.addressPostalCode
+        ? formatCep(profile.addressPostalCode)
+        : "",
+      addressStreet: profile.addressStreet ?? "",
+      addressNumber: profile.addressNumber ?? "",
+      addressComplement: profile.addressComplement ?? "",
+      addressDistrict: profile.addressDistrict ?? "",
+      addressCityCode: profile.addressCityCode ?? "",
+      addressCityName: profile.addressCityName ?? "",
+      addressStateUf: profile.addressStateUf ?? "",
     },
   });
+
+  const [cepLoading, setCepLoading] = useState(false);
+
+  async function handleCepBlur(raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const result = await lookupCep(digits);
+      if (!result) return;
+      const current = form.getValues();
+      if (!current.addressStreet)
+        form.setValue("addressStreet", result.logradouro, { shouldDirty: true });
+      if (!current.addressDistrict)
+        form.setValue("addressDistrict", result.bairro, { shouldDirty: true });
+      if (!current.addressCityName)
+        form.setValue("addressCityName", result.localidade, { shouldDirty: true });
+      if (!current.addressStateUf)
+        form.setValue("addressStateUf", result.uf, { shouldDirty: true });
+      if (!current.addressCityCode)
+        form.setValue("addressCityCode", result.ibge, { shouldDirty: true });
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   async function handleSubmit(values: ProfileFormValues) {
     setServerError(null);
@@ -104,6 +186,31 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
       payload.studentsRange = values.studentsRange;
     if (values.teachingYears !== undefined)
       payload.teachingYears = values.teachingYears;
+
+    // Dados fiscais — manda só dígitos pro CEP, restante trim. Strings
+    // vazias são enviadas pra permitir limpar campos previamente preenchidos.
+    if (values.legalName !== undefined)
+      payload.legalName = values.legalName.trim();
+    if (values.municipalRegistration !== undefined)
+      payload.municipalRegistration = values.municipalRegistration.trim();
+    if (values.addressPostalCode !== undefined)
+      payload.addressPostalCode = values.addressPostalCode.replace(/\D/g, "");
+    if (values.addressStreet !== undefined)
+      payload.addressStreet = values.addressStreet.trim();
+    if (values.addressNumber !== undefined)
+      payload.addressNumber = values.addressNumber.trim();
+    if (values.addressComplement !== undefined)
+      payload.addressComplement = values.addressComplement.trim();
+    if (values.addressDistrict !== undefined)
+      payload.addressDistrict = values.addressDistrict.trim();
+    if (values.addressCityCode !== undefined)
+      payload.addressCityCode = values.addressCityCode;
+    if (values.addressCityName !== undefined)
+      payload.addressCityName = values.addressCityName.trim();
+    if (values.addressStateUf !== undefined)
+      payload.addressStateUf = values.addressStateUf.toUpperCase();
+    // Country fixo "BR" enquanto não houver tomador estrangeiro.
+    if (values.addressPostalCode || values.legalName) payload.addressCountry = "BR";
 
     const res = await authClient.updateUser(payload);
     if (res.error) {
@@ -168,6 +275,126 @@ export function ProfileForm({ profile }: { profile: UserProfileDTO }) {
           {form.formState.errors.taxId && (
             <p className="mt-1 text-xs text-red-600">
               {form.formState.errors.taxId.message}
+            </p>
+          )}
+        </Field>
+      </Section>
+
+      <Section
+        title="Dados fiscais (PJ)"
+        description="Necessário para emissão de nota fiscal quando você é pessoa jurídica (CNPJ). PF (CPF) pode deixar em branco."
+      >
+        <Field label="Razão social">
+          <Input
+            placeholder="Lucida Tecnologia LTDA"
+            autoComplete="organization"
+            {...form.register("legalName")}
+          />
+          {form.formState.errors.legalName && (
+            <p className="mt-1 text-xs text-red-600">
+              {form.formState.errors.legalName.message}
+            </p>
+          )}
+        </Field>
+        <Field
+          label="Inscrição Municipal"
+          hint="Opcional — exigida em alguns municípios"
+        >
+          <Input
+            placeholder="000000000"
+            inputMode="numeric"
+            {...form.register("municipalRegistration")}
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_2fr]">
+          <Field label="CEP" hint={cepLoading ? "Buscando..." : undefined}>
+            <Controller
+              control={form.control}
+              name="addressPostalCode"
+              render={({ field }) => (
+                <Input
+                  placeholder="00000-000"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(formatCep(e.target.value))}
+                  onBlur={(e) => {
+                    field.onBlur();
+                    void handleCepBlur(e.target.value);
+                  }}
+                />
+              )}
+            />
+            {form.formState.errors.addressPostalCode && (
+              <p className="mt-1 text-xs text-red-600">
+                {form.formState.errors.addressPostalCode.message}
+              </p>
+            )}
+          </Field>
+          <Field label="Logradouro">
+            <Input
+              placeholder="Rua, avenida..."
+              autoComplete="address-line1"
+              {...form.register("addressStreet")}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_2fr]">
+          <Field label="Número">
+            <Input placeholder="123" {...form.register("addressNumber")} />
+          </Field>
+          <Field label="Complemento" hint="Opcional">
+            <Input
+              placeholder="Sala 12, Bloco A..."
+              autoComplete="address-line2"
+              {...form.register("addressComplement")}
+            />
+          </Field>
+        </div>
+
+        <Field label="Bairro">
+          <Input
+            autoComplete="address-level3"
+            {...form.register("addressDistrict")}
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[2fr_1fr]">
+          <Field label="Cidade">
+            <Input
+              autoComplete="address-level2"
+              {...form.register("addressCityName")}
+            />
+          </Field>
+          <Field label="UF">
+            <Input
+              maxLength={2}
+              placeholder="SP"
+              autoComplete="address-level1"
+              {...form.register("addressStateUf")}
+            />
+            {form.formState.errors.addressStateUf && (
+              <p className="mt-1 text-xs text-red-600">
+                {form.formState.errors.addressStateUf.message}
+              </p>
+            )}
+          </Field>
+        </div>
+
+        <Field
+          label="Código IBGE da cidade"
+          hint="Preenchido pelo CEP — exigido na nota fiscal"
+        >
+          <Input
+            inputMode="numeric"
+            className="font-mono text-sm"
+            {...form.register("addressCityCode")}
+          />
+          {form.formState.errors.addressCityCode && (
+            <p className="mt-1 text-xs text-red-600">
+              {form.formState.errors.addressCityCode.message}
             </p>
           )}
         </Field>

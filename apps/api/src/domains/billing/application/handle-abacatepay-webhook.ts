@@ -7,12 +7,18 @@ import { getTopup, TOPUP_VALIDITY_DAYS } from "../domain/topup.js";
 import { markEventProcessed } from "../infrastructure/webhook-idempotency.js";
 import type { AbacatePayEvent } from "../infrastructure/abacatepay/abacatepay-event-schema.js";
 import type { BillingMailer } from "./billing-mailer.js";
+import type {
+  IssueInvoiceInput,
+  IssueInvoiceUseCase,
+} from "@/domains/invoicing/application/issue-invoice.js";
 
 interface Deps {
   intents: PixTopupIntentRepository;
   wallets: WalletRepository;
   ledger: LedgerRepository;
   mailer: BillingMailer;
+  /** Opcional — null quando NFE.io não está configurado. Best-effort. */
+  issueInvoice?: IssueInvoiceUseCase | null;
 }
 
 /**
@@ -164,6 +170,37 @@ export class HandleAbacatePayWebhookUseCase {
           err,
         );
       }
+    }
+
+    // NFS-e do top-up. ownerEmail vem do payload; se vazio, o
+    // TakerResolver vai ler do user doc — descricao genérica idêntica
+    // ao caminho Stripe pra UX consistente.
+    await this.tryIssueInvoice({
+      source: "topup_pix",
+      externalRef: `abacate:${intent.abacateId}`,
+      ownerId: intent.ownerId,
+      ownerEmail: customerEmail ?? "",
+      organizationId: null, // PIX hoje é sempre pessoal — quando virar institucional, ler do intent.metadata
+      amountCents: topup.priceCents,
+      description: `Lucida — Pacote de ${topup.credits.toLocaleString("pt-BR")} créditos`,
+      metadata: {
+        topupId: intent.topupId,
+        abacateId: intent.abacateId,
+        paymentProvider: "abacatepay",
+      },
+    });
+  }
+
+  private async tryIssueInvoice(input: IssueInvoiceInput): Promise<void> {
+    if (!this.deps.issueInvoice) return;
+    try {
+      await this.deps.issueInvoice.execute(input);
+    } catch (err) {
+      console.error(
+        "[billing/abacatepay] falha ao registrar invoice (skip):",
+        input.externalRef,
+        err,
+      );
     }
   }
 }

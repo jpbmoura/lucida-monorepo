@@ -6,6 +6,7 @@ import { fetchActiveOrganization } from "@/lib/active-organization";
 import { fetchOrgBilling } from "@/features/analytics/billing/data";
 import { BillingModeCard } from "@/features/analytics/settings/components/billing-mode-card";
 import { OrgInfoCard } from "@/features/analytics/settings/components/org-info-card";
+import { OrgFiscalDataCard } from "@/features/analytics/settings/components/org-fiscal-data-card";
 import { NoActiveOrg } from "@/features/analytics/dashboard/sections/no-active-org";
 import { Eyebrow } from "@/features/marketing/components/eyebrow";
 
@@ -51,6 +52,23 @@ export default async function OrgSettingsPage() {
           name={activeOrg.name}
           slug={activeOrg.slug}
           orgId={activeOrg.id}
+        />
+
+        <OrgFiscalDataCard
+          organizationId={activeOrg.id}
+          initial={{
+            taxId: activeOrg.taxId,
+            legalName: activeOrg.legalName,
+            municipalRegistration: activeOrg.municipalRegistration,
+            addressPostalCode: activeOrg.addressPostalCode,
+            addressStreet: activeOrg.addressStreet,
+            addressNumber: activeOrg.addressNumber,
+            addressComplement: activeOrg.addressComplement,
+            addressDistrict: activeOrg.addressDistrict,
+            addressCityCode: activeOrg.addressCityCode,
+            addressCityName: activeOrg.addressCityName,
+            addressStateUf: activeOrg.addressStateUf,
+          }}
         />
 
         <BillingModeCard current={billing.settings.billingMode} />

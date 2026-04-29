@@ -345,6 +345,13 @@ export class BillingController {
  * Lê `taxId` do user da BetterAuth. O additionalFields adiciona o campo
  * dinamicamente, mas o tipo do session.user em runtime ainda é genérico —
  * por isso o cast localizado.
+ *
+ * **Contrato fiscal**: aqui só validamos `taxId` (CPF ou CNPJ). Razão
+ * social, endereço e demais campos PJ ficam fora do gate de checkout —
+ * cliente paga normal mesmo sem; a falta apenas impede a NFS-e de ser
+ * emitida automaticamente. Quando faltar, o `IssueInvoiceUseCase` lança
+ * `InvoiceTakerMissingError`, o webhook handler captura silenciosamente
+ * via `tryIssueInvoice`, e o pagamento segue 100%.
  */
 function readTaxIdFromUser(user: unknown): string | null {
   if (typeof user !== "object" || user === null) return null;

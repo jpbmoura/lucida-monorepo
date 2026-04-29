@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Check, Sparkles, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { isValidTaxId } from "@/lib/tax-id";
+import { TaxIdPromptDialog } from "@/features/app/billing/components/tax-id-prompt-dialog";
 import {
   PLANS,
   formatBRL,
@@ -14,17 +17,37 @@ import {
 } from "@/features/app/billing/plans";
 import type { PlanId } from "@/features/app/billing/data";
 
+function readTaxIdFromSession(user: unknown): string | null {
+  if (typeof user !== "object" || user === null) return null;
+  const value = (user as { taxId?: unknown }).taxId;
+  if (typeof value !== "string") return null;
+  return value.trim() || null;
+}
+
+/**
+ * Página pública de planos. Único pré-check antes do checkout: `taxId`
+ * (exigido por Stripe pra criar Customer). Demais dados fiscais não
+ * bloqueiam — cliente preenche depois pra receber NFS-e auto-emitida.
+ */
 export function PricingPage() {
+  const session = authClient.useSession();
+  const persistedTaxId = readTaxIdFromSession(session.data?.user);
+
   const [period, setPeriod] = useState<PlanPeriod>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [pendingPlan, setPendingPlan] = useState<PlanId | null>(null);
+  const [taxIdDialogOpen, setTaxIdDialogOpen] = useState(false);
+  const [optimisticTaxId, setOptimisticTaxId] = useState<string | null>(null);
+  const effectiveTaxId = persistedTaxId ?? optimisticTaxId ?? "";
 
   const tiers: PlanDefinition[] =
     period === "monthly"
       ? [PLANS.basic_monthly, PLANS.pro_monthly]
       : [PLANS.basic_yearly, PLANS.pro_yearly];
 
-  async function startCheckout(planId: PlanId) {
+  async function callCheckout(planId: PlanId) {
     setError(null);
     setLoadingPlan(planId);
     try {
@@ -34,7 +57,6 @@ export function PricingPage() {
         body: JSON.stringify({ planId }),
       });
       if (res.status === 401) {
-        // Sem sessão — redireciona pro sign-in com retorno pra cá.
         window.location.href = `/sign-in?next=${encodeURIComponent(
           `/precos?plan=${planId}`,
         )}`;
@@ -52,6 +74,30 @@ export function PricingPage() {
       setError((err as Error).message);
       setLoadingPlan(null);
     }
+  }
+
+  function startCheckout(planId: PlanId) {
+    // Sem sessão: deixa o backend devolver 401 e redirecionar — não dá
+    // pra coletar taxId antes de logar.
+    if (!session.data) {
+      void callCheckout(planId);
+      return;
+    }
+    if (!effectiveTaxId || !isValidTaxId(effectiveTaxId)) {
+      setPendingPlan(planId);
+      setTaxIdDialogOpen(true);
+      return;
+    }
+    void callCheckout(planId);
+  }
+
+  function handleTaxIdSaved(savedTaxId: string) {
+    setOptimisticTaxId(savedTaxId);
+    setTaxIdDialogOpen(false);
+    if (!pendingPlan) return;
+    const planId = pendingPlan;
+    setPendingPlan(null);
+    void callCheckout(planId);
   }
 
   return (
@@ -121,6 +167,17 @@ export function PricingPage() {
       <InstitutionalCTA />
 
       <FAQ />
+
+      <TaxIdPromptDialog
+        open={taxIdDialogOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setTaxIdDialogOpen(false);
+            setPendingPlan(null);
+          }
+        }}
+        onSaved={handleTaxIdSaved}
+      />
     </section>
   );
 }

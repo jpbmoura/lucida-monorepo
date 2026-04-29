@@ -16,12 +16,23 @@ import {
 import { stripePriceIdToPlan } from "../infrastructure/stripe/plan-price-mapping.js";
 import { markEventProcessed } from "../infrastructure/webhook-idempotency.js";
 import type { BillingMailer } from "./billing-mailer.js";
+import type {
+  IssueInvoiceInput,
+  IssueInvoiceUseCase,
+} from "@/domains/invoicing/application/issue-invoice.js";
 
 interface Deps {
   subscriptions: SubscriptionRepository;
   wallets: WalletRepository;
   ledger: LedgerRepository;
   mailer: BillingMailer;
+  /**
+   * Opcional. Quando NFE.io não está configurado, o composition root
+   * passa `null` aqui e a emissão é silenciosamente pulada — pagamentos
+   * processam normal. Erros do issueInvoice nunca falham o webhook
+   * (best-effort): wallet já caiu, NF é o "extra".
+   */
+  issueInvoice?: IssueInvoiceUseCase | null;
 }
 
 /**
@@ -318,6 +329,32 @@ export class HandleStripeWebhookUseCase {
       },
     });
     await this.deps.ledger.save(creditEntry);
+
+    // Emissão da NFS-e da renovação. amount_paid é o valor real pago
+    // (já inclui descontos/cupons aplicados). Se não tiver valor pago
+    // (caso raro de invoice $0), pulamos.
+    const amountPaid = (invoice as Stripe.Invoice).amount_paid ?? 0;
+    if (amountPaid > 0) {
+      await this.tryIssueInvoice({
+        source: "subscription",
+        externalRef: `stripe:invoice:${invoice.id ?? ""}`,
+        ownerId: sub.ownerId,
+        ownerEmail: invoice.customer_email ?? "",
+        // organizationId vem de sub.metadata?.organizationId quando o
+        // Stripe sub foi institucional. Hoje todos checkouts são pessoais
+        // — null por padrão. Quando entrar billing institucional, o
+        // metadata propaga até aqui sem mudar essa linha.
+        organizationId: readOrgIdFromSubMetadata(invoice),
+        amountCents: amountPaid,
+        description: `Lucida — ${plan.name} (renovação)`,
+        metadata: {
+          stripeSubscriptionId: sub.stripeSubscriptionId,
+          stripeInvoiceId: invoice.id ?? "",
+          planId: sub.planId,
+          periodEnd: sub.currentPeriodEnd.toISOString(),
+        },
+      });
+    }
   }
 
   /**
@@ -405,7 +442,59 @@ export class HandleStripeWebhookUseCase {
         console.error("[billing] falha ao enviar recibo de topup", err);
       }
     }
+
+    // NFS-e do top-up — descrição inclui qtd de créditos pra rastreabilidade.
+    await this.tryIssueInvoice({
+      source: "topup_stripe",
+      externalRef: `stripe:session:${session.id}`,
+      ownerId,
+      ownerEmail: customerEmail ?? "",
+      organizationId: session.metadata.organizationId ?? null,
+      amountCents: topup.priceCents,
+      description: `Lucida — Pacote de ${topup.credits.toLocaleString("pt-BR")} créditos`,
+      metadata: {
+        topupId,
+        checkoutSessionId: session.id,
+        credits: String(topup.credits),
+      },
+    });
   }
+
+  /**
+   * Best-effort: tenta criar a Invoice local mas nunca falha o webhook.
+   * Se NFE.io não está configurado (`issueInvoice` é null), pula
+   * silenciosamente. Erros (taker missing, mongo down, etc.) são
+   * logados — staff investiga depois. Pagamento já caiu na wallet,
+   * a NFS-e é o "extra".
+   */
+  private async tryIssueInvoice(input: IssueInvoiceInput): Promise<void> {
+    if (!this.deps.issueInvoice) return;
+    try {
+      await this.deps.issueInvoice.execute(input);
+    } catch (err) {
+      console.error(
+        "[billing] falha ao registrar invoice (skip):",
+        input.externalRef,
+        err,
+      );
+    }
+  }
+}
+
+/**
+ * Tenta extrair `organizationId` da subscription que originou esse
+ * invoice. Vai ser populado quando entrar billing institucional —
+ * pra checkout pessoal (caso atual) o campo nem existe no metadata.
+ */
+function readOrgIdFromSubMetadata(invoice: Stripe.Invoice): string | null {
+  const subscriptionId = getSubscriptionFromInvoice(invoice);
+  if (!subscriptionId) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meta = (invoice as any).subscription_details?.metadata as
+    | Record<string, string>
+    | undefined;
+  const orgId = meta?.organizationId;
+  return typeof orgId === "string" && orgId.length > 0 ? orgId : null;
 }
 
 // ───── helpers ──────────────────────────────────────────────

@@ -54,3 +54,33 @@ export async function fetchOrgBilling(): Promise<OrgBillingDTO | null> {
     throw err;
   }
 }
+
+// ───── invoices (NFS-e da org) ────────────────────────────────
+
+export type { InvoiceListItemDTO } from "@/features/app/billing/data";
+import type { InvoiceListItemDTO } from "@/features/app/billing/data";
+
+/**
+ * Notas em que a org ativa foi tomadora. Vazio quando billing
+ * institucional ainda não gerou cobranças (caso atual). Mesmo gating
+ * de erros que `fetchOrgBilling`.
+ */
+export async function fetchOrgInvoices(): Promise<InvoiceListItemDTO[]> {
+  try {
+    const res = await apiFetch<{ data: InvoiceListItemDTO[] }>(
+      `/v1/invoicing/organization`,
+    );
+    return res.data;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (
+        err.code === "MISSING_ACTIVE_ORGANIZATION" ||
+        err.status === 401 ||
+        err.status === 403
+      ) {
+        return [];
+      }
+    }
+    throw err;
+  }
+}

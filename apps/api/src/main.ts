@@ -138,6 +138,28 @@ import {
   makeBillingPublicRouter,
 } from "@/domains/billing/presentation/billing-routes.js";
 
+import { MongooseInvoiceRepository } from "@/domains/invoicing/infrastructure/mongoose-invoice-repository.js";
+import { BaTakerResolver } from "@/domains/invoicing/infrastructure/ba-taker-resolver.js";
+import { SmtpInvoiceMailer } from "@/domains/invoicing/infrastructure/smtp-invoice-mailer.js";
+import { IssueInvoiceUseCase } from "@/domains/invoicing/application/issue-invoice.js";
+import { ProcessPendingInvoicesUseCase } from "@/domains/invoicing/application/process-pending-invoices.js";
+import { HandleProviderWebhookUseCase } from "@/domains/invoicing/application/handle-provider-webhook.js";
+import {
+  ListInvoicesForOwnerUseCase,
+  ListInvoicesForOrganizationUseCase,
+} from "@/domains/invoicing/application/list-invoices-for-owner.js";
+import {
+  getLucidaEmitterConfig,
+  isInvoicingConfigured,
+} from "@/domains/invoicing/infrastructure/nfeio/lucida-emitter-config.js";
+import { getNfeIoInvoiceProvider } from "@/domains/invoicing/infrastructure/nfeio/nfeio-invoice-provider.js";
+import { InvoicingController } from "@/domains/invoicing/presentation/invoicing-controller.js";
+import {
+  makeInvoicingAuthedRouter,
+  makeInvoicingInternalRouter,
+  makeInvoicingPublicRouter,
+} from "@/domains/invoicing/presentation/invoicing-routes.js";
+
 import { SmtpSupportMailer } from "@/domains/support/infrastructure/smtp-support-mailer.js";
 import { SendContactMessageUseCase } from "@/domains/support/application/send-contact-message.js";
 import { SupportController } from "@/domains/support/presentation/support-controller.js";
@@ -497,6 +519,55 @@ export async function buildApp(): Promise<Express> {
     : new UnavailableAbacatePayClient();
   const billingMailer = new SmtpBillingMailer();
 
+  // --- invoicing (NFS-e via NFE.io) ---
+  // Best-effort: quando NFE.io não está configurado (NFEIO_API_KEY +
+  // NFEIO_COMPANY_ID), passamos `null` pros webhook handlers e a
+  // emissão é silenciosamente pulada. Pagamentos seguem normalmente.
+  // Mesmo padrão de Stripe/AbacatePay (módulo offline ≠ api offline).
+  const invoiceRepository = new MongooseInvoiceRepository();
+  const lucidaEmitter = isInvoicingConfigured()
+    ? getLucidaEmitterConfig()
+    : null;
+  if (!lucidaEmitter) {
+    console.warn(
+      "[invoicing] NFE.io não configurado — emissão de NFS-e desligada.",
+    );
+  }
+  const issueInvoiceUseCase: IssueInvoiceUseCase | null = lucidaEmitter
+    ? new IssueInvoiceUseCase(
+        invoiceRepository,
+        new BaTakerResolver(authDb),
+        lucidaEmitter,
+      )
+    : null;
+  // Worker que envia pendentes pro NFE.io. Compartilha o mesmo provider
+  // singleton — `getNfeIoInvoiceProvider` cacheia internamente.
+  const processPendingInvoicesUseCase: ProcessPendingInvoicesUseCase | null =
+    lucidaEmitter
+      ? new ProcessPendingInvoicesUseCase(
+          invoiceRepository,
+          getNfeIoInvoiceProvider(lucidaEmitter),
+        )
+      : null;
+  // Webhook handler — atualiza status quando NFE.io confirma autorização
+  // pela prefeitura, e dispara email com PDF anexo na transição → issued.
+  const handleProviderWebhookUseCase: HandleProviderWebhookUseCase | null =
+    lucidaEmitter
+      ? new HandleProviderWebhookUseCase({
+          invoices: invoiceRepository,
+          mailer: new SmtpInvoiceMailer(),
+        })
+      : null;
+  const invoicingController = new InvoicingController({
+    processPending: processPendingInvoicesUseCase,
+    handleProviderWebhook: handleProviderWebhookUseCase,
+    // Listagem é safe sem NFE.io — devolve [] quando não há Invoice.
+    listForOwner: new ListInvoicesForOwnerUseCase(invoiceRepository),
+    listForOrganization: new ListInvoicesForOrganizationUseCase(
+      invoiceRepository,
+    ),
+  });
+
   const billingController = new BillingController({
     getBalance: new GetBalanceUseCase(walletRepository),
     listLedger: new ListLedgerUseCase(ledgerRepository),
@@ -511,6 +582,7 @@ export async function buildApp(): Promise<Express> {
       wallets: walletRepository,
       ledger: ledgerRepository,
       mailer: billingMailer,
+      issueInvoice: issueInvoiceUseCase,
     }),
     expireStaleWallets: new ExpireStaleWalletsUseCase(
       walletRepository,
@@ -526,6 +598,7 @@ export async function buildApp(): Promise<Express> {
       wallets: walletRepository,
       ledger: ledgerRepository,
       mailer: billingMailer,
+      issueInvoice: issueInvoiceUseCase,
     }),
     auth,
   });
@@ -778,6 +851,12 @@ export async function buildApp(): Promise<Express> {
     }),
     makeBillingAuthedRouter({ requireAuth, controller: billingController }),
     makeBillingInternalRouter({ controller: billingController }),
+    makeInvoicingInternalRouter({ controller: invoicingController }),
+    makeInvoicingAuthedRouter({
+      requireAuth,
+      requireOrgAdmin,
+      controller: invoicingController,
+    }),
     makeSupportRouter({ requireAuth, controller: supportController }),
     makeKintalRouter({
       requireAuth,
@@ -825,9 +904,11 @@ export async function buildApp(): Promise<Express> {
     }),
   ];
 
-  // Rotas com body bruto — webhook Stripe. Precisam vir antes do express.json.
+  // Rotas com body bruto — webhook Stripe + webhook NFE.io. Precisam vir
+  // antes do express.json pra que verificação HMAC tenha o payload exato.
   const rawBodyRouters = [
     makeBillingPublicRouter({ controller: billingController }),
+    makeInvoicingPublicRouter({ controller: invoicingController }),
   ];
 
   return createApp({ auth, routers, rawBodyRouters });

@@ -82,6 +82,29 @@ export function makeIamRouter(
             (effective.studentsRange as string | null | undefined) ?? null,
           teachingYears:
             (effective.teachingYears as string | null | undefined) ?? null,
+          // Dados fiscais PJ — exigidos pelo backend só quando taxId é CNPJ.
+          // PF pode deixar tudo vazio.
+          legalName: (effective.legalName as string | null | undefined) ?? null,
+          municipalRegistration:
+            (effective.municipalRegistration as string | null | undefined) ?? null,
+          addressPostalCode:
+            (effective.addressPostalCode as string | null | undefined) ?? null,
+          addressStreet:
+            (effective.addressStreet as string | null | undefined) ?? null,
+          addressNumber:
+            (effective.addressNumber as string | null | undefined) ?? null,
+          addressComplement:
+            (effective.addressComplement as string | null | undefined) ?? null,
+          addressDistrict:
+            (effective.addressDistrict as string | null | undefined) ?? null,
+          addressCityCode:
+            (effective.addressCityCode as string | null | undefined) ?? null,
+          addressCityName:
+            (effective.addressCityName as string | null | undefined) ?? null,
+          addressStateUf:
+            (effective.addressStateUf as string | null | undefined) ?? null,
+          addressCountry:
+            (effective.addressCountry as string | null | undefined) ?? null,
           // Estado do modo auxiliar — frontend usa pra banner + bloqueios
           // de UI (não permitir compras, etc).
           assistantMode: ctx.isAssistant,
@@ -125,6 +148,18 @@ interface UserDoc {
   stateUf?: string | null;
   studentsRange?: string | null;
   teachingYears?: string | null;
+  // Dados fiscais PJ — só preenchidos quando taxId é CNPJ.
+  legalName?: string | null;
+  municipalRegistration?: string | null;
+  addressPostalCode?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  addressDistrict?: string | null;
+  addressCityCode?: string | null;
+  addressCityName?: string | null;
+  addressStateUf?: string | null;
+  addressCountry?: string | null;
 }
 
 async function loadUser(
@@ -164,5 +199,16 @@ async function loadUser(
     stateUf: doc.stateUf,
     studentsRange: doc.studentsRange,
     teachingYears: doc.teachingYears,
+    legalName: doc.legalName,
+    municipalRegistration: doc.municipalRegistration,
+    addressPostalCode: doc.addressPostalCode,
+    addressStreet: doc.addressStreet,
+    addressNumber: doc.addressNumber,
+    addressComplement: doc.addressComplement,
+    addressDistrict: doc.addressDistrict,
+    addressCityCode: doc.addressCityCode,
+    addressCityName: doc.addressCityName,
+    addressStateUf: doc.addressStateUf,
+    addressCountry: doc.addressCountry,
   };
 }

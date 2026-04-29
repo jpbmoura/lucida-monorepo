@@ -13,9 +13,13 @@ import { TeachersList } from "@/features/analytics/dashboard/sections/teachers-l
 import { EmptyState } from "@/features/analytics/dashboard/sections/empty-state";
 import { NoActiveOrg } from "@/features/analytics/dashboard/sections/no-active-org";
 import { ComingSoonSection } from "@/features/analytics/dashboard/sections/coming-soon";
-import { fetchOrgBilling } from "@/features/analytics/billing/data";
+import {
+  fetchOrgBilling,
+  fetchOrgInvoices,
+} from "@/features/analytics/billing/data";
 import { OrgBalanceCard } from "@/features/analytics/billing/components/org-balance-card";
 import { OrgLedgerSection } from "@/features/analytics/billing/components/org-ledger-section";
+import { InvoicesSection } from "@/features/app/billing/components/invoices-section";
 
 export const metadata: Metadata = {
   title: "Dashboard · Instituição",
@@ -34,9 +38,10 @@ export default async function AnalyticsDashboardPage({
   const sp = await searchParams;
   const period = parsePeriod(sp.period);
 
-  const [overview, billing, display] = await Promise.all([
+  const [overview, billing, invoices, display] = await Promise.all([
     fetchOrgOverview(period),
     fetchOrgBilling(),
+    fetchOrgInvoices().catch(() => []),
     Promise.resolve(
       buildDisplayUser({
         name: session.user.name,
@@ -85,6 +90,12 @@ export default async function AnalyticsDashboardPage({
         {hasTeachers && <TeachersList teachers={teachers} />}
 
         {billing && <OrgLedgerSection ledger={billing.ledger} />}
+
+        <InvoicesSection
+          items={invoices}
+          title="Notas fiscais da instituição"
+          description="Cobranças institucionais geram NFS-e em nome da org. PDF/XML disponíveis assim que a prefeitura autoriza."
+        />
 
         <ComingSoonSection />
       </div>

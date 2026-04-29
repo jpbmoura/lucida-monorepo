@@ -20,6 +20,20 @@ export interface ActiveOrganization {
    * seguro = trata como não-institucional visualmente).
    */
   billingMode: OrgBillingMode | null;
+  // Dados fiscais da org (PJ). Editáveis em /analytics/configuracoes.
+  // Quando nulos, billing institucional ainda não foi configurado.
+  taxId: string | null;
+  legalName: string | null;
+  municipalRegistration: string | null;
+  addressPostalCode: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressDistrict: string | null;
+  addressCityCode: string | null;
+  addressCityName: string | null;
+  addressStateUf: string | null;
+  addressCountry: string | null;
 }
 
 /**

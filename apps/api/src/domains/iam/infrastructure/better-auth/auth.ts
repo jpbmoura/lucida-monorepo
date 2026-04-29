@@ -58,6 +58,34 @@ export function createAuth(db: Db, hooks: AuthHooks = {}) {
         // contábil/NFe. Se o user ainda não tem, o front coleta antes do
         // checkout e salva via authClient.updateUser.
         taxId: { type: "string", required: false },
+
+        // ─── Dados fiscais para emissão de NFS-e ─────────────────────────
+        // Coletados só quando taxId é CNPJ (PJ). PF emite nota com
+        // CPF + name + email — não precisa preencher esses campos.
+        // PJ precisa: legalName + endereço completo. `municipalRegistration`
+        // (IM) é opcional, exigido por alguns municípios.
+        // Salvos via authClient.updateUser pelo modal `FiscalDataPromptDialog`
+        // antes do checkout. Sem eles, controller devolve 422
+        // FISCAL_DATA_REQUIRED.
+        legalName: { type: "string", required: false },
+        municipalRegistration: { type: "string", required: false },
+        // Endereço estruturado — preenchido via ViaCEP no front. Mantido
+        // achatado (sem nested object) porque BetterAuth additionalFields
+        // só aceita tipos primitivos e isso evita problemas de migração.
+        addressPostalCode: { type: "string", required: false },
+        addressStreet: { type: "string", required: false },
+        addressNumber: { type: "string", required: false },
+        addressComplement: { type: "string", required: false },
+        addressDistrict: { type: "string", required: false },
+        // Código IBGE de 7 dígitos — exigido pelo NFE.io. ViaCEP retorna no
+        // campo `ibge`.
+        addressCityCode: { type: "string", required: false },
+        addressCityName: { type: "string", required: false },
+        addressStateUf: { type: "string", required: false },
+        // Default "BR" no front. Mantemos editável pra futuro tomador
+        // estrangeiro (improvável, mas barato).
+        addressCountry: { type: "string", required: false },
+
         institutionType: { type: "string", required: false },
         gender: { type: "string", required: false },
         teachingLevels: { type: "string[]", required: false },
@@ -125,6 +153,33 @@ export function createAuth(db: Db, hooks: AuthHooks = {}) {
           const url = `${env.WEB_ORIGIN}/accept-invite?invitation=${invitation.id}`;
           const template = organizationInviteTemplate(org.name, url);
           await sendEmail({ to: email, ...template });
+        },
+        // Campos extras na collection `organization`. Org é sempre PJ —
+        // a NFS-e quando o tomador é a instituição usa esses dados, não
+        // os do user que executou o pagamento. Editáveis via
+        // authClient.organization.update (gateado pelo plugin pra
+        // owner/admin) na tela /analytics/configuracoes.
+        schema: {
+          organization: {
+            additionalFields: {
+              // CNPJ da org (14 dígitos, sem máscara). `name` continua
+              // sendo o nome de exibição; `legalName` é a razão social
+              // formal. CNPJ vai pra `borrower.federalTaxNumber` na
+              // emissão NFE.io quando tomador for a org.
+              taxId: { type: "string", required: false },
+              legalName: { type: "string", required: false },
+              municipalRegistration: { type: "string", required: false },
+              addressPostalCode: { type: "string", required: false },
+              addressStreet: { type: "string", required: false },
+              addressNumber: { type: "string", required: false },
+              addressComplement: { type: "string", required: false },
+              addressDistrict: { type: "string", required: false },
+              addressCityCode: { type: "string", required: false },
+              addressCityName: { type: "string", required: false },
+              addressStateUf: { type: "string", required: false },
+              addressCountry: { type: "string", required: false },
+            },
+          },
         },
       }),
     ],

@@ -17,6 +17,25 @@ export interface OrgInfo {
   id: string;
   name: string;
   slug: string;
+  /**
+   * Dados fiscais da org (PJ). Todos opcionais — quando vazios, a UI de
+   * /analytics/configuracoes pede pra preencher antes que o billing
+   * institucional ative. Estrutura espelha os campos do User pra
+   * permitir reuso do mesmo `IssueInvoiceUseCase` independente de quem
+   * é o tomador.
+   */
+  taxId: string | null;
+  legalName: string | null;
+  municipalRegistration: string | null;
+  addressPostalCode: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressDistrict: string | null;
+  addressCityCode: string | null;
+  addressCityName: string | null;
+  addressStateUf: string | null;
+  addressCountry: string | null;
 }
 
 export interface OrganizationMembersRepository {

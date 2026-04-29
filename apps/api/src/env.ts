@@ -63,6 +63,23 @@ const envSchema = z.object({
   // Se não configurado, o endpoint devolve 503 — protege contra calls sem
   // intenção explícita.
   CRON_SECRET: z.string().min(16).optional(),
+
+  // NFE.io — emissão de NFS-e quando há transação financeira (Stripe sub,
+  // Stripe topup, PIX AbacatePay). Sem NFEIO_API_KEY o módulo de invoicing
+  // fica offline: pagamentos seguem sendo processados normalmente, só não
+  // geram nota automática. Mesmo padrão de Stripe/AbacatePay.
+  NFEIO_API_KEY: z.string().optional(),
+  // Base URL — sandbox como default pra evitar emitir nota em produção sem
+  // intenção. Trocar pra https://api.nfe.io em produção.
+  NFEIO_BASE_URL: z.string().url().default("https://api.sandbox.nfe.io"),
+  // ID da Company da Lucida no NFE.io. A Company é criada no painel deles
+  // (CNPJ + endereço + certificado A1 + credenciais da prefeitura). Sem o
+  // ID, mesmo com API key não há pra onde emitir.
+  NFEIO_COMPANY_ID: z.string().optional(),
+  // Secret HMAC pra verificar webhooks de status (Issued/Cancelled/Error).
+  // Sem isso, a rota POST /v1/invoicing/webhook devolve 503 — não dá pra
+  // confiar em webhook não-assinado.
+  NFEIO_WEBHOOK_HMAC_SECRET: z.string().min(16).optional(),
 });
 
 export const env = envSchema.parse(process.env);

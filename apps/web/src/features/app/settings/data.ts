@@ -18,6 +18,18 @@ export interface UserProfileDTO {
   stateUf: string | null;
   studentsRange: string | null;
   teachingYears: string | null;
+  // Dados fiscais — preenchidos só quando taxId é CNPJ.
+  legalName: string | null;
+  municipalRegistration: string | null;
+  addressPostalCode: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressDistrict: string | null;
+  addressCityCode: string | null;
+  addressCityName: string | null;
+  addressStateUf: string | null;
+  addressCountry: string | null;
 }
 
 export async function fetchUserProfile(): Promise<UserProfileDTO> {

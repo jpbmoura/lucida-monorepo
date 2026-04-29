@@ -13,7 +13,7 @@ import { WebhookEventModel } from "./webhook-event-schema.js";
  * de evento — usa-se uma chave composta como `transparent.completed:char_yyy:PAID`).
  */
 export async function markEventProcessed(input: {
-  provider: "stripe" | "abacatepay";
+  provider: "stripe" | "abacatepay" | "nfeio";
   eventKey: string;
   eventType: string;
 }): Promise<{ isNew: boolean }> {

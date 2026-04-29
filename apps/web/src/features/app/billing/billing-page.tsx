@@ -13,17 +13,20 @@ import type {
   BalanceDTO,
   CreditSource,
   CurrentSubscriptionDTO,
+  InvoiceListItemDTO,
   LedgerItemDTO,
   LedgerReason,
 } from "./data";
 import { PlanCard } from "./components/plan-card";
 import { CheckoutSuccessBanner } from "./components/checkout-success-banner";
 import { TopupsSection } from "./components/topups-section";
+import { InvoicesSection } from "./components/invoices-section";
 
 interface BillingPageProps {
   balance: BalanceDTO;
   ledger: LedgerItemDTO[];
   subscription: CurrentSubscriptionDTO | null;
+  invoices: InvoiceListItemDTO[];
   checkoutSuccess: boolean;
 }
 
@@ -31,6 +34,7 @@ export function BillingPage({
   balance,
   ledger,
   subscription,
+  invoices,
   checkoutSuccess,
 }: BillingPageProps) {
   return (
@@ -60,6 +64,8 @@ export function BillingPage({
       </section>
 
       <TopupsSection />
+
+      <InvoicesSection items={invoices} />
 
       <section className="mb-4">
         <header className="mb-5 flex flex-col gap-1">

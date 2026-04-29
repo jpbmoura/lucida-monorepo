@@ -11,19 +11,37 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  /**
+   * Anexos. Hoje só usado pra enviar o PDF da NFS-e junto do email
+   * "nota emitida". `nodemailer` aceita Buffer + filename direto.
+   */
+  attachments?: EmailAttachment[];
 }
 
-export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<void> {
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  attachments,
+}: SendEmailInput): Promise<void> {
   await transporter.sendMail({
     from: env.EMAIL_FROM,
     to,
     subject,
     html,
     text,
+    attachments,
   });
 }

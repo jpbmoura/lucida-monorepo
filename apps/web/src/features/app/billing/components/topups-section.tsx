@@ -23,8 +23,12 @@ type PaymentMethod = "card" | "pix";
  *  - Cartão → Stripe Checkout (redirect).
  *  - PIX    → modal com QR + polling.
  *
- * Ambos exigem `taxId` no perfil. Se o user ainda não tem, abre
- * `TaxIdPromptDialog` antes — depois reentra no fluxo escolhido.
+ * Único pré-check obrigatório: `taxId` no perfil (CPF ou CNPJ — exigido
+ * por Stripe/AbacatePay pra criar a cobrança). Demais dados fiscais
+ * (razão social, endereço, IM) **não bloqueiam** o checkout — a falta
+ * apenas impede a NFS-e de ser emitida automaticamente, mas o pagamento
+ * segue normal. Cliente preenche em /app/configuracoes quando quiser
+ * a NF auto-emitida.
  */
 export function TopupsSection() {
   const session = authClient.useSession();
@@ -36,15 +40,21 @@ export function TopupsSection() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Quando o user clica num botão sem taxId, guardamos a intenção aqui
-  // e abrimos o prompt. Depois que ele salva, retomamos automaticamente.
+  // Ação represada enquanto coletamos taxId. Apenas uma pode estar
+  // pendente por vez — clicar de novo enquanto modal aberto sobrescreve.
   const [pendingAction, setPendingAction] = useState<{
     topupId: TopupId;
     method: PaymentMethod;
   } | null>(null);
+  const [taxIdDialogOpen, setTaxIdDialogOpen] = useState(false);
 
   // Modal PIX — null = fechado.
   const [pixTopup, setPixTopup] = useState<TopupId | null>(null);
+
+  // Optimistic state pra session que ainda não revalidou após save. Mesmo
+  // valor é usado pra gating de modal e como body do PIX.
+  const [optimisticTaxId, setOptimisticTaxId] = useState<string | null>(null);
+  const effectiveTaxId = persistedTaxId ?? optimisticTaxId ?? "";
 
   async function startCardCheckout(id: TopupId) {
     setError(null);
@@ -74,41 +84,32 @@ export function TopupsSection() {
     setPixTopup(id);
   }
 
+  function executeAction(action: { topupId: TopupId; method: PaymentMethod }) {
+    if (action.method === "card") {
+      void startCardCheckout(action.topupId);
+    } else {
+      startPixCheckout(action.topupId);
+    }
+  }
+
   function start(topupId: TopupId, method: PaymentMethod) {
-    if (!persistedTaxId || !isValidTaxId(persistedTaxId)) {
-      setPendingAction({ topupId, method });
+    const action = { topupId, method };
+    if (!effectiveTaxId || !isValidTaxId(effectiveTaxId)) {
+      setPendingAction(action);
+      setTaxIdDialogOpen(true);
       return;
     }
-    if (method === "card") {
-      void startCardCheckout(topupId);
-    } else {
-      startPixCheckout(topupId);
-    }
+    executeAction(action);
   }
 
   function handleTaxIdSaved(savedTaxId: string) {
+    setOptimisticTaxId(savedTaxId);
+    setTaxIdDialogOpen(false);
     if (!pendingAction) return;
-    const { topupId, method } = pendingAction;
+    const action = pendingAction;
     setPendingAction(null);
-    // O hook useSession pode demorar a re-fetch; usamos o valor salvo
-    // direto pra não esperar o invalidate.
-    if (method === "card") {
-      void startCardCheckout(topupId);
-    } else {
-      // PIX precisa do taxId no body — passa direto via state, sem
-      // depender do session refresh.
-      setPixTopup(topupId);
-      // savedTaxId é usado pelo modal via `taxId={savedTaxId}` quando
-      // session ainda não carregou; ver resolveTaxIdForPix abaixo.
-      setOptimisticTaxId(savedTaxId);
-    }
+    executeAction(action);
   }
-
-  // Se o user acabou de salvar, usamos o valor "optimistic" enquanto a
-  // session do BetterAuth não revalida. Depois disso, passamos a usar
-  // `persistedTaxId`.
-  const [optimisticTaxId, setOptimisticTaxId] = useState<string | null>(null);
-  const taxIdForPix = persistedTaxId ?? optimisticTaxId ?? "";
 
   return (
     <section className="mb-12">
@@ -147,16 +148,19 @@ export function TopupsSection() {
       </div>
 
       <TaxIdPromptDialog
-        open={pendingAction !== null}
+        open={taxIdDialogOpen}
         onOpenChange={(v) => {
-          if (!v) setPendingAction(null);
+          if (!v) {
+            setTaxIdDialogOpen(false);
+            setPendingAction(null);
+          }
         }}
         onSaved={handleTaxIdSaved}
       />
 
       <PixCheckoutDialog
         topupId={pixTopup}
-        taxId={normalizeTaxId(taxIdForPix)}
+        taxId={normalizeTaxId(effectiveTaxId)}
         onClose={() => setPixTopup(null)}
       />
     </section>

@@ -71,3 +71,36 @@ export async function fetchCurrentSubscription(): Promise<CurrentSubscriptionDTO
   );
   return res.data;
 }
+
+// ───── invoices (NFS-e) ────────────────────────────────────────
+
+export type InvoiceSource = "subscription" | "topup_stripe" | "topup_pix";
+
+export type InvoiceStatus =
+  | "pending"
+  | "processing"
+  | "issued"
+  | "failed"
+  | "cancelled";
+
+export interface InvoiceListItemDTO {
+  id: string;
+  source: InvoiceSource;
+  status: InvoiceStatus;
+  amountCents: number;
+  description: string;
+  pdfUrl: string | null;
+  xmlUrl: string | null;
+  organizationId: string | null;
+  /** "RPS A 1234" pré-formatado pelo backend, ou null. */
+  rpsLabel: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+}
+
+export async function fetchInvoices(): Promise<InvoiceListItemDTO[]> {
+  const res = await apiFetch<{ data: InvoiceListItemDTO[] }>(
+    "/v1/invoicing/me",
+  );
+  return res.data;
+}
