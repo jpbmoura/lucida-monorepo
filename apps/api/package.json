@@ -19,7 +19,8 @@
     "seed:roadmap": "tsx scripts/seed-roadmap/index.ts",
     "backfill:student-org": "tsx scripts/backfill-student-org/index.ts",
     "backfill:class-org": "tsx scripts/backfill-class-org/index.ts",
-    "billing:add-org-credits": "tsx scripts/add-org-credits/index.ts"
+    "billing:add-org-credits": "tsx scripts/add-org-credits/index.ts",
+    "smtp:smoke-test": "tsx scripts/smtp-smoke-test.ts"
   },
   "dependencies": {
     "better-auth": "^1.6.7",
