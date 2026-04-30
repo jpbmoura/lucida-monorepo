@@ -65,6 +65,15 @@ const envSchema = z.object({
   // intenção explícita.
   CRON_SECRET: z.string().min(16).optional(),
 
+  // Tickets / Suporte — endereço from das respostas (e usado pro plus
+  // addressing no Reply-To). Formato: `Lucida Suporte <suporte@lucidaexam.com>`.
+  // O local part (antes do @) é extraído pra montar `suporte+t_{id}@`.
+  TICKETS_FROM_EMAIL: z.string().min(1).optional(),
+  // Secret HMAC do webhook Resend Inbound (formato `whsec_<base64>`).
+  // Sem isso, a rota POST /v1/tickets/inbound devolve 503 — não dá pra
+  // confiar em payload não-assinado.
+  TICKETS_INBOUND_SECRET: z.string().min(16).optional(),
+
   // NFE.io — emissão de NFS-e quando há transação financeira (Stripe sub,
   // Stripe topup, PIX AbacatePay). Sem NFEIO_API_KEY o módulo de invoicing
   // fica offline: pagamentos seguem sendo processados normalmente, só não

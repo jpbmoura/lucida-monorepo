@@ -160,9 +160,33 @@ import {
   makeInvoicingPublicRouter,
 } from "@/domains/invoicing/presentation/invoicing-routes.js";
 
-import { SmtpSupportMailer } from "@/domains/support/infrastructure/smtp-support-mailer.js";
-import { SendContactMessageUseCase } from "@/domains/support/application/send-contact-message.js";
+import { MongooseTicketRepository } from "@/domains/tickets/infrastructure/mongoose-ticket-repository.js";
+import { BaUserLookup } from "@/domains/tickets/infrastructure/ba-user-lookup.js";
+import { NotificationsTicketNotifier } from "@/domains/tickets/infrastructure/notifications-ticket-notifier.js";
+import {
+  ResendTicketMailer,
+  isTicketsConfigured,
+} from "@/domains/tickets/infrastructure/resend-ticket-mailer.js";
+import { HandleInboundEmailUseCase } from "@/domains/tickets/application/handle-inbound-email.js";
+import { ReplyToTicketUseCase } from "@/domains/tickets/application/reply-to-ticket.js";
+import {
+  CloseTicketUseCase,
+  ReopenTicketUseCase,
+} from "@/domains/tickets/application/close-ticket.js";
+import {
+  MarkInboxReadUseCase,
+  MarkInboxUnreadUseCase,
+} from "@/domains/tickets/application/mark-inbox-read.js";
+import { ListTicketsUseCase } from "@/domains/tickets/application/list-tickets.js";
+import { GetTicketUseCase } from "@/domains/tickets/application/get-ticket.js";
+import { TicketsController } from "@/domains/tickets/presentation/tickets-controller.js";
+import {
+  makeTicketsPublicRouter,
+  makeTicketsStaffRouter,
+} from "@/domains/tickets/presentation/tickets-routes.js";
+
 import { SupportController } from "@/domains/support/presentation/support-controller.js";
+import { CreateTicketFromFormUseCase } from "@/domains/tickets/application/create-ticket-from-form.js";
 import { makeSupportRouter } from "@/domains/support/presentation/support-routes.js";
 
 import { MongooseApiKeyRepository } from "@/domains/api-access/infrastructure/mongoose-api-key-repository.js";
@@ -568,6 +592,49 @@ export async function buildApp(): Promise<Express> {
     ),
   });
 
+  // --- tickets (suporte) ---
+  // Mailer só é instanciado quando TICKETS_FROM_EMAIL está setado. Sem
+  // ele, reply e auto-responder ficam off — webhook inbound continua
+  // funcionando (cria ticket, só não envia auto-resposta) e UI lista
+  // tickets normalmente. HandleInboundEmail também depende do secret
+  // do Resend Inbound estar setado pra rota webhook responder.
+  //
+  // Notifier reusa o `notificationRepository` do domínio notifications —
+  // mas declarado mais abaixo no main; antecipamos a instanciação aqui
+  // pra cobrir o ciclo (tickets antes de notifications no flow). Como
+  // mongoose model é singleton, isso é seguro.
+  const ticketRepository = new MongooseTicketRepository();
+  const ticketNotificationRepository = new MongooseNotificationRepository();
+  const ticketNotifier = new NotificationsTicketNotifier(
+    authDb,
+    ticketNotificationRepository,
+  );
+  const ticketMailer = isTicketsConfigured() && env.TICKETS_FROM_EMAIL
+    ? new ResendTicketMailer(env.TICKETS_FROM_EMAIL)
+    : null;
+  const handleInboundEmailUseCase = env.TICKETS_INBOUND_SECRET
+    ? new HandleInboundEmailUseCase(
+        ticketRepository,
+        new BaUserLookup(authDb),
+        ticketMailer,
+        env.TICKETS_FROM_EMAIL ?? null,
+        ticketNotifier,
+      )
+    : null;
+  const replyToTicketUseCase = ticketMailer
+    ? new ReplyToTicketUseCase(ticketRepository, ticketMailer)
+    : null;
+  const ticketsController = new TicketsController({
+    handleInboundEmail: handleInboundEmailUseCase,
+    list: new ListTicketsUseCase(ticketRepository),
+    get: new GetTicketUseCase(ticketRepository),
+    reply: replyToTicketUseCase,
+    close: new CloseTicketUseCase(ticketRepository),
+    reopen: new ReopenTicketUseCase(ticketRepository),
+    markRead: new MarkInboxReadUseCase(ticketRepository),
+    markUnread: new MarkInboxUnreadUseCase(ticketRepository),
+  });
+
   const billingController = new BillingController({
     getBalance: new GetBalanceUseCase(walletRepository),
     listLedger: new ListLedgerUseCase(ledgerRepository),
@@ -604,8 +671,10 @@ export async function buildApp(): Promise<Express> {
   });
 
   // --- support domain ---
+  // Form de /app/ajuda agora cria ticket (origin=form) em vez de
+  // enviar email. Staff vê todos os pedidos no Kintal /tickets.
   const supportController = new SupportController(
-    new SendContactMessageUseCase(new SmtpSupportMailer()),
+    new CreateTicketFromFormUseCase(ticketRepository, ticketNotifier),
     auth,
   );
 
@@ -857,6 +926,11 @@ export async function buildApp(): Promise<Express> {
       requireOrgAdmin,
       controller: invoicingController,
     }),
+    makeTicketsStaffRouter({
+      requireAuth,
+      requireStaff,
+      controller: ticketsController,
+    }),
     makeSupportRouter({ requireAuth, controller: supportController }),
     makeKintalRouter({
       requireAuth,
@@ -904,11 +978,13 @@ export async function buildApp(): Promise<Express> {
     }),
   ];
 
-  // Rotas com body bruto — webhook Stripe + webhook NFE.io. Precisam vir
-  // antes do express.json pra que verificação HMAC tenha o payload exato.
+  // Rotas com body bruto — webhook Stripe + NFE.io + Resend Inbound.
+  // Precisam vir antes do express.json pra que verificação HMAC tenha
+  // o payload exato.
   const rawBodyRouters = [
     makeBillingPublicRouter({ controller: billingController }),
     makeInvoicingPublicRouter({ controller: invoicingController }),
+    makeTicketsPublicRouter({ controller: ticketsController }),
   ];
 
   return createApp({ auth, routers, rawBodyRouters });

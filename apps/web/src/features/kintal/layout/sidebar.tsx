@@ -27,8 +27,9 @@ const COMERCIAL: KintalSidebarNavItem[] = [
 ];
 
 const ATENDIMENTO: KintalSidebarNavItem[] = [
+  { label: "Caixa de entrada", href: "/kintal/inbox", icon: "bell" },
+  { label: "Tickets", href: "/kintal/tickets", icon: "support" },
   { label: "Notificações", href: "/kintal/notifications", icon: "bell" },
-  { label: "Tickets", icon: "support", disabled: true },
   { label: "Feedbacks", icon: "support", disabled: true },
 ];
 

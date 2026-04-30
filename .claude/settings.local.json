@@ -12,7 +12,8 @@
       "Bash(pnpm --filter @lucida/web exec tsc --noEmit)",
       "Bash(pnpm --filter \"@lucida/api\" exec tsc --noEmit)",
       "Bash(pnpm --filter \"@lucida/web\" exec tsc --noEmit)",
-      "Bash(pnpm install *)"
+      "Bash(pnpm install *)",
+      "Bash(pnpm next *)"
     ]
   }
 }

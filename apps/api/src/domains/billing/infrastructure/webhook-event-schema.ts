@@ -12,7 +12,7 @@ import mongoose, { Schema, type Model } from "mongoose";
  */
 export interface WebhookEventDoc {
   _id: string;
-  provider: "stripe" | "abacatepay" | "nfeio";
+  provider: "stripe" | "abacatepay" | "nfeio" | "resend";
   type: string;
   processedAt: Date;
 }

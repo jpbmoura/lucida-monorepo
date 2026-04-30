@@ -15,10 +15,32 @@ interface SendEmailInput {
   html: string;
   text?: string;
   /**
-   * Anexos. Hoje só usado pra enviar o PDF da NFS-e junto do email
-   * "nota emitida". Resend SDK aceita Buffer direto.
+   * Override do `from` padrão (env.EMAIL_FROM). Útil quando uma feature
+   * tem display name específico — ex: tickets usam `Lucida Suporte
+   * <suporte@lucidaexam.com>` em vez de `Lucida <contato@...>`.
+   * Domínio precisa estar verificado no Resend igual o default.
+   */
+  from?: string;
+  /**
+   * Reply-To. Tickets usam plus-addressing (`suporte+t_{id}@...`) pra
+   * threadar respostas do cliente de volta no ticket certo.
+   */
+  replyTo?: string;
+  /**
+   * Headers RFC 5322 customizados. Tickets passam Message-ID,
+   * In-Reply-To e References pra threading no cliente de email.
+   */
+  headers?: Record<string, string>;
+  /**
+   * Anexos. Hoje usado pra PDF da NFS-e e (futuro) anexos de tickets.
+   * Resend SDK aceita Buffer direto.
    */
   attachments?: EmailAttachment[];
+}
+
+export interface SendEmailResult {
+  /** ID do Resend — útil pra guardar como providerMessageId em tickets. */
+  resendId: string;
 }
 
 /**
@@ -40,14 +62,19 @@ export async function sendEmail({
   subject,
   html,
   text,
+  from,
+  replyTo,
+  headers,
   attachments,
-}: SendEmailInput): Promise<void> {
+}: SendEmailInput): Promise<SendEmailResult> {
   const result = await resend.emails.send({
-    from: env.EMAIL_FROM,
+    from: from ?? env.EMAIL_FROM,
     to,
     subject,
     html,
     text,
+    replyTo,
+    headers,
     attachments: attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
@@ -70,4 +97,6 @@ export async function sendEmail({
     subject,
     resendId: result.data?.id,
   });
+
+  return { resendId: result.data?.id ?? "" };
 }
