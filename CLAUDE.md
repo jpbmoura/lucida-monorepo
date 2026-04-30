@@ -56,9 +56,9 @@ Domínios já migrados:
 | `notifications` | Inbox + campanhas (sender split entre staff e org-admin). |
 | `organization-preferences` | Preferências por organização. |
 | `roadmap` | Suggest + voting público; CRUD pra staff. |
-| `support` | Form de contato (`/app/ajuda`) → email via SMTP. |
+| `support` | Form de contato (`/app/ajuda`) → email via Resend. |
 
-Stack: `express` 5, `mongoose` 8, `better-auth`, `zod`, `stripe`, `openai`, `nodemailer`,
+Stack: `express` 5, `mongoose` 8, `better-auth`, `zod`, `stripe`, `openai`, `resend`,
 `multer`, `pdf-parse`, `mammoth`, `docx`, `youtube-transcript`, `cors`. Dev: `tsx`, `tsc-alias`, `vitest`.
 Path alias `@/*` → `src/*`.
 
@@ -151,7 +151,7 @@ Browser ─▶ Next (3000)
            ├─▶ MongoDB  (Mongoose; precisa replica set p/ transações de billing)
            ├─▶ Stripe   (checkout, portal, webhook em /v1/billing/webhook)
            ├─▶ OpenAI   (geração de questões em ai-ops)
-           ├─▶ SMTP     (verify email, reset, invites, recibos, formulário ajuda)
+           ├─▶ Resend   (verify email, reset, invites, recibos, formulário ajuda)
            └─▶ OMR svc  (Python lucida-omr externo; sem URL → 502)
 ```
 

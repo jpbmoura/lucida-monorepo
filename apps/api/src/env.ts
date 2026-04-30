@@ -13,10 +13,11 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
 
-  SMTP_HOST: z.string().min(1),
-  SMTP_PORT: z.coerce.number().default(587),
-  SMTP_USER: z.string().min(1),
-  SMTP_PASS: z.string().min(1),
+  // Resend (transacional). API HTTP em vez de SMTP — porta 443 sempre passa
+  // em cloud egress. Substitui Hostinger SMTP que tinha problema de
+  // entrega + risco de bloqueio. `EMAIL_FROM` precisa estar num domínio
+  // verificado no painel Resend (SPF + DKIM no DNS).
+  RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
 
   // Destinatário do formulário de contato em /app/ajuda.

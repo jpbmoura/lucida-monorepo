@@ -1,15 +1,7 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "@/env.js";
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_PORT === 465,
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
-});
+const resend = new Resend(env.RESEND_API_KEY);
 
 export interface EmailAttachment {
   filename: string;
@@ -24,11 +16,25 @@ interface SendEmailInput {
   text?: string;
   /**
    * Anexos. Hoje só usado pra enviar o PDF da NFS-e junto do email
-   * "nota emitida". `nodemailer` aceita Buffer + filename direto.
+   * "nota emitida". Resend SDK aceita Buffer direto.
    */
   attachments?: EmailAttachment[];
 }
 
+/**
+ * Envia email via Resend (HTTP API, porta 443). Substituiu Hostinger SMTP
+ * porque (1) Hostinger tem reputação ruim em IPs de cloud (entrega
+ * inconsistente) e (2) cloud providers às vezes bloqueiam egress SMTP —
+ * HTTP API é imune a esse problema.
+ *
+ * `from` (env.EMAIL_FROM) precisa ter o domínio verificado no painel
+ * Resend (SPF + DKIM no DNS) — senão a chamada devolve 422.
+ *
+ * Logging aqui é importante pra debug em prod: cada erro do Resend tem
+ * `name`/`message` estruturado (ex: "validation_error", "rate_limit").
+ * Sucesso loga `id` (UUID do Resend) — útil pra correlacionar com o
+ * dashboard deles.
+ */
 export async function sendEmail({
   to,
   subject,
@@ -36,40 +42,32 @@ export async function sendEmail({
   text,
   attachments,
 }: SendEmailInput): Promise<void> {
-  // Logging temporário pra debug de entrega em prod. nodemailer info traz
-  // accepted/rejected/response (resposta SMTP crua tipo "250 2.0.0 OK"),
-  // o que dá pra distinguir 3 cenários:
-  //   - exception            → não conectou no SMTP (timeout, auth, TLS)
-  //   - rejected populado    → SMTP rejeitou o destinatário
-  //   - accepted + 250       → SMTP aceitou; problema é entrega downstream
-  //                            (SPF/DKIM/blacklist/spam)
-  // Remover quando entrega estabilizar.
-  try {
-    const info = await transporter.sendMail({
-      from: env.EMAIL_FROM,
+  const result = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to,
+    subject,
+    html,
+    text,
+    attachments: attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
+  });
+
+  if (result.error) {
+    console.error("[email] Resend FAILED", {
       to,
       subject,
-      html,
-      text,
-      attachments,
+      name: result.error.name,
+      message: result.error.message,
     });
-    console.log("[email] sent", {
-      to,
-      subject,
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-      response: info.response,
-    });
-  } catch (err) {
-    const e = err as { message?: string; code?: string; command?: string };
-    console.error("[email] FAILED", {
-      to,
-      subject,
-      message: e.message,
-      code: e.code,
-      command: e.command,
-    });
-    throw err;
+    throw new Error(`Resend: ${result.error.message}`);
   }
+
+  console.log("[email] sent", {
+    to,
+    subject,
+    resendId: result.data?.id,
+  });
 }
