@@ -3,20 +3,25 @@
 import { useState } from "react";
 import { UserCircle, Lock, Bell, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { computeCompleteness, type UserProfileDTO } from "./data";
+// Type-only import — `data.ts` é "server-only", então não pode ter
+// imports de valor aqui (vide error de build do Next quando isso acontece).
+// `computeCompleteness` é calculado no `page.tsx` (server) e passado como
+// prop.
+import type { UserProfileDTO } from "./data";
 import { ProfileForm } from "./components/profile-form";
 import { AccountForm } from "./components/account-form";
 import { CompletenessBar } from "./components/completeness-bar";
 
 interface SettingsPageProps {
   profile: UserProfileDTO;
+  /** Calculado no server pra evitar value-import de `data.ts` no client. */
+  completeness: number;
 }
 
 type Tab = "profile" | "account";
 
-export function SettingsPage({ profile }: SettingsPageProps) {
+export function SettingsPage({ profile, completeness }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>("profile");
-  const completeness = computeCompleteness(profile);
 
   return (
     <div className="mx-auto w-full px-5 py-8 md:px-10">
