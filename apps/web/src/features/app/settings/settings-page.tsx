@@ -1,14 +1,21 @@
+"use client";
+
+import { useState } from "react";
 import { UserCircle, Lock, Bell, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { computeCompleteness, type UserProfileDTO } from "./data";
 import { ProfileForm } from "./components/profile-form";
+import { AccountForm } from "./components/account-form";
 import { CompletenessBar } from "./components/completeness-bar";
 
 interface SettingsPageProps {
   profile: UserProfileDTO;
 }
 
+type Tab = "profile" | "account";
+
 export function SettingsPage({ profile }: SettingsPageProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("profile");
   const completeness = computeCompleteness(profile);
 
   return (
@@ -32,15 +39,34 @@ export function SettingsPage({ profile }: SettingsPageProps) {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside>
           <nav className="flex flex-col gap-1" aria-label="Seções">
-            <TabItem icon={<UserCircle className="size-4" />} label="Perfil" active />
-            <TabItem icon={<Lock className="size-4" />} label="Conta" comingSoon />
-            <TabItem icon={<Bell className="size-4" />} label="Notificações" comingSoon />
+            <TabItem
+              icon={<UserCircle className="size-4" />}
+              label="Perfil"
+              active={activeTab === "profile"}
+              onClick={() => setActiveTab("profile")}
+            />
+            <TabItem
+              icon={<Lock className="size-4" />}
+              label="Conta"
+              active={activeTab === "account"}
+              onClick={() => setActiveTab("account")}
+            />
+            <TabItem
+              icon={<Bell className="size-4" />}
+              label="Notificações"
+              comingSoon
+            />
           </nav>
         </aside>
 
         <section className="flex flex-col gap-6">
-          <CompletenessBar percent={completeness} />
-          <ProfileForm profile={profile} />
+          {activeTab === "profile" && (
+            <>
+              <CompletenessBar percent={completeness} />
+              <ProfileForm profile={profile} />
+            </>
+          )}
+          {activeTab === "account" && <AccountForm userEmail={profile.email} />}
         </section>
       </div>
     </div>
@@ -52,30 +78,24 @@ function TabItem({
   label,
   active,
   comingSoon,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
   comingSoon?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-        active
-          ? "bg-gray-100 font-medium text-ink"
-          : "text-gray-500",
-        comingSoon && "cursor-not-allowed",
-      )}
-      aria-current={active ? "page" : undefined}
-    >
-      <span
-        className={cn(
-          active ? "text-ink" : "text-gray-400",
-        )}
-      >
-        {icon}
-      </span>
+  const className = cn(
+    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+    active && "bg-gray-100 font-medium text-ink",
+    !active && !comingSoon && "text-gray-500 hover:bg-gray-50 hover:text-ink",
+    comingSoon && "cursor-not-allowed text-gray-400",
+  );
+
+  const content = (
+    <>
+      <span className={cn(active ? "text-ink" : "text-gray-400")}>{icon}</span>
       <span className="flex-1">{label}</span>
       {comingSoon && (
         <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-brand-primary">
@@ -83,6 +103,21 @@ function TabItem({
           Em breve
         </span>
       )}
-    </div>
+    </>
+  );
+
+  if (comingSoon) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={className}
+      aria-current={active ? "page" : undefined}
+    >
+      {content}
+    </button>
   );
 }

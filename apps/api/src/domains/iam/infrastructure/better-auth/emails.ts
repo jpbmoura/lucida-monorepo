@@ -30,6 +30,19 @@ export function resetPasswordTemplate(url: string): EmailTemplate {
   };
 }
 
+export function magicLinkTemplate(url: string): EmailTemplate {
+  return {
+    subject: "Seu link de acesso · Lucida",
+    text: `Acesse sua conta clicando em: ${url}\n\nEsse link expira em alguns minutos. Se você não pediu, ignore.`,
+    html: wrap(`
+      <h1 style="font-size:22px;margin:0 0 12px;color:#0a0a0a;">Acesse sua conta</h1>
+      <p style="margin:0 0 20px;color:#525252;">Clique abaixo pra entrar na Lucida sem precisar de senha. O link expira em poucos minutos.</p>
+      ${button("Entrar na Lucida", url)}
+      <p style="margin:24px 0 0;font-size:12px;color:#a3a3a3;">Se você não pediu esse link, pode ignorar.</p>
+    `),
+  };
+}
+
 export function organizationInviteTemplate(orgName: string, url: string): EmailTemplate {
   return {
     subject: `Você foi convidado para ${orgName} · Lucida`,

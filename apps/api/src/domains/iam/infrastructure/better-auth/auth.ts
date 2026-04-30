@@ -5,11 +5,12 @@
 
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { organization } from "better-auth/plugins";
+import { magicLink, organization } from "better-auth/plugins";
 import type { Db } from "mongodb";
 import { env } from "@/env.js";
 import { sendEmail } from "./send-email.js";
 import {
+  magicLinkTemplate,
   resetPasswordTemplate,
   verifyEmailTemplate,
   organizationInviteTemplate,
@@ -147,7 +148,35 @@ export function createAuth(db: Db, hooks: AuthHooks = {}) {
       },
     },
 
+    /**
+     * Account linking — usuário logado pode vincular contas extras (ex:
+     * Google) à mesma conta. `trustedProviders` lista os providers que
+     * podem ser linkados automaticamente quando o email bate com o do
+     * user atual; outros provedores caem em fluxo manual de confirmação.
+     *
+     * Sem isso, tentar logar com Google quando já existe conta email/senha
+     * com mesmo email cria conflito ou conta separada — pior UX.
+     */
+    account: {
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+      },
+    },
+
     plugins: [
+      // Magic link: sign-in passwordless. Usuário digita email, recebe um
+      // link no inbox, clica e está logado. UX de fallback quando esquece
+      // a senha mas não quer abrir o fluxo de reset, ou pra logins esporádicos.
+      // `disableSignUp: true` — habilitado só pra sign-in (não cria conta).
+      // Quem ainda não tem conta segue sign-up email/senha ou Google.
+      magicLink({
+        disableSignUp: true,
+        sendMagicLink: async ({ email, url }) => {
+          const template = magicLinkTemplate(url);
+          await sendEmail({ to: email, ...template });
+        },
+      }),
       organization({
         async sendInvitationEmail({ email, organization: org, invitation }) {
           const url = `${env.WEB_ORIGIN}/accept-invite?invitation=${invitation.id}`;
