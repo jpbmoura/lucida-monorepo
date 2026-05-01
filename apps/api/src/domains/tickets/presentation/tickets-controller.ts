@@ -75,6 +75,19 @@ export class TicketsController {
       return;
     }
 
+    // Filtra eventos que não interessam (e que podem ter shape diferente —
+    // Resend manda eventos batch com `data: array` que quebrariam nossa
+    // validação). Só processamos `email.received` (inbound de email único).
+    // Devolvemos 200 ack pra qualquer outro evento — não é erro do remetente.
+    const eventType =
+      typeof json === "object" && json !== null
+        ? (json as { type?: unknown }).type
+        : undefined;
+    if (eventType !== "email.received") {
+      res.status(200).json({ received: true, ignored: true });
+      return;
+    }
+
     const parsed = resendInboundEventSchema.safeParse(json);
     if (!parsed.success) {
       console.error(
