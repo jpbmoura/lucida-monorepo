@@ -624,6 +624,7 @@ export async function buildApp(): Promise<Express> {
     reply: replyToTicketUseCase,
     markDone: new CloseTicketUseCase(ticketRepository),
     reopen: new ReopenTicketUseCase(ticketRepository),
+    repository: ticketRepository,
   });
 
   const billingController = new BillingController({

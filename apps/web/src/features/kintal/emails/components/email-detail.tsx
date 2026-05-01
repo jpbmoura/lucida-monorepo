@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Check,
   CornerDownLeft,
-  ExternalLink,
   Loader2,
   MessageCircle,
   Paperclip,
@@ -17,10 +16,15 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/relative-time";
+import type { KintalUserDetail } from "@/features/kintal/users/types";
 import type { TicketDetailDTO, TicketMessageDTO, TicketStatus } from "../data";
+import { InfoPanel } from "./info-panel";
 
 interface Props {
   ticket: TicketDetailDTO;
+  /** Cadastro Lucida do remetente. Null quando não é cliente cadastrado
+   *  ou quando o lookup por id falhou. */
+  customer: KintalUserDetail | null;
 }
 
 /**
@@ -31,7 +35,7 @@ interface Props {
  * Refresh do router (router.refresh) após cada ação re-fetcha os dados
  * do server.
  */
-export function EmailDetail({ ticket }: Props) {
+export function EmailDetail({ ticket, customer }: Props) {
   const router = useRouter();
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -75,77 +79,84 @@ export function EmailDetail({ ticket }: Props) {
         : "/kintal/emails";
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-8 md:px-10">
-      <div>
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" />
-          Voltar pra lista
-        </Link>
-      </div>
+    <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-10">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Thread */}
+        <main className="flex min-w-0 flex-col gap-6">
+          <div>
+            <Link
+              href={backHref}
+              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-ink"
+            >
+              <ArrowLeft className="size-3.5" />
+              Voltar pra lista
+            </Link>
+          </div>
 
-      <header className="flex flex-col gap-3 border-b border-gray-100 pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-medium tracking-tight text-ink">
-              {ticket.subject || "(sem assunto)"}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-gray-500">
-              <span className="font-medium text-ink">{customerLabel}</span>
-              <span>·</span>
-              <a
-                href={`mailto:${ticket.customerEmail}`}
-                className="hover:text-ink hover:underline"
-              >
-                {ticket.customerEmail}
-              </a>
-              {ticket.userId && (
-                <>
+          <header className="flex flex-col gap-3 border-b border-gray-100 pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl font-medium tracking-tight text-ink">
+                  {ticket.subject || "(sem assunto)"}
+                </h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-gray-500">
+                  <span className="font-medium text-ink">{customerLabel}</span>
                   <span>·</span>
-                  <Link
-                    href={`/kintal/usuarios/${ticket.userId}`}
-                    className="inline-flex items-center gap-0.5 text-brand-primary hover:underline"
+                  <a
+                    href={`mailto:${ticket.customerEmail}`}
+                    className="hover:text-ink hover:underline"
                   >
-                    Ver usuário
-                    <ExternalLink className="size-3" />
-                  </Link>
-                </>
-              )}
+                    {ticket.customerEmail}
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <HeaderStatus
+                  status={ticket.status}
+                  awaitingStaff={ticket.awaitingStaff}
+                />
+                <HeaderActions
+                  status={ticket.status}
+                  isPending={isPending}
+                  onMarkDone={markDone}
+                  onReopen={reopen}
+                />
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <HeaderStatus
-              status={ticket.status}
-              awaitingStaff={ticket.awaitingStaff}
-            />
-            <HeaderActions
-              status={ticket.status}
-              isPending={isPending}
-              onMarkDone={markDone}
-              onReopen={reopen}
-            />
-          </div>
-        </div>
 
-        {actionError && (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
-          >
-            {actionError}
-          </div>
-        )}
-      </header>
+            {actionError && (
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+              >
+                {actionError}
+              </div>
+            )}
+          </header>
 
-      <div className="flex flex-col gap-3">
-        {ticket.messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+          <div className="flex flex-col gap-3">
+            {ticket.messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))}
+          </div>
+
+          <ReplyForm ticketId={ticket.id} />
+        </main>
+
+        {/* Painel lateral. Em <lg fica abaixo da thread (ordem natural).
+            Em >=lg fica sticky no topo. */}
+        <aside>
+          <div className="lg:sticky lg:top-6">
+            <InfoPanel
+              customerEmail={ticket.customerEmail}
+              customerName={ticket.customerName}
+              user={customer}
+              ticketCreatedAt={ticket.createdAt}
+              relatedTickets={ticket.relatedTickets}
+            />
+          </div>
+        </aside>
       </div>
-
-      <ReplyForm ticketId={ticket.id} />
     </div>
   );
 }

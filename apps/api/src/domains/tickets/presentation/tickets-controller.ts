@@ -10,7 +10,9 @@ import type {
 import type { ListTicketsUseCase } from "../application/list-tickets.js";
 import type { ReplyToTicketUseCase } from "../application/reply-to-ticket.js";
 import type { Ticket } from "../domain/ticket.js";
+import { TicketId } from "../domain/ticket-id.js";
 import type { TicketMessage } from "../domain/ticket-message.js";
+import type { TicketRepository } from "../domain/ticket-repository.js";
 import { fetchInboundEmailBody } from "../infrastructure/resend/fetch-inbound-body.js";
 import {
   extractInReplyTo,
@@ -28,6 +30,12 @@ interface Deps {
   reply: ReplyToTicketUseCase | null;
   markDone: CloseTicketUseCase;
   reopen: ReopenTicketUseCase;
+  /**
+   * Repositório usado pra hidratar o detalhe com `relatedTickets` (outras
+   * threads do mesmo customerEmail). Inicial pequeno, fica inline aqui em
+   * vez de criar um use case dedicado.
+   */
+  repository: TicketRepository;
 }
 
 export class TicketsController {
@@ -182,7 +190,15 @@ export class TicketsController {
     try {
       const { id } = ticketIdParam.parse(req.params);
       const ticket = await this.deps.get.execute({ ticketId: id });
-      res.json({ data: toDetailDTO(ticket) });
+      // Hidratamos o painel lateral com até 5 threads anteriores do
+      // mesmo cliente. Útil principalmente pra não-cliente (sem userId)
+      // mas fica disponível pra todos.
+      const related = await this.deps.repository.findRecentByCustomerEmail({
+        email: ticket.customerEmail,
+        excludeId: TicketId.of(ticket.id.toString()),
+        limit: 5,
+      });
+      res.json({ data: toDetailDTO(ticket, related) });
     } catch (err) {
       next(err);
     }
@@ -260,11 +276,22 @@ function toListDTO(t: Ticket) {
   };
 }
 
-function toDetailDTO(t: Ticket) {
+function toDetailDTO(t: Ticket, related: Ticket[]) {
   return {
     ...toListDTO(t),
     userId: t.userId,
     messages: t.messages.map(toMessageDTO),
+    relatedTickets: related.map(toRelatedDTO),
+  };
+}
+
+function toRelatedDTO(t: Ticket) {
+  return {
+    id: t.id.toString(),
+    subject: t.subject,
+    status: t.status,
+    awaitingStaff: t.awaitingStaff(),
+    updatedAt: t.updatedAt.toISOString(),
   };
 }
 

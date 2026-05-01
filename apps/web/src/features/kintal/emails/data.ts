@@ -47,9 +47,22 @@ export interface TicketListItemDTO {
   doneAt: string | null;
 }
 
+export interface RelatedTicketDTO {
+  id: string;
+  subject: string;
+  status: TicketStatus;
+  awaitingStaff: boolean;
+  updatedAt: string;
+}
+
 export interface TicketDetailDTO extends TicketListItemDTO {
   userId: string | null;
   messages: TicketMessageDTO[];
+  /**
+   * Outras threads do mesmo `customerEmail` (até 5, mais recentes
+   * primeiro). Usado pelo painel lateral.
+   */
+  relatedTickets: RelatedTicketDTO[];
 }
 
 export interface TicketsListResponse {

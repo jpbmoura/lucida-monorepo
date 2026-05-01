@@ -28,6 +28,17 @@ export interface TicketRepository {
 
   list(opts?: ListTicketsOptions): Promise<Ticket[]>;
 
+  /**
+   * Outros tickets com o mesmo email de cliente, excluindo o `excludeId`.
+   * Usado no painel lateral do detalhe pra dar contexto ("já recebi 3
+   * emails dessa pessoa antes"). Ordenado por `updatedAt` desc.
+   */
+  findRecentByCustomerEmail(input: {
+    email: string;
+    excludeId: TicketId;
+    limit: number;
+  }): Promise<Ticket[]>;
+
   /** Conta de tickets por status — usado pros badges das tabs do Kintal. */
   countByStatus(status: TicketStatus): Promise<number>;
 }
