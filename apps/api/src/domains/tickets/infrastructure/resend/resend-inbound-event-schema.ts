@@ -56,6 +56,12 @@ export const resendInboundEventSchema = z
     data: z
       .object({
         id: z.string().optional(),
+        /**
+         * UUID do email no Resend. Usado pra fetch do corpo via API
+         * quando o webhook só traz metadata (caso default no Resend
+         * Inbound — text/html não vêm no payload).
+         */
+        email_id: z.string().optional(),
         from: z.string().min(1),
         to: stringOrAddressArray,
         subject: z.string().nullish().transform((s) => s ?? ""),

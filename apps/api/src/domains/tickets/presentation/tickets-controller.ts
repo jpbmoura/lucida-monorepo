@@ -15,6 +15,7 @@ import type {
 import type { ReplyToTicketUseCase } from "../application/reply-to-ticket.js";
 import type { Ticket } from "../domain/ticket.js";
 import type { TicketMessage } from "../domain/ticket-message.js";
+import { fetchInboundEmailBody } from "../infrastructure/resend/fetch-inbound-body.js";
 import {
   extractInReplyTo,
   extractMessageId,
@@ -104,12 +105,27 @@ export class TicketsController {
     const messageId = extractMessageId(parsed.data);
     const inReplyTo = extractInReplyTo(parsed.data);
 
+    // Resend Inbound webhook entrega só metadata — text/html NÃO vêm
+    // no payload. Busca via API quando ambos estão vazios usando o
+    // `email_id` do payload. Falha → corpo vazio (ticket é criado mesmo
+    // assim com a metadata, staff vê e investiga via dashboard Resend).
+    let bodyText = parsed.data.data.text ?? "";
+    let bodyHtml = parsed.data.data.html ?? null;
+    if (!bodyText && !bodyHtml && parsed.data.data.email_id) {
+      const fetched = await fetchInboundEmailBody(parsed.data.data.email_id);
+      bodyText = fetched.text || stripHtml(fetched.html ?? "");
+      bodyHtml = fetched.html;
+    } else if (!bodyText && bodyHtml) {
+      // Caso o webhook traga só html sem text — fallback derivando.
+      bodyText = stripHtml(bodyHtml);
+    }
+
     const input: HandleInboundEmailInput = {
       from: parsed.data.data.from,
       toAddresses: parsed.data.data.to,
       subject: parsed.data.data.subject ?? "",
-      bodyText: parsed.data.data.text ?? stripHtml(parsed.data.data.html ?? ""),
-      bodyHtml: parsed.data.data.html ?? null,
+      bodyText,
+      bodyHtml,
       messageId,
       inReplyTo,
       attachments: (parsed.data.data.attachments ?? []).map((a) => ({
