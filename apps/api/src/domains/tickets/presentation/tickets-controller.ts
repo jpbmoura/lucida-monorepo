@@ -105,10 +105,15 @@ export class TicketsController {
     const messageId = extractMessageId(parsed.data);
     const inReplyTo = extractInReplyTo(parsed.data);
 
-    // Resend Inbound webhook entrega só metadata — text/html NÃO vêm
-    // no payload. Busca via API quando ambos estão vazios usando o
-    // `email_id` do payload. Falha → corpo vazio (ticket é criado mesmo
-    // assim com a metadata, staff vê e investiga via dashboard Resend).
+    // Body vem no webhook payload (campos `text`/`html` do data).
+    // Se não vier, tentamos fetch via API como fallback — mas Resend
+    // hoje não expõe endpoint pra inbound (retorna 405); a função
+    // sempre devolve vazio, só serve pra log.
+    //
+    // Quando body chega vazio é problema de config no painel Resend
+    // (event type errado, "include body" off no webhook). Persistimos
+    // a mensagem com corpo vazio mesmo assim — staff vê o ticket com
+    // "(corpo não disponível)" e debug via dashboard Resend.
     let bodyText = parsed.data.data.text ?? "";
     let bodyHtml = parsed.data.data.html ?? null;
     if (!bodyText && !bodyHtml && parsed.data.data.email_id) {
@@ -116,8 +121,14 @@ export class TicketsController {
       bodyText = fetched.text || stripHtml(fetched.html ?? "");
       bodyHtml = fetched.html;
     } else if (!bodyText && bodyHtml) {
-      // Caso o webhook traga só html sem text — fallback derivando.
       bodyText = stripHtml(bodyHtml);
+    }
+    if (!bodyText && !bodyHtml) {
+      console.warn("[tickets] webhook sem body — config do Resend Inbound:", {
+        emailId: parsed.data.data.email_id,
+        type: parsed.data.type,
+        from: parsed.data.data.from,
+      });
     }
 
     const input: HandleInboundEmailInput = {
