@@ -1,5 +1,4 @@
 import mongoose, { Schema, type Model } from "mongoose";
-import type { TicketKind } from "../domain/ticket-kind.js";
 import type { TicketOrigin } from "../domain/ticket-origin.js";
 import type { TicketStatus } from "../domain/ticket-status.js";
 import type {
@@ -8,10 +7,10 @@ import type {
 } from "../domain/ticket-message.js";
 
 /**
- * Documento Ticket. Mensagens vivem aninhadas — volume é baixo (5-10
+ * Documento Ticket. Mensagens vivem aninhadas — volume é baixo (poucos
  * tickets/dia, poucas msgs por ticket) e queries comuns precisam delas.
- * Index unique em `outbound message providerMessageId` é parcial pra
- * permitir múltiplas mensagens com null.
+ * Index em `messages.providerMessageId` é parcial pra permitir múltiplas
+ * mensagens com null.
  */
 
 interface TicketMessageDoc {
@@ -35,7 +34,6 @@ interface TicketMessageDoc {
 
 export interface TicketDoc {
   _id: string;
-  kind: TicketKind;
   subject: string;
   status: TicketStatus;
   customerEmail: string;
@@ -43,8 +41,7 @@ export interface TicketDoc {
   userId: string | null;
   origin: TicketOrigin;
   messages: TicketMessageDoc[];
-  readByUserIds: string[];
-  closedAt: Date | null;
+  doneAt: Date | null;
   lastInboundAt: Date | null;
   lastOutboundAt: Date | null;
   createdAt: Date;
@@ -90,20 +87,11 @@ const ticketMessageSchema = new Schema<TicketMessageDoc>(
 const ticketSchema = new Schema<TicketDoc>(
   {
     _id: { type: String, required: true },
-    // `support` é default pra back-compat com tickets criados antes do
-    // campo existir (todos eram do suporte@).
-    kind: {
-      type: String,
-      required: true,
-      enum: ["support", "general"],
-      default: "support",
-      index: true,
-    },
     subject: { type: String, required: true },
     status: {
       type: String,
       required: true,
-      enum: ["open", "closed"],
+      enum: ["new", "in_progress", "done"],
       index: true,
     },
     customerEmail: { type: String, required: true, index: true },
@@ -115,8 +103,7 @@ const ticketSchema = new Schema<TicketDoc>(
       enum: ["email", "form"],
     },
     messages: { type: [ticketMessageSchema], default: [] },
-    readByUserIds: { type: [String], default: [] },
-    closedAt: { type: Date, default: null },
+    doneAt: { type: Date, default: null },
     lastInboundAt: { type: Date, default: null },
     lastOutboundAt: { type: Date, default: null },
   },
@@ -128,14 +115,10 @@ const ticketSchema = new Schema<TicketDoc>(
   },
 );
 
-// Lista por kind+status, mais recentes primeiro (query principal Kintal).
-ticketSchema.index({ kind: 1, status: 1, updatedAt: -1 });
-// Caixa de entrada — busca por kind=general filtrando "não-lidos por mim".
-ticketSchema.index({ kind: 1, readByUserIds: 1, updatedAt: -1 });
+// Lista por status, mais recentes primeiro (query principal Kintal).
+ticketSchema.index({ status: 1, updatedAt: -1 });
 // Threading via lookup por providerMessageId de mensagem outbound.
 ticketSchema.index({ "messages.providerMessageId": 1 });
-// Fallback de threading: tickets recentes por email do cliente.
-ticketSchema.index({ customerEmail: 1, createdAt: -1 });
 
 export const TicketModel: Model<TicketDoc> =
   (mongoose.models.Ticket as Model<TicketDoc> | undefined) ??

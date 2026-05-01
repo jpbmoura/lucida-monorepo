@@ -1,13 +1,7 @@
 import { z } from "zod";
 
 export const listTicketsQuery = z.object({
-  kind: z.enum(["support", "general"]).optional(),
-  status: z.enum(["open", "closed"]).optional(),
-  /** Filtro pra caixa de entrada — só "não lidos por mim". */
-  unreadOnly: z
-    .union([z.literal("true"), z.literal("1")])
-    .optional()
-    .transform((v) => Boolean(v)),
+  status: z.enum(["new", "in_progress", "done"]).optional(),
   limit: z.coerce.number().int().positive().max(200).optional(),
   before: z
     .string()

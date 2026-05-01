@@ -24,37 +24,6 @@ export function ticketReplyTemplate(input: ReplyTemplateInput): {
   return { html, text };
 }
 
-export interface AutoResponderTemplateInput {
-  customerName: string | null;
-}
-
-export function ticketAutoResponderTemplate(
-  input: AutoResponderTemplateInput,
-): { subject: string; html: string; text: string } {
-  const greeting = input.customerName
-    ? `Olá, ${escapeHtml(input.customerName)}`
-    : "Olá";
-  const body = `
-    <p>${greeting},</p>
-    <p>Recebemos sua mensagem e em breve um humano vai te responder.</p>
-    <p>Se quiser adicionar mais contexto ou anexos, é só responder este email — sua resposta cai no mesmo atendimento.</p>
-  `;
-  const text = [
-    input.customerName ? `Olá, ${input.customerName}` : "Olá",
-    "",
-    "Recebemos sua mensagem e em breve um humano vai te responder.",
-    "Se quiser adicionar mais contexto ou anexos, é só responder este email — sua resposta cai no mesmo atendimento.",
-    "",
-    footerText(),
-  ].join("\n");
-
-  return {
-    subject: "Recebemos sua mensagem · Lucida",
-    html: wrap(body),
-    text,
-  };
-}
-
 // ─── Internals ────────────────────────────────────────────────────────
 
 function wrap(body: string): string {

@@ -1,74 +1,49 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Archive,
-  ArchiveRestore,
   ArrowLeft,
-  Bot,
   Check,
   CornerDownLeft,
   ExternalLink,
-  Eye,
-  EyeOff,
   Loader2,
+  MessageCircle,
   Paperclip,
   RotateCcw,
   Send,
-  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/relative-time";
-import type {
-  TicketDetailDTO,
-  TicketKind,
-  TicketMessageDTO,
-} from "../data";
+import type { TicketDetailDTO, TicketMessageDTO, TicketStatus } from "../data";
 
 interface Props {
   ticket: TicketDetailDTO;
 }
 
 /**
- * Tela de detalhe + conversa. Comporta os dois `kind`:
+ * Tela de detalhe + conversa. Status flui new → in_progress → done.
+ * Reply automaticamente progride new → in_progress no backend
+ * (`Ticket.addOutboundMessage`). UI expõe ações pra concluir e reabrir.
  *
- *  - support → header tem botão Fechar/Reabrir; status badge open/closed
- *  - general → header tem botão Marcar como não lida; auto marca como
- *              lida no mount; status badge lido/não-lido
- *
- * Reply box é o mesmo em ambos. Refresh do router (router.refresh) após
- * cada ação re-fetcha os dados do server.
+ * Refresh do router (router.refresh) após cada ação re-fetcha os dados
+ * do server.
  */
-export function TicketDetail({ ticket }: Props) {
+export function EmailDetail({ ticket }: Props) {
   const router = useRouter();
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const isInbox = ticket.kind === "general";
-  const isArchived = isInbox && ticket.status === "closed";
-
-  // Auto-marca como lida ao abrir (apenas inbox + se ainda não lida).
-  useEffect(() => {
-    if (!isInbox || ticket.readByMe) return;
-    void fetch(`/v1/tickets/${encodeURIComponent(ticket.id)}/read`, {
-      method: "POST",
-    }).catch(() => {
-      // Silencioso — falha aqui não impede o usuário de ler. Próxima
-      // visita tenta de novo.
-    });
-  }, [isInbox, ticket.id, ticket.readByMe]);
-
-  async function close() {
+  async function markDone() {
     setActionError(null);
     try {
       const res = await fetch(
-        `/v1/tickets/${encodeURIComponent(ticket.id)}/close`,
+        `/v1/tickets/${encodeURIComponent(ticket.id)}/done`,
         { method: "POST" },
       );
-      if (!res.ok) throw new Error("Falha ao fechar ticket.");
+      if (!res.ok) throw new Error("Falha ao concluir email.");
       startTransition(() => router.refresh());
     } catch (err) {
       setActionError((err as Error).message);
@@ -82,21 +57,7 @@ export function TicketDetail({ ticket }: Props) {
         `/v1/tickets/${encodeURIComponent(ticket.id)}/reopen`,
         { method: "POST" },
       );
-      if (!res.ok) throw new Error("Falha ao reabrir ticket.");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      setActionError((err as Error).message);
-    }
-  }
-
-  async function markUnread() {
-    setActionError(null);
-    try {
-      const res = await fetch(
-        `/v1/tickets/${encodeURIComponent(ticket.id)}/unread`,
-        { method: "POST" },
-      );
-      if (!res.ok) throw new Error("Falha ao marcar como não lida.");
+      if (!res.ok) throw new Error("Falha ao reabrir email.");
       startTransition(() => router.refresh());
     } catch (err) {
       setActionError((err as Error).message);
@@ -104,14 +65,14 @@ export function TicketDetail({ ticket }: Props) {
   }
 
   const customerLabel = ticket.customerName ?? ticket.customerEmail;
-  // Volta sempre pra view de origem. Quando arquivada, volta pra
-  // /inbox?archived=1 pra não jogar o staff numa lista que parece vazia.
-  const backHref = isInbox
-    ? isArchived
-      ? "/kintal/inbox?archived=1"
-      : "/kintal/inbox"
-    : "/kintal/tickets";
-  const backLabel = isInbox ? "Voltar pra caixa de entrada" : "Voltar pra lista";
+  // Volta sempre pra view de origem. Quando concluído, volta pra
+  // /emails?status=done pra não jogar o staff numa lista que parece vazia.
+  const backHref =
+    ticket.status === "done"
+      ? "/kintal/emails?status=done"
+      : ticket.status === "new"
+        ? "/kintal/emails?status=new"
+        : "/kintal/emails";
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-8 md:px-10">
@@ -121,7 +82,7 @@ export function TicketDetail({ ticket }: Props) {
           className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-ink"
         >
           <ArrowLeft className="size-3.5" />
-          {backLabel}
+          Voltar pra lista
         </Link>
       </div>
 
@@ -155,16 +116,15 @@ export function TicketDetail({ ticket }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <HeaderStatus ticket={ticket} kind={ticket.kind} />
+            <HeaderStatus
+              status={ticket.status}
+              awaitingStaff={ticket.awaitingStaff}
+            />
             <HeaderActions
-              kind={ticket.kind}
               status={ticket.status}
               isPending={isPending}
-              onClose={close}
+              onMarkDone={markDone}
               onReopen={reopen}
-              onMarkUnread={markUnread}
-              isArchived={isArchived}
-              isInbox={isInbox}
             />
           </div>
         </div>
@@ -191,88 +151,56 @@ export function TicketDetail({ ticket }: Props) {
 }
 
 function HeaderStatus({
-  ticket,
-  kind,
+  status,
+  awaitingStaff,
 }: {
-  ticket: TicketDetailDTO;
-  kind: TicketKind;
+  status: TicketStatus;
+  awaitingStaff: boolean;
 }) {
-  if (kind === "support") {
-    if (ticket.status === "closed") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
-          <X className="size-3" />
-          Fechado
-        </span>
-      );
-    }
+  if (status === "done") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
+        <Check className="size-3" />
+        Concluído
+      </span>
+    );
+  }
+  if (status === "new") {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
-        Aberto
+        <span className="size-1.5 rounded-full bg-emerald-500" />
+        Novo
       </span>
     );
   }
-  // inbox: estados possíveis = arquivada / lida / não-lida.
-  if (ticket.status === "closed") {
+  if (awaitingStaff) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500">
-        <Archive className="size-3" />
-        Arquivada
-      </span>
-    );
-  }
-  if (ticket.readByMe) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500">
-        <Eye className="size-3" />
-        Lida
+      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+        <MessageCircle className="size-3" />
+        Aguardando você
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-brand-primary/10 px-2 py-1 text-[11px] font-medium text-brand-primary">
-      <span className="size-1.5 rounded-full bg-brand-primary" />
-      Não lida
+    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+      Em andamento
     </span>
   );
 }
 
 function HeaderActions({
-  kind,
   status,
   isPending,
-  onClose,
+  onMarkDone,
   onReopen,
-  onMarkUnread,
-  isArchived,
-  isInbox,
 }: {
-  kind: TicketKind;
-  status: "open" | "closed";
+  status: TicketStatus;
   isPending: boolean;
-  onClose: () => void;
+  onMarkDone: () => void;
   onReopen: () => void;
-  onMarkUnread: () => void;
-  isArchived: boolean;
-  isInbox: boolean;
 }) {
-  if (kind === "support") {
-    return status === "open" ? (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onClose}
-        disabled={isPending}
-      >
-        {isPending ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <Check className="size-3.5" />
-        )}
-        Fechar
-      </Button>
-    ) : (
+  if (status === "done") {
+    return (
       <Button
         type="button"
         variant="outline"
@@ -289,64 +217,26 @@ function HeaderActions({
       </Button>
     );
   }
-  // inbox (kind=general):
-  //  - arquivada (status=closed) → botão "Desarquivar" (reopen)
-  //  - ativa (status=open) → "Arquivar" (close) + "Marcar não lida"
-  if (isInbox && isArchived) {
-    return (
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onReopen}
-        disabled={isPending}
-      >
-        {isPending ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <ArchiveRestore className="size-3.5" />
-        )}
-        Desarquivar
-      </Button>
-    );
-  }
   return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onMarkUnread}
-        disabled={isPending}
-      >
-        {isPending ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <EyeOff className="size-3.5" />
-        )}
-        Marcar não lida
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onClose}
-        disabled={isPending}
-      >
-        {isPending ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <Archive className="size-3.5" />
-        )}
-        Arquivar
-      </Button>
-    </>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onMarkDone}
+      disabled={isPending}
+    >
+      {isPending ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <Check className="size-3.5" />
+      )}
+      Concluir
+    </Button>
   );
 }
 
 function MessageBubble({ message }: { message: TicketMessageDTO }) {
   const isInbound = message.direction === "inbound";
-  const isAuto = message.kind === "auto";
   const author = message.fromName ?? message.fromEmail;
 
   return (
@@ -360,12 +250,6 @@ function MessageBubble({ message }: { message: TicketMessageDTO }) {
       )}
     >
       <header className="flex items-center gap-2 text-[11px] text-gray-500">
-        {isAuto && (
-          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-            <Bot className="size-3" />
-            Auto
-          </span>
-        )}
         <span
           className={cn(
             "font-medium",

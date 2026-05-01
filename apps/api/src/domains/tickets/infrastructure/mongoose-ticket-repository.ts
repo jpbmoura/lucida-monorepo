@@ -26,7 +26,6 @@ export class MongooseTicketRepository implements TicketRepository {
       { _id: ticket.id.toString() },
       {
         $set: {
-          kind: ticket.kind,
           subject: ticket.subject,
           status: ticket.status,
           customerEmail: ticket.customerEmail,
@@ -46,8 +45,7 @@ export class MongooseTicketRepository implements TicketRepository {
             attachments: m.attachments,
             createdAt: m.createdAt,
           })),
-          readByUserIds: ticket.readByUserIds,
-          closedAt: ticket.closedAt,
+          doneAt: ticket.doneAt,
           lastInboundAt: ticket.lastInboundAt,
           lastOutboundAt: ticket.lastOutboundAt,
         },
@@ -76,7 +74,6 @@ export class MongooseTicketRepository implements TicketRepository {
   async list(opts: ListTicketsOptions = {}): Promise<Ticket[]> {
     const limit = clampLimit(opts.limit);
     const filter: Record<string, unknown> = {};
-    if (opts.kind) filter.kind = opts.kind;
     if (opts.status) filter.status = opts.status;
     if (opts.before) filter.updatedAt = { $lt: opts.before };
     const docs = await TicketModel.find(filter)
@@ -87,20 +84,8 @@ export class MongooseTicketRepository implements TicketRepository {
     return docs.map(toEntity);
   }
 
-  countByStatus(
-    status: TicketStatus,
-    kind?: import("../domain/ticket-kind.js").TicketKind,
-  ): Promise<number> {
-    const filter: Record<string, unknown> = { status };
-    if (kind) filter.kind = kind;
-    return TicketModel.countDocuments(filter).exec();
-  }
-
-  countUnreadByUser(userId: string): Promise<number> {
-    return TicketModel.countDocuments({
-      kind: "general",
-      readByUserIds: { $ne: userId },
-    }).exec();
+  countByStatus(status: TicketStatus): Promise<number> {
+    return TicketModel.countDocuments({ status }).exec();
   }
 }
 
@@ -112,7 +97,6 @@ function clampLimit(raw: number | undefined): number {
 function toEntity(doc: TicketDoc): Ticket {
   return Ticket.restore({
     id: TicketId.of(doc._id),
-    kind: doc.kind ?? "support",
     subject: doc.subject,
     status: doc.status,
     customerEmail: doc.customerEmail,
@@ -134,10 +118,9 @@ function toEntity(doc: TicketDoc): Ticket {
         createdAt: m.createdAt,
       }),
     ),
-    readByUserIds: doc.readByUserIds ?? [],
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
-    closedAt: doc.closedAt,
+    doneAt: doc.doneAt,
     lastInboundAt: doc.lastInboundAt,
     lastOutboundAt: doc.lastOutboundAt,
   });

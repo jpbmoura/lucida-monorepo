@@ -14,7 +14,8 @@
       "Bash(pnpm --filter \"@lucida/web\" exec tsc --noEmit)",
       "Bash(pnpm install *)",
       "Bash(pnpm next *)",
-      "WebFetch(domain:resend.com)"
+      "WebFetch(domain:resend.com)",
+      "Bash(npx tsc *)"
     ]
   }
 }

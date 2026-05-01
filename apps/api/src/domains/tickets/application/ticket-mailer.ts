@@ -13,15 +13,6 @@ export interface TicketMailer {
    * cliente de email.
    */
   sendReply(input: SendReplyInput): Promise<{ providerMessageId: string }>;
-
-  /**
-   * Auto-resposta enviada quando ticket é criado de email do cliente.
-   * Bloco curto avisando que recebemos. Mesma lógica de threading do
-   * reply — cliente que responder esse email cai no mesmo ticket.
-   */
-  sendAutoResponder(input: SendAutoResponderInput): Promise<{
-    providerMessageId: string;
-  }>;
 }
 
 export interface SendReplyInput {
@@ -35,16 +26,5 @@ export interface SendReplyInput {
   /** Texto puro escrito pelo staff. */
   bodyText: string;
   /** Message-ID da última mensagem do cliente, se houver — vai pro In-Reply-To. */
-  inReplyTo?: string | null;
-}
-
-export interface SendAutoResponderInput {
-  ticketId: string;
-  messageId: string;
-  toEmail: string;
-  customerName: string | null;
-  /** Subject vindo da auto-template. */
-  subject: string;
-  /** Message-ID inicial do cliente — pra threadear o auto-reply. */
   inReplyTo?: string | null;
 }

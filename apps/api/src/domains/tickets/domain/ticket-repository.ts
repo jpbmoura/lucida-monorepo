@@ -1,11 +1,8 @@
 import type { Ticket } from "./ticket.js";
 import { TicketId } from "./ticket-id.js";
-import type { TicketKind } from "./ticket-kind.js";
 import type { TicketStatus } from "./ticket-status.js";
 
 export interface ListTicketsOptions {
-  /** Filtrar por kind (support/general). Sem filtro = todos. */
-  kind?: TicketKind;
   /** Filtrar por status. Sem filtro = todos. */
   status?: TicketStatus;
   /** Default 50, máx 200. */
@@ -31,18 +28,6 @@ export interface TicketRepository {
 
   list(opts?: ListTicketsOptions): Promise<Ticket[]>;
 
-  /**
-   * Conta de tickets por status (e opcionalmente por kind) — usado pra
-   * badge "N abertos" na UI staff. Em kind=general, "open" = todos
-   * (não fechamos inbox); o que importa é unread por user (cálculo
-   * separado feito na app layer).
-   */
-  countByStatus(status: TicketStatus, kind?: TicketKind): Promise<number>;
-
-  /**
-   * Conta de tickets em kind=general que **não foram lidos** por um
-   * user específico. Usado pro badge "N na caixa de entrada" no
-   * sidebar do Kintal.
-   */
-  countUnreadByUser(userId: string): Promise<number>;
+  /** Conta de tickets por status — usado pros badges das tabs do Kintal. */
+  countByStatus(status: TicketStatus): Promise<number>;
 }

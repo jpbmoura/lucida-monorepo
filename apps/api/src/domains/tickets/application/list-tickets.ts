@@ -3,16 +3,14 @@ import type {
   ListTicketsOptions,
   TicketRepository,
 } from "../domain/ticket-repository.js";
-import type { TicketKind } from "../domain/ticket-kind.js";
 import type { TicketStatus } from "../domain/ticket-status.js";
 
 export interface ListTicketsInput extends ListTicketsOptions {}
 
 export interface TicketsCounts {
-  open: number;
-  closed: number;
-  /** Conta de tickets `kind=general` que ESSE user ainda não leu. */
-  unreadInbox?: number;
+  new: number;
+  in_progress: number;
+  done: number;
 }
 
 /** Lista tickets pra UI staff (Kintal). */
@@ -23,34 +21,16 @@ export class ListTicketsUseCase {
     return this.tickets.list(input);
   }
 
-  /**
-   * Counts pra badges/headers do Kintal.
-   *  - support open/closed: counts globais
-   *  - unreadInbox: per-user (precisa do userId)
-   *
-   * Se não passar userId, omite unreadInbox.
-   */
-  async counts(opts?: {
-    kind?: TicketKind;
-    userId?: string;
-  }): Promise<TicketsCounts> {
-    const [openCount, closedCount, unreadInbox] = await Promise.all([
-      this.tickets.countByStatus(
-        "open" satisfies TicketStatus,
-        opts?.kind,
-      ),
-      this.tickets.countByStatus(
-        "closed" satisfies TicketStatus,
-        opts?.kind,
-      ),
-      opts?.userId
-        ? this.tickets.countUnreadByUser(opts.userId)
-        : Promise.resolve(undefined),
-    ]);
+  /** Counts pros badges das tabs (Novos / Em andamento / Concluídos). */
+  async counts(): Promise<TicketsCounts> {
+    const statuses: TicketStatus[] = ["new", "in_progress", "done"];
+    const [n, inProgress, done] = await Promise.all(
+      statuses.map((s) => this.tickets.countByStatus(s)),
+    );
     return {
-      open: openCount,
-      closed: closedCount,
-      unreadInbox,
+      new: n ?? 0,
+      in_progress: inProgress ?? 0,
+      done: done ?? 0,
     };
   }
 }

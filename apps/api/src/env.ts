@@ -65,9 +65,9 @@ const envSchema = z.object({
   // intenção explícita.
   CRON_SECRET: z.string().min(16).optional(),
 
-  // Tickets / Suporte — endereço from das respostas (e usado pro plus
-  // addressing no Reply-To). Formato: `Lucida Suporte <suporte@lucidaexam.com>`.
-  // O local part (antes do @) é extraído pra montar `suporte+t_{id}@`.
+  // Tickets / Atendimento — endereço from das respostas (e usado pro plus
+  // addressing no Reply-To). Formato: `Lucida <contato@lucidaexam.com>`.
+  // O local part (antes do @) é extraído pra montar `contato+t_{id}@`.
   TICKETS_FROM_EMAIL: z.string().min(1).optional(),
   // Secret HMAC do webhook Resend Inbound (formato `whsec_<base64>`).
   // Sem isso, a rota POST /v1/tickets/inbound devolve 503 — não dá pra

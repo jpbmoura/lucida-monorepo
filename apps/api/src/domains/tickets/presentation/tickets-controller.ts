@@ -8,10 +8,6 @@ import type {
   HandleInboundEmailUseCase,
 } from "../application/handle-inbound-email.js";
 import type { ListTicketsUseCase } from "../application/list-tickets.js";
-import type {
-  MarkInboxReadUseCase,
-  MarkInboxUnreadUseCase,
-} from "../application/mark-inbox-read.js";
 import type { ReplyToTicketUseCase } from "../application/reply-to-ticket.js";
 import type { Ticket } from "../domain/ticket.js";
 import type { TicketMessage } from "../domain/ticket-message.js";
@@ -30,10 +26,8 @@ interface Deps {
   list: ListTicketsUseCase;
   get: GetTicketUseCase;
   reply: ReplyToTicketUseCase | null;
-  close: CloseTicketUseCase;
+  markDone: CloseTicketUseCase;
   reopen: ReopenTicketUseCase;
-  markRead: MarkInboxReadUseCase;
-  markUnread: MarkInboxUnreadUseCase;
 }
 
 export class TicketsController {
@@ -119,14 +113,7 @@ export class TicketsController {
     const inReplyTo = extractInReplyTo(parsed.data);
 
     // Body vem no webhook payload (campos `text`/`html` do data).
-    // Se não vier, tentamos fetch via API como fallback — mas Resend
-    // hoje não expõe endpoint pra inbound (retorna 405); a função
-    // sempre devolve vazio, só serve pra log.
-    //
-    // Quando body chega vazio é problema de config no painel Resend
-    // (event type errado, "include body" off no webhook). Persistimos
-    // a mensagem com corpo vazio mesmo assim — staff vê o ticket com
-    // "(corpo não disponível)" e debug via dashboard Resend.
+    // Se não vier, tentamos fetch via API como fallback.
     let bodyText = parsed.data.data.text ?? "";
     let bodyHtml = parsed.data.data.html ?? null;
     if (!bodyText && !bodyHtml && parsed.data.data.email_id) {
@@ -174,27 +161,15 @@ export class TicketsController {
   list: RequestHandler = async (req, res, next) => {
     try {
       const query = listTicketsQuery.parse(req.query);
-      const userId = req.auth!.userId;
-      let items = await this.deps.list.execute({
-        kind: query.kind,
+      const items = await this.deps.list.execute({
         status: query.status,
         limit: query.limit,
         before: query.before,
       });
-      // Filtro client-side de unread: feito após list pra reaproveitar
-      // o mesmo path. Volume baixo (até 200 itens), aceitável.
-      if (query.unreadOnly) {
-        items = items.filter(
-          (t) => t.kind === "general" && !t.isReadBy(userId),
-        );
-      }
-      const counts = await this.deps.list.counts({
-        kind: query.kind,
-        userId,
-      });
+      const counts = await this.deps.list.counts();
       res.json({
         data: {
-          items: items.map((t) => toListDTO(t, userId)),
+          items: items.map(toListDTO),
           counts,
         },
       });
@@ -206,9 +181,8 @@ export class TicketsController {
   get: RequestHandler = async (req, res, next) => {
     try {
       const { id } = ticketIdParam.parse(req.params);
-      const userId = req.auth!.userId;
       const ticket = await this.deps.get.execute({ ticketId: id });
-      res.json({ data: toDetailDTO(ticket, userId) });
+      res.json({ data: toDetailDTO(ticket) });
     } catch (err) {
       next(err);
     }
@@ -238,10 +212,10 @@ export class TicketsController {
     }
   };
 
-  close: RequestHandler = async (req, res, next) => {
+  markDone: RequestHandler = async (req, res, next) => {
     try {
       const { id } = ticketIdParam.parse(req.params);
-      await this.deps.close.execute({ ticketId: id });
+      await this.deps.markDone.execute({ ticketId: id });
       res.json({ data: { ok: true } });
     } catch (err) {
       next(err);
@@ -257,49 +231,20 @@ export class TicketsController {
       next(err);
     }
   };
-
-  markRead: RequestHandler = async (req, res, next) => {
-    try {
-      const { id } = ticketIdParam.parse(req.params);
-      await this.deps.markRead.execute({
-        ticketId: id,
-        userId: req.auth!.userId,
-      });
-      res.json({ data: { ok: true } });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  markUnread: RequestHandler = async (req, res, next) => {
-    try {
-      const { id } = ticketIdParam.parse(req.params);
-      await this.deps.markUnread.execute({
-        ticketId: id,
-        userId: req.auth!.userId,
-      });
-      res.json({ data: { ok: true } });
-    } catch (err) {
-      next(err);
-    }
-  };
 }
 
 // ─── DTO mappers ────────────────────────────────────────────────────
 
-function toListDTO(t: Ticket, viewerUserId: string) {
+function toListDTO(t: Ticket) {
   const last = t.lastMessage();
   return {
     id: t.id.toString(),
-    kind: t.kind,
     subject: t.subject,
     status: t.status,
     customerEmail: t.customerEmail,
     customerName: t.customerName,
     origin: t.origin,
     awaitingStaff: t.awaitingStaff(),
-    /** Lido por mim — relevante em kind=general (caixa de entrada). */
-    readByMe: t.isReadBy(viewerUserId),
     lastMessagePreview: last
       ? {
           direction: last.direction,
@@ -311,13 +256,13 @@ function toListDTO(t: Ticket, viewerUserId: string) {
     messagesCount: t.messages.length,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
-    closedAt: t.closedAt?.toISOString() ?? null,
+    doneAt: t.doneAt?.toISOString() ?? null,
   };
 }
 
-function toDetailDTO(t: Ticket, viewerUserId: string) {
+function toDetailDTO(t: Ticket) {
   return {
-    ...toListDTO(t, viewerUserId),
+    ...toListDTO(t),
     userId: t.userId,
     messages: t.messages.map(toMessageDTO),
   };

@@ -16,13 +16,12 @@ interface SendEmailInput {
   text?: string;
   /**
    * Override do `from` padrão (env.EMAIL_FROM). Útil quando uma feature
-   * tem display name específico — ex: tickets usam `Lucida Suporte
-   * <suporte@lucidaexam.com>` em vez de `Lucida <contato@...>`.
-   * Domínio precisa estar verificado no Resend igual o default.
+   * tem display name específico. Domínio precisa estar verificado no
+   * Resend igual o default.
    */
   from?: string;
   /**
-   * Reply-To. Tickets usam plus-addressing (`suporte+t_{id}@...`) pra
+   * Reply-To. Tickets usam plus-addressing (`contato+t_{id}@...`) pra
    * threadar respostas do cliente de volta no ticket certo.
    */
   replyTo?: string;

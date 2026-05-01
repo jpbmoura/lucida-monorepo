@@ -11,15 +11,16 @@
  *     no envio. Cliente que segue RFC 5322 inclui esse valor no
  *     `In-Reply-To` da resposta. Match no DB pelo providerMessageId.
  *
- * Se nenhum bater, fallback é "tickets recentes do mesmo email do cliente"
- * (24h) — repo lookup. Cobre o caso "cliente apagou headers/criou novo email".
+ * Se nenhum bater, é considerado conversa nova (cria ticket). Não fazemos
+ * fallback "por email do cliente" — emails diferentes do mesmo sender são
+ * tratados como threads separadas.
  */
 
 const PLUS_ADDR_RE = /\+t_([a-zA-Z0-9-]+)@/;
 
 /**
  * Extrai ticketId de um endereço com plus addressing.
- * `suporte+t_abc123@lucidaexam.com` → `"abc123"`
+ * `contato+t_abc123@lucidaexam.com` → `"abc123"`
  *
  * Aceita arrays (alguns inbounds vêm com `to` como array) ou string.
  * Retorna null quando nenhum match encontrado.

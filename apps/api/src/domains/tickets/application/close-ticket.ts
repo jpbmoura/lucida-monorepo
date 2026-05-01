@@ -7,9 +7,9 @@ export interface CloseTicketInput {
 }
 
 /**
- * Marca ticket como `closed`. Idempotente — fechar um já fechado é
+ * Marca ticket como `done`. Idempotente — concluir um já concluído é
  * no-op. Cliente que responder depois reabre automático (lógica em
- * HandleInboundEmail).
+ * `Ticket.addInboundMessage`).
  */
 export class CloseTicketUseCase {
   constructor(private readonly tickets: TicketRepository) {}
@@ -17,12 +17,12 @@ export class CloseTicketUseCase {
   async execute(input: CloseTicketInput): Promise<void> {
     const ticket = await this.tickets.findById(TicketId.of(input.ticketId));
     if (!ticket) throw new TicketNotFoundError();
-    ticket.close();
+    ticket.markDone();
     await this.tickets.save(ticket);
   }
 }
 
-/** Reabertura manual via UI (o auto-reabrir acontece em HandleInboundEmail). */
+/** Reabertura manual via UI (auto-reabrir acontece em addInboundMessage). */
 export class ReopenTicketUseCase {
   constructor(private readonly tickets: TicketRepository) {}
 

@@ -173,10 +173,6 @@ import {
   CloseTicketUseCase,
   ReopenTicketUseCase,
 } from "@/domains/tickets/application/close-ticket.js";
-import {
-  MarkInboxReadUseCase,
-  MarkInboxUnreadUseCase,
-} from "@/domains/tickets/application/mark-inbox-read.js";
 import { ListTicketsUseCase } from "@/domains/tickets/application/list-tickets.js";
 import { GetTicketUseCase } from "@/domains/tickets/application/get-ticket.js";
 import { TicketsController } from "@/domains/tickets/presentation/tickets-controller.js";
@@ -592,17 +588,16 @@ export async function buildApp(): Promise<Express> {
     ),
   });
 
-  // --- tickets (suporte) ---
+  // --- tickets ---
   // Mailer só é instanciado quando TICKETS_FROM_EMAIL está setado. Sem
-  // ele, reply e auto-responder ficam off — webhook inbound continua
-  // funcionando (cria ticket, só não envia auto-resposta) e UI lista
-  // tickets normalmente. HandleInboundEmail também depende do secret
-  // do Resend Inbound estar setado pra rota webhook responder.
+  // ele, reply fica off — webhook inbound continua funcionando (cria
+  // ticket) e UI lista normalmente. HandleInboundEmail depende também
+  // do secret do Resend Inbound pra a rota responder.
   //
   // Notifier reusa o `notificationRepository` do domínio notifications —
-  // mas declarado mais abaixo no main; antecipamos a instanciação aqui
-  // pra cobrir o ciclo (tickets antes de notifications no flow). Como
-  // mongoose model é singleton, isso é seguro.
+  // declarado mais abaixo no main, antecipamos aqui pra cobrir o ciclo
+  // (tickets antes de notifications no flow). Mongoose model é singleton,
+  // então é seguro.
   const ticketRepository = new MongooseTicketRepository();
   const ticketNotificationRepository = new MongooseNotificationRepository();
   const ticketNotifier = new NotificationsTicketNotifier(
@@ -616,8 +611,6 @@ export async function buildApp(): Promise<Express> {
     ? new HandleInboundEmailUseCase(
         ticketRepository,
         new BaUserLookup(authDb),
-        ticketMailer,
-        env.TICKETS_FROM_EMAIL ?? null,
         ticketNotifier,
       )
     : null;
@@ -629,10 +622,8 @@ export async function buildApp(): Promise<Express> {
     list: new ListTicketsUseCase(ticketRepository),
     get: new GetTicketUseCase(ticketRepository),
     reply: replyToTicketUseCase,
-    close: new CloseTicketUseCase(ticketRepository),
+    markDone: new CloseTicketUseCase(ticketRepository),
     reopen: new ReopenTicketUseCase(ticketRepository),
-    markRead: new MarkInboxReadUseCase(ticketRepository),
-    markUnread: new MarkInboxUnreadUseCase(ticketRepository),
   });
 
   const billingController = new BillingController({

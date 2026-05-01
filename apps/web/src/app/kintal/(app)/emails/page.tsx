@@ -1,21 +1,27 @@
 import type { Metadata } from "next";
-import { fetchTickets, type TicketStatus } from "@/features/kintal/tickets/data";
-import { TicketsList } from "@/features/kintal/tickets/components/tickets-list";
+import { fetchTickets, type TicketStatus } from "@/features/kintal/emails/data";
+import {
+  EmailsList,
+  type EmailsFilter,
+} from "@/features/kintal/emails/components/emails-list";
 
 export const metadata: Metadata = {
-  title: "Tickets",
+  title: "Emails",
 };
 
 interface PageProps {
   searchParams: Promise<{ status?: string }>;
 }
 
-export default async function KintalTicketsPage({ searchParams }: PageProps) {
+const STATUSES: TicketStatus[] = ["new", "in_progress", "done"];
+
+export default async function KintalEmailsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const filter: TicketStatus | "all" =
-    sp.status === "open" || sp.status === "closed" ? sp.status : "all";
+  const filter: EmailsFilter = STATUSES.includes(sp.status as TicketStatus)
+    ? (sp.status as TicketStatus)
+    : "all";
+
   const data = await fetchTickets({
-    kind: "support",
     status: filter === "all" ? undefined : filter,
   });
 
@@ -27,16 +33,17 @@ export default async function KintalTicketsPage({ searchParams }: PageProps) {
           Atendimento
         </div>
         <h1 className="text-3xl font-medium leading-tight tracking-tighter text-ink md:text-4xl">
-          Tickets
+          Emails
         </h1>
         <p className="mt-2 max-w-xl text-[15px] text-gray-500">
-          Solicitações de suporte enviadas pra{" "}
-          <strong>suporte@lucidaexam.com</strong> ou pelo formulário{" "}
-          <strong>/app/ajuda</strong>.
+          Tudo que chega em <strong>contato@lucidaexam.com</strong> ou pelo
+          formulário <strong>/app/ajuda</strong>. Responda direto daqui — a
+          resposta sai pelo Resend e cai de volta aqui se o cliente continuar
+          a conversa.
         </p>
       </header>
 
-      <TicketsList data={data} kind="support" activeFilter={filter} />
+      <EmailsList data={data} activeFilter={filter} />
     </div>
   );
 }

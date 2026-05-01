@@ -1,12 +1,9 @@
 import type { TicketAttachment } from "../domain/ticket-message.js";
 import { Ticket } from "../domain/ticket.js";
 import { TicketId } from "../domain/ticket-id.js";
-import type { TicketKind } from "../domain/ticket-kind.js";
 import { TicketMessage } from "../domain/ticket-message.js";
 import type { TicketRepository } from "../domain/ticket-repository.js";
 import { parseEmailAddress, parsePlusAddressing } from "../infrastructure/threading.js";
-import { ticketAutoResponderTemplate } from "../infrastructure/ticket-email-templates.js";
-import type { TicketMailer } from "./ticket-mailer.js";
 import type { TicketNotifier } from "./ticket-notifier.js";
 import type { UserLookup } from "./user-lookup.js";
 
@@ -40,14 +37,13 @@ export interface HandleInboundEmailOutput {
  * Roteia email recebido pra ticket existente ou cria um novo. Estratégia
  * de match em ordem:
  *
- *  1. Plus addressing — `to: suporte+t_<id>@...` → ticketId direto.
+ *  1. Plus addressing — `to: contato+t_<id>@...` → ticketId direto.
  *  2. In-Reply-To — header bate com `providerMessageId` de uma mensagem
  *     outbound nossa. Caminho RFC 5322 standard.
  *
  * Threading é só por sinal explícito (plus-address ou In-Reply-To). Email
  * novo do mesmo cliente, mesmo dentro de minutos, vira ticket novo —
- * cliente não tem como saber se a gente "agruparia" mentalmente, então
- * tratamos cada compose nova como conversa separada.
+ * cada compose nova é uma conversa separada.
  *
  * Se nenhuma estratégia bater, cria ticket novo. UserId opcional (lookup
  * pelo email do cliente; null quando não tem cadastro Lucida).
@@ -56,14 +52,6 @@ export class HandleInboundEmailUseCase {
   constructor(
     private readonly tickets: TicketRepository,
     private readonly userLookup: UserLookup,
-    /**
-     * Mailer pra disparar auto-resposta quando ticket é criado novo.
-     * Opcional — se não configurado, ticket é criado mas auto-resposta
-     * não é enviada (best-effort). Mesmo padrão de outros mailers.
-     */
-    private readonly mailer: TicketMailer | null = null,
-    /** Sender pra registrar em `fromEmail` da mensagem auto. */
-    private readonly autoResponderFromEmail: string | null = null,
     /**
      * Notifica staff via Kintal quando ticket é criado novo. Best-effort,
      * opcional. Quando null, ticket cria silencioso (staff descobre via
@@ -79,18 +67,11 @@ export class HandleInboundEmailUseCase {
     const fromEmail = fromParts ? `${fromParts.local}@${fromParts.domain}` : input.from;
     const fromName = fromParts?.name ?? null;
 
-    // Kind esperado pra essa mensagem baseado no destinatário. Threading
-    // SÓ anexa se o ticket existente for do mesmo kind — caso contrário
-    // a gente criaria conversas misturadas (cliente que tem ticket de
-    // suporte + manda email pro contato@ ou vice-versa cairia tudo no
-    // mesmo ticket, errado).
-    const expectedKind = inferKindFromTo(input.toAddresses);
-
     // 1. Plus addressing — checa cada `to`.
     const plusTicketId = parsePlusAddressing(input.toAddresses);
     if (plusTicketId) {
       const ticket = await this.tickets.findById(TicketId.of(plusTicketId));
-      if (ticket && ticket.kind === expectedKind) {
+      if (ticket) {
         return this.appendToExisting(ticket, input, fromEmail, fromName);
       }
     }
@@ -98,14 +79,12 @@ export class HandleInboundEmailUseCase {
     // 2. In-Reply-To.
     if (input.inReplyTo) {
       const ticket = await this.tickets.findByOutboundMessageId(input.inReplyTo);
-      if (ticket && ticket.kind === expectedKind) {
+      if (ticket) {
         return this.appendToExisting(ticket, input, fromEmail, fromName);
       }
     }
 
-    // 3. Sem match explícito → cria ticket novo. Não fazemos fallback por
-    // email do cliente: emails diferentes (mesmo do mesmo sender) merecem
-    // threads separadas.
+    // 3. Sem match explícito → cria ticket novo.
     return this.createNew(input, fromEmail, fromName);
   }
 
@@ -137,7 +116,6 @@ export class HandleInboundEmailUseCase {
     fromEmail: string,
     fromName: string | null,
   ): Promise<HandleInboundEmailOutput> {
-    const kind = inferKindFromTo(input.toAddresses);
     const userId = await this.userLookup.findIdByEmail(fromEmail);
     const initialMessage = TicketMessage.create({
       id: this.tickets.nextMessageId(),
@@ -153,7 +131,6 @@ export class HandleInboundEmailUseCase {
     });
     const ticket = Ticket.create({
       id: this.tickets.nextId(),
-      kind,
       subject: input.subject?.trim() || "(sem assunto)",
       customerEmail: fromEmail,
       customerName: fromName,
@@ -163,12 +140,6 @@ export class HandleInboundEmailUseCase {
     });
     await this.tickets.save(ticket);
 
-    // Auto-resposta só pra `support` — `general` é caixa de entrada genérica
-    // (contato@), e auto-reply soaria robótico em conversa institucional.
-    if (kind === "support") {
-      await this.tryAutoRespond(ticket, input);
-    }
-
     // Notifica staff (Kintal). Best-effort.
     if (this.notifier) {
       await this.notifier.notifyNewTicket(ticket);
@@ -176,70 +147,4 @@ export class HandleInboundEmailUseCase {
 
     return { ticketId: ticket.id.toString(), created: true };
   }
-
-  /**
-   * Envia auto-resposta de "recebemos seu email" e persiste a mensagem
-   * outbound (kind=auto) no ticket. Best-effort: log + segue se falhar.
-   */
-  private async tryAutoRespond(
-    ticket: Ticket,
-    input: HandleInboundEmailInput,
-  ): Promise<void> {
-    if (!this.mailer || !this.autoResponderFromEmail) return;
-
-    const template = ticketAutoResponderTemplate({
-      customerName: ticket.customerName,
-    });
-    const messageId = this.tickets.nextMessageId();
-
-    try {
-      const { providerMessageId } = await this.mailer.sendAutoResponder({
-        ticketId: ticket.id.toString(),
-        messageId,
-        toEmail: ticket.customerEmail,
-        customerName: ticket.customerName,
-        subject: template.subject,
-        inReplyTo: input.messageId ?? null,
-      });
-
-      const autoMsg = TicketMessage.create({
-        id: messageId,
-        direction: "outbound",
-        kind: "auto",
-        fromEmail: this.autoResponderFromEmail,
-        fromName: "Lucida Suporte",
-        bodyText: template.text,
-        bodyHtml: template.html,
-        providerMessageId,
-        inReplyTo: input.messageId ?? null,
-      });
-      ticket.addOutboundMessage(autoMsg);
-      await this.tickets.save(ticket);
-    } catch (err) {
-      console.error(
-        "[tickets] auto-responder falhou (skip):",
-        ticket.id.toString(),
-        err,
-      );
-    }
-  }
-}
-
-/**
- * Decide o `kind` do ticket a partir do endereço destinatário do email.
- *  - `suporte@*` → support (helpdesk completo, auto-resposta, status)
- *  - qualquer outro → general (caixa de entrada estilo Gmail)
- *
- * Catch-all em general é proposital — se um cliente errar e mandar
- * pra `oi@`, `ola@`, etc., a gente ainda vê a mensagem.
- */
-function inferKindFromTo(toAddresses: string[]): TicketKind {
-  const localParts = toAddresses
-    .map((addr) => parseEmailAddress(addr)?.local.toLowerCase())
-    .filter((v): v is string => Boolean(v));
-
-  // Plus-addressing: `suporte+t_xyz@` → ainda é suporte. Splitamos no `+`.
-  const baseLocals = localParts.map((l) => l.split("+")[0] ?? l);
-  if (baseLocals.includes("suporte")) return "support";
-  return "general";
 }

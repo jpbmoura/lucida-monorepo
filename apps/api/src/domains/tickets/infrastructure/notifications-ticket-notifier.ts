@@ -15,9 +15,9 @@ import type { TicketNotifier } from "../application/ticket-notifier.js";
  * já trata erros de notification como não-fatais.
  *
  * Notifications criadas:
- *  - title: "Novo ticket: {subject}"
+ *  - title: "Novo email de {cliente}"
  *  - body: snippet do email do cliente
- *  - link: `/kintal/tickets/{id}` — cliente Kintal abre direto
+ *  - link: `/kintal/emails/{id}` — cliente Kintal abre direto
  *  - severity: "info"
  *  - senderRole: "system"
  */
@@ -36,17 +36,11 @@ export class NotificationsTicketNotifier implements TicketNotifier {
       const snippet = last?.bodyText.slice(0, 200) ?? "";
       const customerLabel =
         ticket.customerName ?? ticket.customerEmail;
-      // Texto e link diferem por kind: tickets de suporte vão pra
-      // /kintal/tickets, caixa de entrada genérica pra /kintal/inbox.
-      const isSupport = ticket.kind === "support";
-      const title = isSupport
-        ? `Novo ticket de ${customerLabel}`
-        : `Nova mensagem de ${customerLabel}`;
+      const title = `Novo email de ${customerLabel}`;
       const body = ticket.subject
         ? `${ticket.subject}\n\n${snippet}`
         : snippet;
-      const basePath = isSupport ? "tickets" : "inbox";
-      const link = `${env.WEB_ORIGIN}/kintal/${basePath}/${ticket.id.toString()}`;
+      const link = `${env.WEB_ORIGIN}/kintal/emails/${ticket.id.toString()}`;
       const now = new Date();
 
       const docs = staffIds.map((userId) =>

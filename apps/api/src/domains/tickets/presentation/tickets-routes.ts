@@ -42,28 +42,16 @@ export function makeTicketsStaffRouter({
     controller.reply,
   );
   router.post(
-    "/v1/tickets/:id/close",
+    "/v1/tickets/:id/done",
     requireAuth,
     requireStaff,
-    controller.close,
+    controller.markDone,
   );
   router.post(
     "/v1/tickets/:id/reopen",
     requireAuth,
     requireStaff,
     controller.reopen,
-  );
-  router.post(
-    "/v1/tickets/:id/read",
-    requireAuth,
-    requireStaff,
-    controller.markRead,
-  );
-  router.post(
-    "/v1/tickets/:id/unread",
-    requireAuth,
-    requireStaff,
-    controller.markUnread,
   );
   return router;
 }
