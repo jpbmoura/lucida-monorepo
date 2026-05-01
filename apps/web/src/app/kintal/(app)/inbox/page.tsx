@@ -7,16 +7,26 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ unread?: string }>;
+  searchParams: Promise<{ unread?: string; archived?: string }>;
 }
 
 export default async function KintalInboxPage({ searchParams }: PageProps) {
   const sp = await searchParams;
+  const archived = sp.archived === "1" || sp.archived === "true";
   const unread = sp.unread === "1" || sp.unread === "true";
-  const filter: "all" | "unread" = unread ? "unread" : "all";
+
+  // Filtros são exclusivos: archived ganha prioridade. Default = Caixa
+  // (status=open, não arquivada). "Arquivadas" só mostra closed.
+  const filter: "all" | "unread" | "archived" = archived
+    ? "archived"
+    : unread
+      ? "unread"
+      : "all";
+
   const data = await fetchTickets({
     kind: "general",
-    unreadOnly: unread,
+    status: archived ? "closed" : "open",
+    unreadOnly: unread && !archived,
   });
 
   return (

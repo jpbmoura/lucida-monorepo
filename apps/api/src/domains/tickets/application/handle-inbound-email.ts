@@ -77,11 +77,18 @@ export class HandleInboundEmailUseCase {
     const fromEmail = fromParts ? `${fromParts.local}@${fromParts.domain}` : input.from;
     const fromName = fromParts?.name ?? null;
 
+    // Kind esperado pra essa mensagem baseado no destinatário. Threading
+    // SÓ anexa se o ticket existente for do mesmo kind — caso contrário
+    // a gente criaria conversas misturadas (cliente que tem ticket de
+    // suporte + manda email pro contato@ ou vice-versa cairia tudo no
+    // mesmo ticket, errado).
+    const expectedKind = inferKindFromTo(input.toAddresses);
+
     // 1. Plus addressing — checa cada `to`.
     const plusTicketId = parsePlusAddressing(input.toAddresses);
     if (plusTicketId) {
       const ticket = await this.tickets.findById(TicketId.of(plusTicketId));
-      if (ticket) {
+      if (ticket && ticket.kind === expectedKind) {
         return this.appendToExisting(ticket, input, fromEmail, fromName);
       }
     }
@@ -89,21 +96,22 @@ export class HandleInboundEmailUseCase {
     // 2. In-Reply-To.
     if (input.inReplyTo) {
       const ticket = await this.tickets.findByOutboundMessageId(input.inReplyTo);
-      if (ticket) {
+      if (ticket && ticket.kind === expectedKind) {
         return this.appendToExisting(ticket, input, fromEmail, fromName);
       }
     }
 
-    // 3. Fallback 24h pelo email do cliente.
+    // 3. Fallback 24h pelo email do cliente — só pega ticket do mesmo kind.
     const recents = await this.tickets.findRecentByCustomerEmail(
       fromEmail,
       FALLBACK_LOOKUP_WINDOW_MS,
     );
-    if (recents.length > 0 && recents[0]) {
-      return this.appendToExisting(recents[0], input, fromEmail, fromName);
+    const matching = recents.find((t) => t.kind === expectedKind);
+    if (matching) {
+      return this.appendToExisting(matching, input, fromEmail, fromName);
     }
 
-    // 4. Sem match → cria novo.
+    // 4. Sem match → cria novo (kind do destinatário).
     return this.createNew(input, fromEmail, fromName);
   }
 

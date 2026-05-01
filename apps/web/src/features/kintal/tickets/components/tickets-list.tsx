@@ -10,7 +10,7 @@ import type {
 } from "../data";
 
 type SupportFilter = "all" | TicketStatus;
-type InboxFilter = "all" | "unread";
+type InboxFilter = "all" | "unread" | "archived";
 
 interface Props {
   data: TicketsListResponse;
@@ -191,15 +191,19 @@ function InboxFiltersTabs({
   counts: TicketsListResponse["counts"];
   active: InboxFilter;
 }) {
-  const total = counts.open + counts.closed;
+  // counts.open / counts.closed já vêm filtrados por kind=general
+  // (controller passa o filtro pro use case). "Caixa" = open (não
+  // arquivado). "Arquivadas" = closed.
+  const inbox = counts.open;
+  const archived = counts.closed;
   const unread = counts.unreadInbox ?? 0;
   return (
     <div className="inline-flex rounded-pill bg-gray-100 p-1">
       <FilterTab
         href={INBOX_BASE_PATH}
         active={active === "all"}
-        label="Todas"
-        count={total}
+        label="Caixa"
+        count={inbox}
       />
       <FilterTab
         href={`${INBOX_BASE_PATH}?unread=1`}
@@ -207,6 +211,12 @@ function InboxFiltersTabs({
         label="Não lidas"
         count={unread}
         highlight
+      />
+      <FilterTab
+        href={`${INBOX_BASE_PATH}?archived=1`}
+        active={active === "archived"}
+        label="Arquivadas"
+        count={archived}
       />
     </div>
   );
@@ -321,7 +331,9 @@ function EmptyState({
       ? `Nenhum ticket ${filter === "open" ? "aberto" : filter === "closed" ? "fechado" : ""} no momento.`
       : filter === "unread"
         ? "Inbox em dia. Sem mensagens não lidas."
-        : "Nenhuma mensagem na caixa de entrada ainda.";
+        : filter === "archived"
+          ? "Nenhuma mensagem arquivada."
+          : "Nenhuma mensagem na caixa de entrada.";
   return (
     <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center text-sm text-gray-500">
       {text}

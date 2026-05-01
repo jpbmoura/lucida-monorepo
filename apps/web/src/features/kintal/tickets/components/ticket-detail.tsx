@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Bot,
   Check,
@@ -46,6 +48,7 @@ export function TicketDetail({ ticket }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const isInbox = ticket.kind === "general";
+  const isArchived = isInbox && ticket.status === "closed";
 
   // Auto-marca como lida ao abrir (apenas inbox + se ainda não lida).
   useEffect(() => {
@@ -101,7 +104,13 @@ export function TicketDetail({ ticket }: Props) {
   }
 
   const customerLabel = ticket.customerName ?? ticket.customerEmail;
-  const backHref = isInbox ? "/kintal/inbox" : "/kintal/tickets";
+  // Volta sempre pra view de origem. Quando arquivada, volta pra
+  // /inbox?archived=1 pra não jogar o staff numa lista que parece vazia.
+  const backHref = isInbox
+    ? isArchived
+      ? "/kintal/inbox?archived=1"
+      : "/kintal/inbox"
+    : "/kintal/tickets";
   const backLabel = isInbox ? "Voltar pra caixa de entrada" : "Voltar pra lista";
 
   return (
@@ -154,6 +163,8 @@ export function TicketDetail({ ticket }: Props) {
               onClose={close}
               onReopen={reopen}
               onMarkUnread={markUnread}
+              isArchived={isArchived}
+              isInbox={isInbox}
             />
           </div>
         </div>
@@ -201,7 +212,15 @@ function HeaderStatus({
       </span>
     );
   }
-  // inbox
+  // inbox: estados possíveis = arquivada / lida / não-lida.
+  if (ticket.status === "closed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500">
+        <Archive className="size-3" />
+        Arquivada
+      </span>
+    );
+  }
   if (ticket.readByMe) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500">
@@ -225,6 +244,8 @@ function HeaderActions({
   onClose,
   onReopen,
   onMarkUnread,
+  isArchived,
+  isInbox,
 }: {
   kind: TicketKind;
   status: "open" | "closed";
@@ -232,6 +253,8 @@ function HeaderActions({
   onClose: () => void;
   onReopen: () => void;
   onMarkUnread: () => void;
+  isArchived: boolean;
+  isInbox: boolean;
 }) {
   if (kind === "support") {
     return status === "open" ? (
@@ -266,22 +289,58 @@ function HeaderActions({
       </Button>
     );
   }
-  // inbox: só "marcar como não lida". Lida acontece automaticamente no mount.
+  // inbox (kind=general):
+  //  - arquivada (status=closed) → botão "Desarquivar" (reopen)
+  //  - ativa (status=open) → "Arquivar" (close) + "Marcar não lida"
+  if (isInbox && isArchived) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onReopen}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <ArchiveRestore className="size-3.5" />
+        )}
+        Desarquivar
+      </Button>
+    );
+  }
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onMarkUnread}
-      disabled={isPending}
-    >
-      {isPending ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : (
-        <EyeOff className="size-3.5" />
-      )}
-      Marcar não lida
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onMarkUnread}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <EyeOff className="size-3.5" />
+        )}
+        Marcar não lida
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onClose}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Archive className="size-3.5" />
+        )}
+        Arquivar
+      </Button>
+    </>
   );
 }
 
