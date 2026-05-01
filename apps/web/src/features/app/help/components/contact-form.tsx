@@ -10,13 +10,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  sendContactMessageAction,
-  type ContactFormInput,
-} from "../actions";
+
+// Categorias compartilhadas com o backend (support-controller.ts).
+export const CONTACT_CATEGORIES = [
+  "duvida",
+  "problema",
+  "sugestao",
+  "billing",
+  "outro",
+  "duvida_admin",
+  "billing_institucional",
+  "gestao_professores",
+] as const;
+
+export type ContactCategory = (typeof CONTACT_CATEGORIES)[number];
 
 export interface ContactCategoryOption {
-  value: ContactFormInput["category"];
+  value: ContactCategory;
   label: string;
 }
 
@@ -81,17 +91,32 @@ export function ContactForm({
 
   async function handleSubmit(values: FormValues) {
     setServerError(null);
-    // Cast seguro: `values.category` vem do select restrito à prop
-    // `categories`, que por sua vez é tipada em ContactFormInput["category"].
-    const res = await sendContactMessageAction(
-      values as unknown as ContactFormInput,
-    );
-    if (!res.ok) {
-      setServerError(res.error ?? "Não conseguimos enviar sua mensagem.");
-      return;
+    try {
+      // Fetch direto na API — cookies da sessão BetterAuth vão automático
+      // (mesma origem via Next rewrite). Antes era Server Action mas o
+      // proxy adicionava uma camada de erro opaca em prod (500 sem stack).
+      const res = await fetch("/v1/support/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as
+          | { message?: string; code?: string }
+          | null;
+        setServerError(
+          body?.message ?? "Não conseguimos enviar sua mensagem.",
+        );
+        return;
+      }
+      setSent(true);
+      form.reset({ category: defaultCategory, subject: "", message: "" });
+    } catch (err) {
+      setServerError(
+        (err as Error).message ??
+          "Falha de conexão. Tente novamente em instantes.",
+      );
     }
-    setSent(true);
-    form.reset({ category: defaultCategory, subject: "", message: "" });
   }
 
   if (sent) {
