@@ -144,9 +144,10 @@ export function EmailDetail({ ticket, customer }: Props) {
         </main>
 
         {/* Painel lateral. Em <lg fica abaixo da thread (ordem natural).
-            Em >=lg fica sticky no topo. */}
+            Em >=lg fica sticky abaixo do topbar do Kintal (h-[72px]) +
+            margem de respiro. */}
         <aside>
-          <div className="lg:sticky lg:top-6">
+          <div className="lg:sticky lg:top-22">
             <InfoPanel
               customerEmail={ticket.customerEmail}
               customerName={ticket.customerName}
