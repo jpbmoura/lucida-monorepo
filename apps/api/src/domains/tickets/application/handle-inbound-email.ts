@@ -36,8 +36,6 @@ export interface HandleInboundEmailOutput {
   created: boolean;
 }
 
-const FALLBACK_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 /**
  * Roteia email recebido pra ticket existente ou cria um novo. Estratégia
  * de match em ordem:
@@ -45,10 +43,14 @@ const FALLBACK_LOOKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
  *  1. Plus addressing — `to: suporte+t_<id>@...` → ticketId direto.
  *  2. In-Reply-To — header bate com `providerMessageId` de uma mensagem
  *     outbound nossa. Caminho RFC 5322 standard.
- *  3. Fallback de 24h — tickets recentes do mesmo email do cliente.
  *
- * Se nenhum bater, cria ticket novo. UserId opcional (lookup pelo email
- * do cliente; null quando não tem cadastro Lucida).
+ * Threading é só por sinal explícito (plus-address ou In-Reply-To). Email
+ * novo do mesmo cliente, mesmo dentro de minutos, vira ticket novo —
+ * cliente não tem como saber se a gente "agruparia" mentalmente, então
+ * tratamos cada compose nova como conversa separada.
+ *
+ * Se nenhuma estratégia bater, cria ticket novo. UserId opcional (lookup
+ * pelo email do cliente; null quando não tem cadastro Lucida).
  */
 export class HandleInboundEmailUseCase {
   constructor(
@@ -101,17 +103,9 @@ export class HandleInboundEmailUseCase {
       }
     }
 
-    // 3. Fallback 24h pelo email do cliente — só pega ticket do mesmo kind.
-    const recents = await this.tickets.findRecentByCustomerEmail(
-      fromEmail,
-      FALLBACK_LOOKUP_WINDOW_MS,
-    );
-    const matching = recents.find((t) => t.kind === expectedKind);
-    if (matching) {
-      return this.appendToExisting(matching, input, fromEmail, fromName);
-    }
-
-    // 4. Sem match → cria novo (kind do destinatário).
+    // 3. Sem match explícito → cria ticket novo. Não fazemos fallback por
+    // email do cliente: emails diferentes (mesmo do mesmo sender) merecem
+    // threads separadas.
     return this.createNew(input, fromEmail, fromName);
   }
 

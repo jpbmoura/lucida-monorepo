@@ -29,16 +29,6 @@ export interface TicketRepository {
    */
   findByOutboundMessageId(messageId: string): Promise<Ticket | null>;
 
-  /**
-   * Fallback de threading quando In-Reply-To não bate: busca tickets do
-   * mesmo email do cliente nas últimas 24h. Cobre o caso "cliente
-   * respondeu mas o cliente de email apagou os headers".
-   */
-  findRecentByCustomerEmail(
-    email: string,
-    sinceMs: number,
-  ): Promise<Ticket[]>;
-
   list(opts?: ListTicketsOptions): Promise<Ticket[]>;
 
   /**

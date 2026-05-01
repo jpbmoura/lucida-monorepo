@@ -73,22 +73,6 @@ export class MongooseTicketRepository implements TicketRepository {
     return doc ? toEntity(doc) : null;
   }
 
-  async findRecentByCustomerEmail(
-    email: string,
-    sinceMs: number,
-  ): Promise<Ticket[]> {
-    const since = new Date(Date.now() - sinceMs);
-    const docs = await TicketModel.find({
-      customerEmail: email.toLowerCase(),
-      updatedAt: { $gte: since },
-    })
-      .sort({ updatedAt: -1 })
-      .limit(20)
-      .lean<TicketDoc[]>()
-      .exec();
-    return docs.map(toEntity);
-  }
-
   async list(opts: ListTicketsOptions = {}): Promise<Ticket[]> {
     const limit = clampLimit(opts.limit);
     const filter: Record<string, unknown> = {};
