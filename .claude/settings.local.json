@@ -17,7 +17,8 @@
       "WebFetch(domain:resend.com)",
       "Bash(npx tsc *)",
       "Bash(pnpm --filter @lucida/web typecheck)",
-      "Bash(pnpm --filter @lucida/web build)"
+      "Bash(pnpm --filter @lucida/web build)",
+      "Bash(pnpm --filter @lucida/api lint)"
     ]
   }
 }

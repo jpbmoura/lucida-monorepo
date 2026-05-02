@@ -14,10 +14,10 @@ const SOLO: KintalSidebarNavItem[] = [
 ];
 
 const FINANCEIRO: KintalSidebarNavItem[] = [
+  { label: "Visão geral", href: "/kintal/financeiro", icon: "money" },
   { label: "Assinaturas", icon: "money", disabled: true },
   { label: "Compras avulsas", icon: "money", disabled: true },
   { label: "MRR", icon: "money", disabled: true },
-  { label: "Extrato", icon: "money", disabled: true },
 ];
 
 const COMERCIAL: KintalSidebarNavItem[] = [

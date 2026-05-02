@@ -230,6 +230,15 @@ import { KintalInstitutionsController } from "@/domains/kintal/presentation/kint
 import { makeKintalRouter } from "@/domains/kintal/presentation/kintal-routes.js";
 import { makeRequireStaff } from "@/domains/kintal/presentation/require-staff.js";
 
+import { MongooseExpenseRepository } from "@/domains/finance/infrastructure/mongoose-expense-repository.js";
+import { LedgerRevenueSource } from "@/domains/finance/infrastructure/ledger-revenue-source.js";
+import { GetFinancialSummaryUseCase } from "@/domains/finance/application/get-financial-summary.js";
+import { CreateExpenseUseCase } from "@/domains/finance/application/create-expense.js";
+import { DeleteExpenseUseCase } from "@/domains/finance/application/delete-expense.js";
+import { ListExpensesUseCase } from "@/domains/finance/application/list-expenses.js";
+import { FinanceController } from "@/domains/finance/presentation/finance-controller.js";
+import { makeFinanceRouter } from "@/domains/finance/presentation/finance-routes.js";
+
 import { MongooseCardRepository } from "@/domains/kanban/infrastructure/mongoose-card-repository.js";
 import { ListCardsUseCase } from "@/domains/kanban/application/list-cards.js";
 import { CreateCardUseCase } from "@/domains/kanban/application/create-card.js";
@@ -761,6 +770,18 @@ export async function buildApp(): Promise<Express> {
 
   const requireStaff = makeRequireStaff();
 
+  // --- finance (kintal financeiro — staff-only) ---
+  // Receita vem do credit_ledger cruzado com catálogo PLANS/TOPUPS;
+  // despesas são lançadas manualmente em finance_expenses por enquanto.
+  const expenseRepository = new MongooseExpenseRepository();
+  const revenueSource = new LedgerRevenueSource();
+  const financeController = new FinanceController({
+    getSummary: new GetFinancialSummaryUseCase(revenueSource, expenseRepository),
+    createExpense: new CreateExpenseUseCase(expenseRepository),
+    deleteExpense: new DeleteExpenseUseCase(expenseRepository),
+    listExpenses: new ListExpensesUseCase(expenseRepository),
+  });
+
   // --- kanban (board interno staff-only) ---
   const cardRepository = new MongooseCardRepository();
   const kanbanController = new KanbanController({
@@ -931,6 +952,11 @@ export async function buildApp(): Promise<Express> {
       staffController: kintalStaffController,
       usersController: kintalUsersController,
       institutionsController: kintalInstitutionsController,
+    }),
+    makeFinanceRouter({
+      requireAuth,
+      requireStaff,
+      controller: financeController,
     }),
     makeKanbanRouter({
       requireAuth,
