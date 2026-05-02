@@ -15,7 +15,8 @@
       "Bash(pnpm install *)",
       "Bash(pnpm next *)",
       "WebFetch(domain:resend.com)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(pnpm --filter @lucida/web typecheck)"
     ]
   }
 }

@@ -1,13 +1,22 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import { FileUp, FileText, FileType, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  FileType,
+  FileUp,
+  Loader2,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { MaterialFile } from "../wizard-store";
 
 interface DropZoneProps {
-  files: File[];
+  files: MaterialFile[];
   onAdd: (files: File[]) => void;
-  onRemove: (index: number) => void;
+  onRemove: (id: string) => void;
   disabled?: boolean;
 }
 
@@ -77,7 +86,7 @@ export function DropZone({ files, onAdd, onRemove, disabled }: DropZoneProps) {
             Arraste arquivos aqui ou <span className="text-brand-primary">clique para escolher</span>
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            PDF, DOCX, TXT — até 25 MB cada, até 10 arquivos
+            PDF, DOCX, TXT — texto extraído no seu navegador, até 10 arquivos
           </p>
         </div>
         <input
@@ -95,12 +104,24 @@ export function DropZone({ files, onAdd, onRemove, disabled }: DropZoneProps) {
 
       {files.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {files.map((file, i) => (
+          {files.map((file) => (
             <li
-              key={`${file.name}-${i}`}
-              className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
+              key={file.id}
+              className={cn(
+                "flex items-start gap-3 rounded-xl border bg-white px-3 py-2.5",
+                file.status === "error"
+                  ? "border-red-200 bg-red-50/30"
+                  : "border-gray-100",
+              )}
             >
-              <span className="grid size-8 place-items-center rounded-lg bg-gray-50 text-gray-500">
+              <span
+                className={cn(
+                  "mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+                  file.status === "error"
+                    ? "bg-red-100 text-red-600"
+                    : "bg-gray-50 text-gray-500",
+                )}
+              >
                 {/\.(pdf)$/i.test(file.name) ? (
                   <FileType className="size-4" />
                 ) : (
@@ -108,14 +129,35 @@ export function DropZone({ files, onAdd, onRemove, disabled }: DropZoneProps) {
                 )}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="truncate text-sm font-medium text-ink">{file.name}</div>
-                <div className="text-[11px] text-gray-500">{formatSize(file.size)}</div>
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-ink">
+                    {file.name}
+                  </span>
+                  <StatusIcon status={file.status} />
+                </div>
+                <div className="mt-0.5 text-[11px] text-gray-500">
+                  {formatSize(file.size)}
+                  {file.status === "extracting" && " · extraindo texto..."}
+                  {file.status === "done" &&
+                    file.text != null &&
+                    ` · ${file.text.length.toLocaleString("pt-BR")} caracteres`}
+                </div>
+                {file.status === "error" && file.error && (
+                  <div className="mt-1 text-[12px] text-red-600">
+                    {file.error}
+                  </div>
+                )}
+                {file.status === "done" && file.warning && (
+                  <div className="mt-1 text-[12px] text-amber-600">
+                    {file.warning}
+                  </div>
+                )}
               </div>
               <button
                 type="button"
-                onClick={() => onRemove(i)}
+                onClick={() => onRemove(file.id)}
                 aria-label={`Remover ${file.name}`}
-                className="grid size-8 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-ink"
+                className="grid size-8 shrink-0 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-ink"
               >
                 <X className="size-4" />
               </button>
@@ -124,6 +166,31 @@ export function DropZone({ files, onAdd, onRemove, disabled }: DropZoneProps) {
         </ul>
       )}
     </div>
+  );
+}
+
+function StatusIcon({ status }: { status: MaterialFile["status"] }) {
+  if (status === "extracting") {
+    return (
+      <Loader2
+        className="size-3.5 shrink-0 animate-spin text-brand-primary"
+        aria-label="Extraindo"
+      />
+    );
+  }
+  if (status === "done") {
+    return (
+      <CheckCircle2
+        className="size-3.5 shrink-0 text-emerald-500"
+        aria-label="Pronto"
+      />
+    );
+  }
+  return (
+    <AlertCircle
+      className="size-3.5 shrink-0 text-red-500"
+      aria-label="Erro"
+    />
   );
 }
 

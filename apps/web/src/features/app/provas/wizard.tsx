@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useWizardStore } from "./wizard-store";
+import { buildCombinedPastedText, useWizardStore } from "./wizard-store";
 import { StepMaterial } from "./steps/step-material";
 import { StepConfig } from "./steps/step-config";
 import { StepGenerating } from "./steps/step-generating";
@@ -21,7 +21,7 @@ interface WizardProps {
 
 export function Wizard({ classId, turmaName }: WizardProps) {
   const step = useWizardStore((s) => s.step);
-  const files = useWizardStore((s) => s.files);
+  const materialFiles = useWizardStore((s) => s.materialFiles);
   const pastedText = useWizardStore((s) => s.pastedText);
   const youtubeUrls = useWizardStore((s) => s.youtubeUrls);
   const config = useWizardStore((s) => s.config);
@@ -41,17 +41,18 @@ export function Wizard({ classId, turmaName }: WizardProps) {
     };
   }, [reset]);
 
-  // Dispara estimativa real (server-side) ao abrir o confirm. O backend
-  // extrai o material com os mesmos extractors do generate, então o número
-  // bate com o débito final dentro da margem de variação dos tokens da IA.
-  // Falha silenciosa: o dialog mostra "estimativa indisponível" e segue.
+  // Dispara estimativa real (server-side) ao abrir o confirm. Extração de
+  // PDF/DOCX já rodou no browser, então mandamos só o texto combinado e o
+  // api estima em cima dele — débito final fica dentro da margem de variação
+  // dos tokens da IA. Falha silenciosa: o dialog mostra "estimativa
+  // indisponível" e segue.
   function openConfirm() {
     setEstimate(null);
     setEstimateLoading(true);
     setConfirmOpen(true);
 
+    const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
     const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
     formData.append(
       "config",
       JSON.stringify({
@@ -59,7 +60,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
         difficulty: config.difficulty,
         style: config.style,
         questionTypes: config.questionTypes,
-        pastedText,
+        pastedText: combinedText,
         youtubeUrls,
       }),
     );
@@ -82,8 +83,8 @@ export function Wizard({ classId, turmaName }: WizardProps) {
   async function doGenerate() {
     setStep("generating");
     try {
+      const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
       formData.append(
         "config",
         JSON.stringify({
@@ -91,7 +92,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
           difficulty: config.difficulty,
           style: config.style,
           questionTypes: config.questionTypes,
-          pastedText,
+          pastedText: combinedText,
           youtubeUrls,
         }),
       );
@@ -127,20 +128,20 @@ export function Wizard({ classId, turmaName }: WizardProps) {
     }
   }
 
-  // Passada como prop pro StepReview. Faz chamada multipart com os mesmos
-  // materiais + questões existentes como "evite". Retorna a nova questão
-  // pra review atualizar a lista.
+  // Passada como prop pro StepReview. Manda o mesmo texto combinado da
+  // geração inicial + as questões existentes como "evite". Retorna a nova
+  // questão pra review atualizar a lista.
   const handleRegenerate = useCallback(
     async (avoidStatements: string[]): Promise<GeneratedQuestion | null> => {
+      const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
       formData.append(
         "config",
         JSON.stringify({
           difficulty: config.difficulty,
           style: config.style,
           questionTypes: config.questionTypes,
-          pastedText,
+          pastedText: combinedText,
           youtubeUrls,
           avoidStatements,
         }),
@@ -177,7 +178,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
       notifyBalanceChanged();
       return data.question;
     },
-    [files, pastedText, youtubeUrls, config, addUsage],
+    [materialFiles, pastedText, youtubeUrls, config, addUsage],
   );
 
   // Review usa split view (questões + preview do aluno), precisa mais largura.

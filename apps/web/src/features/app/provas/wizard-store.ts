@@ -1,6 +1,10 @@
 "use client";
 
 import { create } from "zustand";
+import {
+  ExtractError,
+  extractTextFromFile,
+} from "./extractors/extract-text";
 import type {
   ExamDifficulty,
   ExamStyle,
@@ -12,11 +16,23 @@ import type {
 
 export type WizardStep = "material" | "config" | "generating" | "review";
 
+export type MaterialFileStatus = "extracting" | "done" | "error";
+
+export interface MaterialFile {
+  id: string;
+  name: string;
+  size: number;
+  status: MaterialFileStatus;
+  text?: string;
+  warning?: string;
+  error?: string;
+}
+
 interface WizardState {
   step: WizardStep;
 
   // material
-  files: File[];
+  materialFiles: MaterialFile[];
   pastedText: string;
   youtubeUrls: string[];
 
@@ -30,8 +46,14 @@ interface WizardState {
 
   // actions
   setStep: (step: WizardStep) => void;
-  addFiles: (files: File[]) => void;
-  removeFile: (index: number) => void;
+  /**
+   * Adiciona arquivos e dispara extração em paralelo no browser. O store
+   * acompanha o ciclo de vida de cada um (extracting → done | error). Limita
+   * o total a 10 — descarta o excedente silenciosamente, igual ao limite do
+   * api antigo (multer files: 10).
+   */
+  addMaterialFiles: (files: File[]) => void;
+  removeMaterialFile: (id: string) => void;
   setPastedText: (text: string) => void;
   addYoutubeUrl: (url: string) => void;
   removeYoutubeUrl: (index: number) => void;
@@ -89,21 +111,13 @@ function defaultQuestion(config: WizardConfig): GeneratedQuestion {
   };
 }
 
-function hasMaterial(
-  files: File[],
-  pastedText: string,
-  youtubeUrls: string[],
-): boolean {
-  return (
-    files.length > 0 ||
-    pastedText.trim().length > 0 ||
-    youtubeUrls.some((u) => u.trim().length > 0)
-  );
+function newId(): string {
+  return `mf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export const useWizardStore = create<WizardState>((set) => ({
+export const useWizardStore = create<WizardState>((set, get) => ({
   step: "material",
-  files: [],
+  materialFiles: [],
   pastedText: "",
   youtubeUrls: [],
   config: defaultConfig(),
@@ -113,14 +127,61 @@ export const useWizardStore = create<WizardState>((set) => ({
 
   setStep: (step) => set({ step }),
 
-  addFiles: (files) =>
-    set((s) => ({
-      files: [...s.files, ...files].slice(0, 10),
-    })),
+  addMaterialFiles: (incoming) => {
+    const slotsLeft = 10 - get().materialFiles.length;
+    if (slotsLeft <= 0) return;
+    const accepted = incoming.slice(0, slotsLeft);
 
-  removeFile: (index) =>
+    const newEntries: MaterialFile[] = accepted.map((file) => ({
+      id: newId(),
+      name: file.name,
+      size: file.size,
+      status: "extracting",
+    }));
+
+    set((s) => ({ materialFiles: [...s.materialFiles, ...newEntries] }));
+
+    // Extrai cada um em paralelo. Cada result/error atualiza só sua entry pelo
+    // id — independência total entre arquivos. Promise.allSettled não é
+    // necessária porque cada um faz seu próprio set().
+    accepted.forEach((file, i) => {
+      const id = newEntries[i]!.id;
+      void extractTextFromFile(file)
+        .then((result) => {
+          set((s) => ({
+            materialFiles: s.materialFiles.map((mf) =>
+              mf.id === id
+                ? {
+                    ...mf,
+                    status: "done",
+                    text: result.text,
+                    warning: result.warning,
+                  }
+                : mf,
+            ),
+          }));
+        })
+        .catch((err: unknown) => {
+          const message =
+            err instanceof ExtractError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Falha ao extrair texto.";
+          set((s) => ({
+            materialFiles: s.materialFiles.map((mf) =>
+              mf.id === id
+                ? { ...mf, status: "error", error: message }
+                : mf,
+            ),
+          }));
+        });
+    });
+  },
+
+  removeMaterialFile: (id) =>
     set((s) => ({
-      files: s.files.filter((_, i) => i !== index),
+      materialFiles: s.materialFiles.filter((mf) => mf.id !== id),
     })),
 
   setPastedText: (text) => set({ pastedText: text }),
@@ -188,7 +249,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   reset: () =>
     set({
       step: "material",
-      files: [],
+      materialFiles: [],
       pastedText: "",
       youtubeUrls: [],
       config: defaultConfig(),
@@ -198,11 +259,43 @@ export const useWizardStore = create<WizardState>((set) => ({
     }),
 }));
 
-// Export helpers para consumidores
+/**
+ * Junta texto colado + textos extraídos dos arquivos num só blob com
+ * marcadores `### <label>` por fonte. O api lê isso como `pastedText`
+ * (uma fonte única chamada "Texto colado") e o prompt da IA enxerga os
+ * sub-headers como divisores entre arquivos. Sem arquivos novos no
+ * multipart — payload fica em alguns KB.
+ */
+export function buildCombinedPastedText(
+  state: Pick<WizardState, "materialFiles" | "pastedText">,
+): string {
+  const parts: string[] = [];
+  for (const mf of state.materialFiles) {
+    if (mf.status === "done" && mf.text && mf.text.length > 0) {
+      parts.push(`### ${mf.name}\n${mf.text}`);
+    }
+  }
+  const pasted = state.pastedText.trim();
+  if (pasted) {
+    parts.push(`### Trecho colado\n${pasted}`);
+  }
+  return parts.join("\n\n");
+}
+
 export function canProceedToConfig(
-  state: Pick<WizardState, "files" | "pastedText" | "youtubeUrls">,
+  state: Pick<WizardState, "materialFiles" | "pastedText" | "youtubeUrls">,
 ): boolean {
-  return hasMaterial(state.files, state.pastedText, state.youtubeUrls);
+  // Bloqueia o "Continuar" enquanto algum arquivo ainda está extraindo —
+  // evita seguir pra config sem saber se a extração vai falhar.
+  if (state.materialFiles.some((mf) => mf.status === "extracting")) {
+    return false;
+  }
+  const hasUsableFile = state.materialFiles.some(
+    (mf) => mf.status === "done" && (mf.text?.length ?? 0) > 0,
+  );
+  const hasPasted = state.pastedText.trim().length > 0;
+  const hasYoutube = state.youtubeUrls.some((u) => u.trim().length > 0);
+  return hasUsableFile || hasPasted || hasYoutube;
 }
 
 export function canGenerate(state: Pick<WizardState, "config">): boolean {

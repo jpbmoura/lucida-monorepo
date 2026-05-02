@@ -7,25 +7,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { DropZone } from "../components/drop-zone";
 import { YoutubeInput } from "../components/youtube-input";
-import { useWizardStore, canProceedToConfig } from "../wizard-store";
+import {
+  canProceedToConfig,
+  useWizardStore,
+  type MaterialFile,
+} from "../wizard-store";
 
 interface StepMaterialProps {
   classId: string;
 }
 
 export function StepMaterial({ classId }: StepMaterialProps) {
-  const files = useWizardStore((s) => s.files);
+  const materialFiles = useWizardStore((s) => s.materialFiles);
   const pastedText = useWizardStore((s) => s.pastedText);
   const youtubeUrls = useWizardStore((s) => s.youtubeUrls);
-  const addFiles = useWizardStore((s) => s.addFiles);
-  const removeFile = useWizardStore((s) => s.removeFile);
+  const addMaterialFiles = useWizardStore((s) => s.addMaterialFiles);
+  const removeMaterialFile = useWizardStore((s) => s.removeMaterialFile);
   const setPastedText = useWizardStore((s) => s.setPastedText);
   const addYoutubeUrl = useWizardStore((s) => s.addYoutubeUrl);
   const removeYoutubeUrl = useWizardStore((s) => s.removeYoutubeUrl);
   const setStep = useWizardStore((s) => s.setStep);
 
-  const canProceed = canProceedToConfig({ files, pastedText, youtubeUrls });
-  const summary = buildSummary(files, pastedText, youtubeUrls);
+  const canProceed = canProceedToConfig({
+    materialFiles,
+    pastedText,
+    youtubeUrls,
+  });
+  const summary = buildSummary(materialFiles, pastedText, youtubeUrls);
+  const isExtracting = materialFiles.some((mf) => mf.status === "extracting");
 
   return (
     <div className="flex flex-col gap-8">
@@ -44,7 +53,11 @@ export function StepMaterial({ classId }: StepMaterialProps) {
       </header>
 
       <section>
-        <DropZone files={files} onAdd={addFiles} onRemove={removeFile} />
+        <DropZone
+          files={materialFiles}
+          onAdd={addMaterialFiles}
+          onRemove={removeMaterialFile}
+        />
       </section>
 
       <section className="flex flex-col gap-2">
@@ -75,7 +88,7 @@ export function StepMaterial({ classId }: StepMaterialProps) {
               Cancelar
             </Link>
           </Button>
-          {canProceed && summary && (
+          {summary && (
             <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 font-medium text-gray-600">
               <FileText className="size-3" />
               {summary}
@@ -89,35 +102,42 @@ export function StepMaterial({ classId }: StepMaterialProps) {
           disabled={!canProceed}
           onClick={() => setStep("config")}
         >
-          Continuar
-          <ArrowRight className="size-4" />
+          {isExtracting ? "Extraindo arquivos..." : "Continuar"}
+          {!isExtracting && <ArrowRight className="size-4" />}
         </Button>
       </footer>
     </div>
   );
 }
 
-// Resumo neutro — sem fingir contar tokens. Antes da extração no servidor
-// não há como estimar texto a partir de bytes do PDF (binário comprimido).
-// O custo real aparece no confirm dialog, calculado server-side.
+// Resumo conta caracteres reais agora — extração roda no browser, então
+// dá pra somar os textos extraídos + colado e mostrar o tamanho concreto
+// do material que vai pra IA.
 function buildSummary(
-  files: File[],
+  materialFiles: MaterialFile[],
   pastedText: string,
   youtubeUrls: string[],
 ): string | null {
   const parts: string[] = [];
-  if (files.length > 0) {
-    parts.push(`${files.length} ${files.length === 1 ? "arquivo" : "arquivos"}`);
+
+  const doneFiles = materialFiles.filter((mf) => mf.status === "done");
+  if (doneFiles.length > 0) {
+    parts.push(
+      `${doneFiles.length} ${doneFiles.length === 1 ? "arquivo" : "arquivos"}`,
+    );
   }
   if (youtubeUrls.length > 0) {
     parts.push(
       `${youtubeUrls.length} ${youtubeUrls.length === 1 ? "vídeo" : "vídeos"}`,
     );
   }
-  const pastedChars = pastedText.trim().length;
-  if (pastedChars > 0) {
+
+  const totalChars =
+    doneFiles.reduce((acc, mf) => acc + (mf.text?.length ?? 0), 0) +
+    pastedText.trim().length;
+  if (totalChars > 0) {
     parts.push(
-      `${pastedChars.toLocaleString("pt-BR")} ${pastedChars === 1 ? "char" : "chars"} colados`,
+      `${totalChars.toLocaleString("pt-BR")} ${totalChars === 1 ? "char" : "chars"}`,
     );
   }
   return parts.length > 0 ? parts.join(" · ") : null;
