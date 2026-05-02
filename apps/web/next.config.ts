@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "25mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.lucidaexam.com" }],
+        destination: "https://lucidaexam.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

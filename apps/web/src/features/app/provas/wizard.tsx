@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { buildCombinedPastedText, useWizardStore } from "./wizard-store";
+import { postSseExpectingResult, SseHttpError } from "./sse-client";
 import { StepMaterial } from "./steps/step-material";
 import { StepConfig } from "./steps/step-config";
 import { StepGenerating } from "./steps/step-generating";
@@ -97,34 +98,17 @@ export function Wizard({ classId, turmaName }: WizardProps) {
         }),
       );
 
-      const response = await fetch("/v1/ai/generate-exam", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const err = (await response.json().catch(() => null)) as
-          | { code?: string; message?: string }
-          | null;
-        if (response.status === 402) {
-          if (err?.code === "INSTITUTION_OUT_OF_CREDITS") {
-            throw new Error(
-              "Sua instituição está sem créditos. Fale com o administrador pra reabastecer.",
-            );
-          }
-          throw new Error(
-            err?.message ??
-              "Saldo insuficiente de créditos. Compre mais pra continuar.",
-          );
-        }
-        throw new Error(err?.message ?? "Falha ao gerar as questões.");
-      }
-
-      const { data } = (await response.json()) as { data: GenerationResult };
+      // SSE: api manda heartbeat enquanto a OpenAI roda, evita o ECONNRESET
+      // do edge proxy (Fastly) por idle timeout de ~60s.
+      const data = await postSseExpectingResult<GenerationResult>(
+        "/v1/ai/generate-exam",
+        { method: "POST", body: formData },
+      );
       setGenerationResult(data.questions, data.usage);
       notifyBalanceChanged();
     } catch (err) {
-      setGenerationError((err as Error).message ?? "Erro inesperado ao gerar a prova.");
+      const message = mapGenerationError(err);
+      setGenerationError(message);
     }
   }
 
@@ -210,4 +194,21 @@ export function Wizard({ classId, turmaName }: WizardProps) {
       />
     </div>
   );
+}
+
+// Mapeia erro do generate (SSE ou HTTP) pra mensagem mostrada ao usuário.
+// 402 INSTITUTION_OUT_OF_CREDITS tem cópia específica; o resto reusa
+// `message` quando vem do backend, com fallback genérico.
+function mapGenerationError(err: unknown): string {
+  if (err instanceof SseHttpError) {
+    if (err.status === 402) {
+      if (err.code === "INSTITUTION_OUT_OF_CREDITS") {
+        return "Sua instituição está sem créditos. Fale com o administrador pra reabastecer.";
+      }
+      return err.message || "Saldo insuficiente de créditos. Compre mais pra continuar.";
+    }
+    return err.message || "Falha ao gerar as questões.";
+  }
+  if (err instanceof Error) return err.message;
+  return "Erro inesperado ao gerar a prova.";
 }
