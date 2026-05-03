@@ -6,6 +6,9 @@ import { ExamModel } from "@/domains/exam/infrastructure/exam-schema.js";
 import type { OrgBillingMode } from "@/domains/billing/domain/billing-mode.js";
 import type { Auth } from "@/domains/iam/infrastructure/better-auth/auth.js";
 import type {
+  AddInstitutionMemberByUserIdInput,
+  AddInstitutionMemberInput,
+  AddInstitutionMemberResult,
   CreateInstitutionInput,
   CreateInstitutionResult,
   KintalInstitutionDetail,
@@ -16,10 +19,18 @@ import type {
   KintalInstitutionWalletBreakdown,
   KintalInstitutionsRepository,
   ListKintalInstitutionsFilter,
+  RemoveInstitutionMemberInput,
 } from "../application/ports/kintal-institutions-repository.js";
 import {
-  InstitutionOwnerEmailTakenError,
+  CannotRemoveInstitutionOwnerError,
+  InstitutionNotFoundError,
   InstitutionSlugTakenError,
+  InvalidInstitutionInputError,
+  MemberMissingSignupDataError,
+  MembershipNotFoundError,
+  OwnerAlreadyInOrganizationError,
+  UserAlreadyInOrganizationError,
+  UserAlreadyMemberError,
 } from "../domain/institutions-errors.js";
 
 interface OrganizationDoc {
@@ -267,44 +278,42 @@ export class MongoKintalInstitutionsRepository
   async create(
     input: CreateInstitutionInput,
   ): Promise<CreateInstitutionResult> {
-    // Pré-checks rápidos antes de tocar em qualquer write — evita dejá-lo
+    // Pré-checks rápidos antes de tocar em qualquer write — evita deixá-lo
     // a meio caminho num cenário trivial.
     const slugTaken = await this.organizations.findOne({ slug: input.orgSlug });
     if (slugTaken) {
       throw new InstitutionSlugTakenError(input.orgSlug);
     }
-    const emailTaken = await this.users.findOne({ email: input.ownerEmail });
-    if (emailTaken) {
-      throw new InstitutionOwnerEmailTakenError(input.ownerEmail);
-    }
 
-    // 1. Cria o user via BA. Mantém comportamento do seed:test-org —
-    // mesmo se SMTP falhar no envio do email de verificação, o user é
-    // persistido. Buscamos pelo email se a chamada lançar.
+    // 1. Resolve o owner: reusa user existente sem org, ou cria um novo.
+    const existingUser = await this.users.findOne({ email: input.ownerEmail });
     let ownerUserId: string;
-    try {
-      const result = await this.auth.api.signUpEmail({
-        body: {
-          email: input.ownerEmail,
-          password: input.ownerPassword,
-          name: input.ownerName,
-        },
-      });
-      ownerUserId = result.user.id;
-    } catch (err) {
-      const fallback = await this.users.findOne({ email: input.ownerEmail });
-      if (!fallback) {
-        throw new Error(
-          `Falha ao criar user owner: ${err instanceof Error ? err.message : String(err)}`,
+    let ownerExisted: boolean;
+    if (existingUser) {
+      const hasOrg = await this.userHasMembership(existingUser._id);
+      if (hasOrg) {
+        throw new OwnerAlreadyInOrganizationError(input.ownerEmail);
+      }
+      ownerUserId = String(existingUser._id);
+      ownerExisted = true;
+    } else {
+      if (!input.ownerPassword || input.ownerPassword.length < 8) {
+        throw new InvalidInstitutionInputError(
+          "Senha precisa ter pelo menos 8 caracteres para criar o owner.",
         );
       }
-      ownerUserId = String(fallback._id);
+      ownerUserId = await this.signUpUser({
+        email: input.ownerEmail,
+        name: input.ownerName,
+        password: input.ownerPassword,
+      });
+      ownerExisted = false;
     }
 
-    // 2. Força emailVerified=true — staff cria com email/senha definitivos.
-    const userOid = new ObjectId(ownerUserId);
+    // 2. Força emailVerified=true — staff cria/vincula com dados definitivos.
+    const ownerOid = new ObjectId(ownerUserId);
     await this.users.updateOne(
-      { _id: userOid },
+      { _id: ownerOid },
       {
         $set: {
           emailVerified: true,
@@ -314,7 +323,7 @@ export class MongoKintalInstitutionsRepository
       },
     );
 
-    // 3. Cria org + membership.
+    // 3. Cria org + membership owner.
     const orgOid = new ObjectId();
     const memberOid = new ObjectId();
     const now = new Date();
@@ -328,13 +337,12 @@ export class MongoKintalInstitutionsRepository
     await this.members.insertOne({
       _id: memberOid,
       organizationId: orgOid,
-      userId: userOid,
+      userId: ownerOid,
       role: "owner",
       createdAt: now,
     });
 
-    // 4. Cria billing settings com o modo escolhido (default 'unlimited' ou
-    // 'pool', conforme staff selecionou).
+    // 4. Cria billing settings com o modo escolhido.
     const orgIdHex = orgOid.toHexString();
     await OrganizationBillingSettingsModel.updateOne(
       { _id: orgIdHex },
@@ -351,7 +359,157 @@ export class MongoKintalInstitutionsRepository
       { upsert: true },
     );
 
-    return { organizationId: orgIdHex, ownerUserId };
+    return { organizationId: orgIdHex, ownerUserId, ownerExisted };
+  }
+
+  // ─── members (add / remove via Kintal) ───────────────────────────────
+
+  async addMember(
+    input: AddInstitutionMemberInput,
+  ): Promise<AddInstitutionMemberResult> {
+    const orgOid = parseOrgId(input.organizationId);
+    const orgExists = await this.organizations.findOne({ _id: orgOid });
+    if (!orgExists) throw new InstitutionNotFoundError();
+
+    const existingUser = await this.users.findOne({
+      email: input.userEmail,
+    });
+
+    let userId: string;
+    let userExisted: boolean;
+    if (existingUser) {
+      // Regra "1 user = 1 org" — se já tem alguma membership, recusa
+      // (independente de qual org, mantém a regra global).
+      const hasOrg = await this.userHasMembership(existingUser._id);
+      if (hasOrg) {
+        throw new OwnerAlreadyInOrganizationError(input.userEmail);
+      }
+      userId = String(existingUser._id);
+      userExisted = true;
+    } else {
+      if (
+        !input.userName ||
+        input.userName.trim().length === 0 ||
+        !input.password ||
+        input.password.length < 8
+      ) {
+        throw new MemberMissingSignupDataError();
+      }
+      userId = await this.signUpUser({
+        email: input.userEmail,
+        name: input.userName,
+        password: input.password,
+      });
+      userExisted = false;
+    }
+
+    const userOid = new ObjectId(userId);
+    await this.users.updateOne(
+      { _id: userOid },
+      {
+        $set: {
+          emailVerified: true,
+          needsEmailUpdate: false,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    await this.members.insertOne({
+      _id: new ObjectId(),
+      organizationId: orgOid,
+      userId: userOid,
+      role: input.role,
+      createdAt: new Date(),
+    });
+
+    return { userId, userExisted };
+  }
+
+  async addMemberByUserId(
+    input: AddInstitutionMemberByUserIdInput,
+  ): Promise<void> {
+    const orgOid = parseOrgId(input.organizationId);
+    const userOid = parseUserId(input.userId);
+
+    const orgExists = await this.organizations.findOne({ _id: orgOid });
+    if (!orgExists) throw new InstitutionNotFoundError();
+
+    const userExists = await this.users.findOne({ _id: userOid });
+    if (!userExists) {
+      throw new InvalidInstitutionInputError("Usuário não encontrado.");
+    }
+
+    const hasOrg = await this.userHasMembership(userOid);
+    if (hasOrg) {
+      // Diferencia mensagem: se já é membro DESTA org → UserAlreadyMember;
+      // se é membro de OUTRA → UserAlreadyInOrganization.
+      const sameOrg = await this.members.findOne({
+        organizationId: orgOid,
+        userId: userOid,
+      });
+      if (sameOrg) throw new UserAlreadyMemberError();
+      throw new UserAlreadyInOrganizationError();
+    }
+
+    await this.members.insertOne({
+      _id: new ObjectId(),
+      organizationId: orgOid,
+      userId: userOid,
+      role: input.role,
+      createdAt: new Date(),
+    });
+  }
+
+  async removeMember(input: RemoveInstitutionMemberInput): Promise<void> {
+    const orgOid = parseOrgId(input.organizationId);
+    const userOid = parseUserId(input.userId);
+    const membership = await this.members.findOne({
+      organizationId: orgOid,
+      userId: userOid,
+    });
+    if (!membership) throw new MembershipNotFoundError();
+    if (membership.role === "owner") {
+      throw new CannotRemoveInstitutionOwnerError();
+    }
+    await this.members.deleteOne({ _id: membership._id });
+  }
+
+  // ─── helpers ─────────────────────────────────────────────────────────
+
+  private async userHasMembership(userId: ObjectId): Promise<boolean> {
+    const found = await this.members.findOne({ userId });
+    return found !== null;
+  }
+
+  /**
+   * Cria user via BetterAuth signUp. Mantém o fallback do seed:test-org
+   * — mesmo se SMTP falhar no envio de verificação, o user é persistido.
+   * Buscamos pelo email se a chamada lançar.
+   */
+  private async signUpUser(input: {
+    email: string;
+    name: string;
+    password: string;
+  }): Promise<string> {
+    try {
+      const result = await this.auth.api.signUpEmail({
+        body: {
+          email: input.email,
+          password: input.password,
+          name: input.name,
+        },
+      });
+      return result.user.id;
+    } catch (err) {
+      const fallback = await this.users.findOne({ email: input.email });
+      if (!fallback) {
+        throw new Error(
+          `Falha ao criar usuário: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      return String(fallback._id);
+    }
   }
 
   // ─── archive / unarchive ─────────────────────────────────────────────
@@ -515,6 +673,18 @@ function tryObjectId(value: string): ObjectId | null {
   } catch {
     return null;
   }
+}
+
+function parseOrgId(value: string): ObjectId {
+  const oid = tryObjectId(value);
+  if (!oid) throw new InstitutionNotFoundError();
+  return oid;
+}
+
+function parseUserId(value: string): ObjectId {
+  const oid = tryObjectId(value);
+  if (!oid) throw new InvalidInstitutionInputError("Usuário inválido.");
+  return oid;
 }
 
 function escapeRegex(input: string): string {

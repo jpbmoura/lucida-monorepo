@@ -78,6 +78,19 @@ export function makeKintalRouter({
     usersController.adjustCredits,
   );
 
+  router.post(
+    "/api/kintal/users/:userId/memberships",
+    requireAuth,
+    requireStaff,
+    institutionsController.linkUserToInstitution,
+  );
+  router.delete(
+    "/api/kintal/users/:userId/memberships/:orgId",
+    requireAuth,
+    requireStaff,
+    institutionsController.unlinkUserFromInstitution,
+  );
+
   // ─── Institutions ──────────────────────────────────────────────────
   router.get(
     "/api/kintal/institutions",
@@ -120,6 +133,18 @@ export function makeKintalRouter({
     requireAuth,
     requireStaff,
     institutionsController.adjustCredits,
+  );
+  router.post(
+    "/api/kintal/institutions/:orgId/members",
+    requireAuth,
+    requireStaff,
+    institutionsController.addMemberByEmail,
+  );
+  router.delete(
+    "/api/kintal/institutions/:orgId/members/:userId",
+    requireAuth,
+    requireStaff,
+    institutionsController.removeMember,
   );
 
   // ─── Impersonate (staff "vira" o user pra navegar como ele) ────────

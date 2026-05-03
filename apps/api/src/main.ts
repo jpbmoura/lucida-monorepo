@@ -229,6 +229,8 @@ import {
   UnarchiveInstitutionUseCase,
 } from "@/domains/kintal/application/archive-institution.js";
 import { AdjustInstitutionCreditsUseCase } from "@/domains/kintal/application/adjust-institution-credits.js";
+import { AddInstitutionMemberUseCase } from "@/domains/kintal/application/add-institution-member.js";
+import { RemoveInstitutionMemberUseCase } from "@/domains/kintal/application/remove-institution-member.js";
 import { KintalController } from "@/domains/kintal/presentation/kintal-controller.js";
 import { KintalStaffController } from "@/domains/kintal/presentation/kintal-staff-controller.js";
 import { KintalUsersController } from "@/domains/kintal/presentation/kintal-users-controller.js";
@@ -782,6 +784,10 @@ export async function buildApp(): Promise<Express> {
         ledgerRepository,
         atomicDebitService,
       ),
+    ),
+    addMember: new AddInstitutionMemberUseCase(kintalInstitutionsRepository),
+    removeMember: new RemoveInstitutionMemberUseCase(
+      kintalInstitutionsRepository,
     ),
   });
 

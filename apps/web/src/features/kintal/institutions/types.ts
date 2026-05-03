@@ -75,7 +75,18 @@ export type InstitutionActionResult =
   | { ok: false; code: string; message: string };
 
 export type CreateInstitutionActionResult =
-  | { ok: true; organizationId: string; ownerUserId: string }
+  | {
+      ok: true;
+      organizationId: string;
+      ownerUserId: string;
+      ownerExisted: boolean;
+    }
+  | { ok: false; code: string; message: string };
+
+export type InstitutionRole = "admin" | "member";
+
+export type AddMemberActionResult =
+  | { ok: true; userId: string; userExisted: boolean }
   | { ok: false; code: string; message: string };
 
 export type AdjustOrgCreditsActionResult =

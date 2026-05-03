@@ -8,7 +8,11 @@ import { InvalidInstitutionInputError } from "../domain/institutions-errors.js";
 export interface CreateInstitutionInputDTO {
   ownerEmail: string;
   ownerName: string;
-  ownerPassword: string;
+  /**
+   * Obrigatória quando o email **não existe** ainda — só é usada nesse
+   * caso. Se o user já existe, é ignorada (o create reusa o cadastro).
+   */
+  ownerPassword?: string;
   orgName: string;
   orgSlug: string;
   billingMode: OrgBillingMode;
@@ -20,6 +24,10 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
  * Cria uma nova instituição (user owner + organization + membership +
  * billing settings) via Kintal. Validação de input é feita aqui pra
  * garantir que callers diretos da camada (testes) passem por elas.
+ *
+ * Se o `ownerEmail` já corresponder a um user existente sem org, ele é
+ * **reusado** como owner. A senha é exigida apenas quando o user precisa
+ * ser criado — esse check está no repo (depende de buscar o user).
  */
 export class CreateInstitutionUseCase {
   constructor(private readonly repo: KintalInstitutionsRepository) {}
@@ -37,11 +45,6 @@ export class CreateInstitutionUseCase {
     }
     if (!ownerName) {
       throw new InvalidInstitutionInputError("Informe o nome do owner.");
-    }
-    if (input.ownerPassword.length < 8) {
-      throw new InvalidInstitutionInputError(
-        "Senha precisa ter pelo menos 8 caracteres.",
-      );
     }
     if (!orgName) {
       throw new InvalidInstitutionInputError("Informe o nome da instituição.");

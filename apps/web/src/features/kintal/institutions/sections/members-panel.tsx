@@ -1,7 +1,14 @@
-import { Crown, User, Users } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Crown, Loader2, Trash2, User, UserPlus, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { buildDisplayUser } from "@/lib/user-display";
 import { cn } from "@/lib/utils";
+import { removeInstitutionMemberAction } from "../data";
 import type { KintalInstitutionMember } from "../types";
+import { AddMemberDialog } from "../components/add-member-dialog";
 
 const ROLE_LABEL: Record<KintalInstitutionMember["role"], string> = {
   owner: "Owner",
@@ -9,20 +16,65 @@ const ROLE_LABEL: Record<KintalInstitutionMember["role"], string> = {
   member: "Professor",
 };
 
-export function MembersPanel({
-  members,
-}: {
+interface MembersPanelProps {
+  orgId: string;
   members: KintalInstitutionMember[];
-}) {
+}
+
+export function MembersPanel({ orgId, members }: MembersPanelProps) {
+  const router = useRouter();
+  const [addOpen, setAddOpen] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRemove(member: KintalInstitutionMember) {
+    if (member.role === "owner") return;
+    if (
+      !window.confirm(
+        `Remover ${member.name ?? member.email} da instituição?`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setRemovingId(member.id);
+    const res = await removeInstitutionMemberAction(orgId, member.id);
+    setRemovingId(null);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-6">
       <header className="flex items-center gap-2 pb-4">
         <Users className="size-4 text-gray-500" />
         <h2 className="text-xl font-medium tracking-tight text-ink">Membros</h2>
-        <span className="ml-auto text-xs text-gray-400 tabular-nums">
+        <span className="text-xs text-gray-400 tabular-nums">
           {members.length}
         </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          onClick={() => setAddOpen(true)}
+        >
+          <UserPlus className="size-3.5" />
+          Adicionar
+        </Button>
       </header>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+        >
+          {error}
+        </div>
+      )}
 
       {members.length === 0 ? (
         <p className="text-sm text-gray-500">Sem membros associados.</p>
@@ -30,6 +82,8 @@ export function MembersPanel({
         <ul className="flex flex-col">
           {members.map((m, i) => {
             const display = buildDisplayUser({ name: m.name, email: m.email });
+            const removable = m.role !== "owner";
+            const isRemoving = removingId === m.id;
             return (
               <li
                 key={m.id}
@@ -59,11 +113,32 @@ export function MembersPanel({
                     year: "numeric",
                   })}
                 </span>
+                {removable && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(m)}
+                    disabled={isRemoving}
+                    aria-label="Remover membro"
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    {isRemoving ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-3.5" />
+                    )}
+                  </button>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+
+      <AddMemberDialog
+        orgId={orgId}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
     </section>
   );
 }

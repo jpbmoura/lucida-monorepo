@@ -25,10 +25,17 @@ import type { OrgBillingMode } from "../types";
 const SCHEMA = z.object({
   ownerName: z.string().trim().min(1, "Informe o nome do owner."),
   ownerEmail: z.string().trim().email("Email inválido."),
+  /**
+   * Opcional — só é usada se o email não existir ainda. Permitimos
+   * vazio aqui e validamos só quando preenchida (mín. 8). Backend
+   * faz a checagem definitiva.
+   */
   ownerPassword: z
     .string()
-    .min(8, "Mínimo de 8 caracteres.")
-    .max(200),
+    .max(200)
+    .refine((v) => v === "" || v.length >= 8, {
+      message: "Mínimo de 8 caracteres.",
+    }),
   orgName: z.string().trim().min(1, "Informe o nome da instituição."),
   orgSlug: z
     .string()
@@ -77,7 +84,7 @@ export function CreateInstitutionDialog({ open, onOpenChange }: Props) {
     const res = await createInstitutionAction({
       ownerName: values.ownerName,
       ownerEmail: values.ownerEmail.toLowerCase(),
-      ownerPassword: values.ownerPassword,
+      ownerPassword: values.ownerPassword || undefined,
       orgName: values.orgName,
       orgSlug: values.orgSlug.toLowerCase(),
       billingMode: values.billingMode,
@@ -97,9 +104,10 @@ export function CreateInstitutionDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Nova instituição</DialogTitle>
           <DialogDescription>
-            Cria a organização, o user owner com email/senha definitivos e
-            inicializa o modo de cobrança. Email é marcado como verificado
-            automaticamente.
+            Cria a organização e atribui um owner. Se o email já tiver
+            cadastro e não estiver vinculado a outra instituição, reusamos
+            o usuário (a senha informada é ignorada). Caso contrário,
+            criamos um user novo com o email/senha definidos.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,7 +171,7 @@ export function CreateInstitutionDialog({ open, onOpenChange }: Props) {
             </Field>
             <Field
               label="Senha"
-              hint="Mínimo de 8 caracteres. Anote — você precisa entregar manualmente."
+              hint="Mínimo de 8 caracteres. Se este email já existe, mantemos a senha atual e este campo é ignorado."
               error={form.formState.errors.ownerPassword?.message}
             >
               <Input

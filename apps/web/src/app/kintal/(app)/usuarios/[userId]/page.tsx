@@ -55,7 +55,10 @@ export default async function KintalUserDetailPage({ params }: PageProps) {
           <CreditsPanel user={user} />
           <LedgerList entries={user.recentLedger} />
           <SubscriptionsHistory items={user.billing.subscriptionsHistory} />
-          <OrganizationsList organizations={user.organizations} />
+          <OrganizationsList
+            userId={user.id}
+            organizations={user.organizations}
+          />
           <ProfileEditor user={user} />
         </div>
         <UserMeta user={user} />

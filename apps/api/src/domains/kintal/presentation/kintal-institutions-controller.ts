@@ -8,13 +8,20 @@ import type {
   UnarchiveInstitutionUseCase,
 } from "../application/archive-institution.js";
 import type { AdjustInstitutionCreditsUseCase } from "../application/adjust-institution-credits.js";
+import type { AddInstitutionMemberUseCase } from "../application/add-institution-member.js";
+import type { RemoveInstitutionMemberUseCase } from "../application/remove-institution-member.js";
 import {
+  addInstitutionMemberBody,
   adjustInstitutionCreditsBody,
   createInstitutionBody,
   institutionParam,
+  linkUserToInstitutionBody,
   listInstitutionsQuery,
+  memberParam,
   updateInstitutionBillingBody,
+  userMembershipParam,
 } from "./kintal-institutions-schemas.js";
+import { userIdParams } from "./kintal-users-schemas.js";
 
 interface Deps {
   list: ListInstitutionsUseCase;
@@ -24,6 +31,8 @@ interface Deps {
   archive: ArchiveInstitutionUseCase;
   unarchive: UnarchiveInstitutionUseCase;
   adjustCredits: AdjustInstitutionCreditsUseCase;
+  addMember: AddInstitutionMemberUseCase;
+  removeMember: RemoveInstitutionMemberUseCase;
 }
 
 export class KintalInstitutionsController {
@@ -140,6 +149,66 @@ export class KintalInstitutionsController {
         note: body.note,
       });
       res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  addMemberByEmail: RequestHandler = async (req, res, next) => {
+    try {
+      const { orgId } = institutionParam.parse(req.params);
+      const body = addInstitutionMemberBody.parse(req.body);
+      const result = await this.deps.addMember.byEmail({
+        organizationId: orgId,
+        userEmail: body.userEmail,
+        userName: body.userName,
+        password: body.password,
+        role: body.role,
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  removeMember: RequestHandler = async (req, res, next) => {
+    try {
+      const { orgId, userId } = memberParam.parse(req.params);
+      await this.deps.removeMember.execute({
+        organizationId: orgId,
+        userId,
+      });
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // ─── triggered pelas rotas /api/kintal/users/:userId/memberships ─────
+
+  linkUserToInstitution: RequestHandler = async (req, res, next) => {
+    try {
+      const { userId } = userIdParams.parse(req.params);
+      const body = linkUserToInstitutionBody.parse(req.body);
+      await this.deps.addMember.byUserId({
+        organizationId: body.organizationId,
+        userId,
+        role: body.role,
+      });
+      res.status(201).json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  unlinkUserFromInstitution: RequestHandler = async (req, res, next) => {
+    try {
+      const { userId, orgId } = userMembershipParam.parse(req.params);
+      await this.deps.removeMember.execute({
+        organizationId: orgId,
+        userId,
+      });
+      res.status(204).end();
     } catch (err) {
       next(err);
     }

@@ -43,7 +43,7 @@ export default async function KintalInstituicaoDetailPage({
           <LedgerPanel entries={institution.recentLedger} />
         </div>
         <div className="flex flex-col gap-6">
-          <MembersPanel members={institution.members} />
+          <MembersPanel orgId={institution.id} members={institution.members} />
           <DangerZone institution={institution} />
         </div>
       </div>

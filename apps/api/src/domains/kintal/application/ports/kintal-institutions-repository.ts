@@ -72,8 +72,10 @@ export interface ListKintalInstitutionsFilter {
 
 export interface CreateInstitutionInput {
   ownerEmail: string;
+  /** Ignorado quando o user já existe (apenas reusa). */
   ownerName: string;
-  ownerPassword: string;
+  /** Obrigatório só se o email **não existir** ainda. Validado no use case. */
+  ownerPassword?: string;
   orgName: string;
   /** Slug em kebab — único na collection `organization`. */
   orgSlug: string;
@@ -83,6 +85,37 @@ export interface CreateInstitutionInput {
 export interface CreateInstitutionResult {
   organizationId: string;
   ownerUserId: string;
+  /** true se reusou um user já existente; false se criou um novo. */
+  ownerExisted: boolean;
+}
+
+export type InstitutionRole = "admin" | "member";
+
+export interface AddInstitutionMemberInput {
+  organizationId: string;
+  userEmail: string;
+  /** Usado só se o user não existir; ignorado caso contrário. */
+  userName?: string;
+  /** Usado só se o user não existir; ignorado caso contrário. */
+  password?: string;
+  role: InstitutionRole;
+}
+
+export interface AddInstitutionMemberByUserIdInput {
+  organizationId: string;
+  userId: string;
+  role: InstitutionRole;
+}
+
+export interface AddInstitutionMemberResult {
+  userId: string;
+  /** true se reusou um user existente; false se criou um novo. */
+  userExisted: boolean;
+}
+
+export interface RemoveInstitutionMemberInput {
+  organizationId: string;
+  userId: string;
 }
 
 /**
@@ -98,14 +131,34 @@ export interface KintalInstitutionsRepository {
   ): Promise<KintalInstitutionListItem[]>;
   findById(orgId: string): Promise<KintalInstitutionDetail | null>;
   /**
-   * Cria user + org + membership + billing settings em sequência.
-   * Lança `InstitutionSlugTakenError` ou `InstitutionOwnerEmailTakenError`
-   * quando aplicável. NÃO é uma transação Mongo — em caso de falha
-   * intermediária, o caller deve esperar uma org parcialmente criada.
-   * (Mongo MVP, troca por session.withTransaction quando os 3 docs precisarem
-   * de garantia transacional.)
+   * Cria org + membership + billing settings, reusando ou criando o user
+   * owner conforme o email já exista. Lança:
+   * - `InstitutionSlugTakenError` quando o slug colide.
+   * - `OwnerAlreadyInOrganizationError` quando o email pertence a um
+   *   user que já é membro de outra instituição.
+   * - `InvalidInstitutionInputError` quando email novo precisa de senha
+   *   e ela não foi passada.
+   *
+   * NÃO é uma transação Mongo — em caso de falha intermediária, o
+   * caller deve esperar uma org parcialmente criada.
    */
   create(input: CreateInstitutionInput): Promise<CreateInstitutionResult>;
+  /**
+   * Adiciona um user à instituição via email — pode criar o user se ele
+   * não existir (precisa `userName` + `password`). Recusa se o user já
+   * for membro de qualquer org (regra "1 user = 1 org"). Não envia email
+   * de convite — o vínculo é direto.
+   */
+  addMember(input: AddInstitutionMemberInput): Promise<AddInstitutionMemberResult>;
+  /**
+   * Adiciona um user já existente à instituição — usado quando staff
+   * resolve o user pela tela do user (não cria user novo).
+   */
+  addMemberByUserId(
+    input: AddInstitutionMemberByUserIdInput,
+  ): Promise<void>;
+  /** Remove o vínculo do user com a org. Não permite remover owner. */
+  removeMember(input: RemoveInstitutionMemberInput): Promise<void>;
   /** Soft-delete: seta `archivedAt = now()` na collection organization. */
   archive(orgId: string): Promise<void>;
   /** Limpa `archivedAt`. */
