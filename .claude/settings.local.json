@@ -20,7 +20,9 @@
       "Bash(pnpm --filter @lucida/web build)",
       "Bash(pnpm --filter @lucida/api lint)",
       "Bash(pnpm --filter @lucida/api typecheck)",
-      "Bash(pnpm -r exec tsc --noEmit)"
+      "Bash(pnpm -r exec tsc --noEmit)",
+      "PowerShell(pnpm --filter @lucida/api typecheck 2>&1; Write-Output \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(pnpm typecheck 2>&1; Write-Output \"EXIT=$LASTEXITCODE\")"
     ]
   }
 }
