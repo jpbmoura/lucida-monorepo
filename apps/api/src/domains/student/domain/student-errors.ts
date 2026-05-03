@@ -27,6 +27,15 @@ export class StudentMatriculaInvalidError extends DomainError {
   }
 }
 
+export class StudentEmailInvalidError extends DomainError {
+  readonly code = "STUDENT_EMAIL_INVALID";
+  readonly statusCode = 400;
+
+  constructor(reason: string) {
+    super(reason);
+  }
+}
+
 export class DuplicateMatriculaError extends DomainError {
   readonly code = "STUDENT_DUPLICATE_MATRICULA";
   readonly statusCode = 409;

@@ -38,6 +38,12 @@ export interface OrgInfo {
   addressCountry: string | null;
 }
 
+export interface UserMembership {
+  organizationId: string;
+  role: "owner" | "admin" | "member";
+  joinedAt: Date;
+}
+
 export interface OrganizationMembersRepository {
   listMembers(organizationId: string): Promise<OrgMember[]>;
   getOrganization(organizationId: string): Promise<OrgInfo | null>;
@@ -50,4 +56,10 @@ export interface OrganizationMembersRepository {
     organizationId: string,
     userId: string,
   ): Promise<"owner" | "admin" | "member" | null>;
+  /**
+   * Lista todas as orgs em que o user é member. Ordenado por `joinedAt`
+   * ascendente. Vazio se não pertence a nenhuma. Usado pelo impersonate
+   * de staff pra herdar org ativa do alvo.
+   */
+  listMembershipsByUser(userId: string): Promise<UserMembership[]>;
 }

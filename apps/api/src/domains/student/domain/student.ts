@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { StudentId } from "./student-id.js";
 import { StudentCode } from "./student-code.js";
 import {
+  StudentEmailInvalidError,
   StudentMatriculaInvalidError,
   StudentNameInvalidError,
 } from "./student-errors.js";
@@ -66,6 +68,38 @@ export class Student {
 
   static restore(props: StudentProps): Student {
     return new Student({ ...props });
+  }
+
+  /**
+   * Auto-cadastro do aluno no fluxo público da prova: ele entra com
+   * email + nome (sem código). Geramos `code` (7 dígitos) e `matricula`
+   * sintética automaticamente — colisão de `code` é tratada no save
+   * (retry com novo `Student.selfRegister`). Email é obrigatório aqui.
+   */
+  static selfRegister(input: {
+    id: StudentId;
+    classId: string;
+    ownerId: string;
+    organizationId?: string | null;
+    name: string;
+    email: string;
+    now?: Date;
+  }): Student {
+    const email = normalizeEmail(input.email);
+    if (!email) {
+      throw new StudentEmailInvalidError("Email é obrigatório.");
+    }
+    return Student.create({
+      id: input.id,
+      classId: input.classId,
+      ownerId: input.ownerId,
+      organizationId: input.organizationId ?? null,
+      code: StudentCode.generate(),
+      name: input.name,
+      matricula: `auto-${randomUUID().slice(0, 12)}`,
+      email,
+      now: input.now,
+    });
   }
 
   get id(): StudentId {

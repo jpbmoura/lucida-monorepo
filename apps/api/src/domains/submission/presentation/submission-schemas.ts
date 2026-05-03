@@ -12,6 +12,15 @@ export const beginExamFromTokenBody = z.object({
   token: z.string().min(1),
 });
 
+export const beginExamByEmailBody = z.object({
+  email: z.string().trim().email("Email inválido."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Nome precisa ter ao menos 2 caracteres.")
+    .max(120, "Nome não pode passar de 120 caracteres."),
+});
+
 const integrityFlagsSchema = z
   .object({
     tabSwitches: z.number().int().nonnegative().default(0),

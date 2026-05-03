@@ -1,8 +1,15 @@
 import "server-only";
 import { apiFetch, ApiError } from "./api-client";
 
+export type ImpersonateMode = "org-admin" | "staff";
+
 export interface ImpersonateState {
   isImpersonating: boolean;
+  /**
+   * `null` quando não há impersonate; senão indica de onde veio. Frontend
+   * usa pra decidir o endpoint de stop e o redirect ao encerrar.
+   */
+  mode: ImpersonateMode | null;
   realUser: { id: string; email: string };
   actingAs: { id: string; email: string; name: string } | null;
 }

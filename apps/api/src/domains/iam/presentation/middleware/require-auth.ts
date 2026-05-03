@@ -12,6 +12,7 @@ import {
 } from "../../infrastructure/assistant-target-cookie.js";
 import type { OrganizationMembersRepository } from "@/domains/analytics/application/ports/organization-members-repository.js";
 import type { TeacherAssistantRepository } from "../../domain/teacher-assistant-repository.js";
+import type { UserLookupById } from "../../application/ports/user-lookup.js";
 
 export interface AuthContext {
   /**
@@ -69,6 +70,16 @@ interface MakeRequireAuthDeps {
    * próprio user (sem delegação).
    */
   teacherAssistantsRepository?: TeacherAssistantRepository;
+  /**
+   * Opcional. Quando provido, libera o **modo staff impersonate**: se
+   * `realUserRole === "staff"` e há cookie `lucida.impersonate` válido,
+   * o middleware busca o alvo direto pelo id (sem checagem de org) e
+   * decora `req.auth.userId = targetId` + herda a primeira org do alvo
+   * como `activeOrganizationId`. Sem este lookup, o caminho de staff
+   * impersonate é ignorado e o middleware cai no impersonate de org
+   * admin clássico.
+   */
+  userLookup?: UserLookupById;
   /** Secret pra validar o HMAC do cookie. Default `process.env.AUTH_SECRET`. */
   authSecret?: string;
 }
@@ -79,6 +90,7 @@ export function makeRequireAuth(
 ): RequestHandler {
   const orgMembers = deps.orgMembersRepository;
   const teacherAssistants = deps.teacherAssistantsRepository;
+  const userLookup = deps.userLookup;
   const secret = deps.authSecret ?? process.env.AUTH_SECRET ?? "";
 
   return async (req, _res, next) => {
@@ -144,9 +156,45 @@ export function makeRequireAuth(
         }
       }
 
+      // Impersonate de staff (Kintal) — tem precedência sobre o de org
+      // admin porque o staff vê o sistema todo, não está limitado à
+      // própria org. Se o real user é staff e há cookie válido, aceita
+      // o target direto e herda a primeira org do alvo como activeOrg.
+      if (
+        !isAssistant &&
+        userLookup &&
+        secret &&
+        realUserRole === "staff"
+      ) {
+        const targetUserId = readImpersonateTarget(req, secret);
+        if (targetUserId && targetUserId !== realUserId) {
+          const target = await userLookup.findById(targetUserId);
+          if (target) {
+            userId = target.id;
+            email = target.email;
+            isImpersonating = true;
+            // Herda a primeira org do alvo (ordem por joinedAt asc) pra
+            // que o /app abra com contexto institucional certo. Quando
+            // o alvo não tem org, fica null — UI mostra "sem org" igual
+            // user puro. Best-effort: erro silencioso preserva o impersonate.
+            if (orgMembers) {
+              try {
+                const memberships =
+                  await orgMembers.listMembershipsByUser(targetUserId);
+                if (memberships.length > 0) {
+                  activeOrganizationId = memberships[0]!.organizationId;
+                }
+              } catch {
+                // Ignora — continuar com activeOrganizationId existente.
+              }
+            }
+          }
+        }
+      }
+
       // Impersonate de admin org — só ativa se ainda não estamos em
-      // modo auxiliar.
-      if (!isAssistant && orgMembers && secret) {
+      // modo auxiliar nem em modo staff.
+      if (!isImpersonating && orgMembers && secret) {
         const teacherId = readImpersonateTarget(req, secret);
         if (teacherId && activeOrganizationId && teacherId !== realUserId) {
           // Valida: real user é owner/admin da org E teacherId é member.

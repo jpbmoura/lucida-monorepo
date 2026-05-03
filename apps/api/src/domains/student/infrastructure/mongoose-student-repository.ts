@@ -123,6 +123,18 @@ export class MongooseStudentRepository implements StudentRepository {
       .exec();
     return doc ? toEntity(doc) : null;
   }
+
+  async findByClassIdAndEmail(
+    classId: string,
+    email: string,
+  ): Promise<Student | null> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return null;
+    const doc = await StudentModel.findOne({ classId, email: normalized })
+      .lean<StudentDoc>()
+      .exec();
+    return doc ? toEntity(doc) : null;
+  }
 }
 
 function toEntity(doc: StudentDoc): Student {

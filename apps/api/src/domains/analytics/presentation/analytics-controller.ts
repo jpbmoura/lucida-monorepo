@@ -13,6 +13,7 @@ import type { ExportTeacherDataUseCase } from "../application/export-teacher-dat
 import type { OrganizationMembersRepository } from "../application/ports/organization-members-repository.js";
 import type { OrganizationInvitationsRepository } from "../application/ports/organization-invitations-repository.js";
 import type { OrganizationBillingSettingsRepository } from "@/domains/billing/domain/organization-billing-settings-repository.js";
+import type { UserLookupById } from "@/domains/iam/application/ports/user-lookup.js";
 import {
   IMPERSONATE_COOKIE_NAME,
   buildImpersonateCookieValue,
@@ -44,6 +45,13 @@ interface Deps {
   orgMembersRepository: OrganizationMembersRepository;
   orgInvitationsRepository: OrganizationInvitationsRepository;
   orgBillingSettingsRepository: OrganizationBillingSettingsRepository;
+  /**
+   * Opcional. Quando provido, o `impersonateState` consegue resolver o
+   * nome do alvo mesmo quando ele não pertence à mesma org do real user
+   * (caso do staff impersonate via Kintal). Sem o lookup, fallback é
+   * usar o email como nome.
+   */
+  userLookup?: UserLookupById;
 }
 
 class MissingActiveOrganizationError extends DomainError {
@@ -377,15 +385,23 @@ export class AnalyticsController {
         res.json({
           data: {
             isImpersonating: false,
+            mode: null,
             realUser: { id: auth.realUserId, email: auth.realEmail },
             actingAs: null,
           },
         });
         return;
       }
+      // Distingue origem do impersonate. Frontend usa pra decidir qual
+      // endpoint de stop chamar (kintal mantém audit log; analytics não)
+      // e pra qual rota redirecionar ao encerrar.
+      const mode: "staff" | "org-admin" =
+        auth.realUserRole === "staff" ? "staff" : "org-admin";
       const orgId = auth.activeOrganizationId;
-      // Em impersonate, sempre temos org ativa (validamos no middleware).
-      // Mesmo assim: defensivo.
+      // Em impersonate de org admin, sempre temos org ativa. Em staff
+      // impersonate, pode estar null (alvo sem org) ou apontar pra uma
+      // org da qual o real user não é member — então a busca via
+      // `listMembers` pode não achar. Cai no `userLookup` nesses casos.
       let actingAsName = "";
       if (orgId) {
         const members =
@@ -393,9 +409,14 @@ export class AnalyticsController {
         actingAsName =
           members.find((m) => m.userId === auth.userId)?.name ?? "";
       }
+      if (!actingAsName && this.deps.userLookup) {
+        const target = await this.deps.userLookup.findById(auth.userId);
+        actingAsName = target?.name ?? target?.email ?? "";
+      }
       res.json({
         data: {
           isImpersonating: true,
+          mode,
           realUser: { id: auth.realUserId, email: auth.realEmail },
           actingAs: {
             id: auth.userId,

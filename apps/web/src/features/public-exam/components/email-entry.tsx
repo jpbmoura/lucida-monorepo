@@ -1,50 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, KeyRound, ShieldAlert } from "lucide-react";
+import { ArrowRight, Mail, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface CodeEntryProps {
+interface EmailEntryProps {
   examTitle: string;
   examDescription: string;
   questionCount: number;
   duration: number;
   securityLevel: "off" | "strict";
-  onSubmit: (code: string) => Promise<void>;
-  onBack?: () => void;
+  onSubmit: (input: { email: string; name: string }) => Promise<void>;
+  onSwitchToCode: () => void;
 }
 
-export function CodeEntry({
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function EmailEntry({
   examTitle,
   examDescription,
   questionCount,
   duration,
   securityLevel,
   onSubmit,
-  onBack,
-}: CodeEntryProps) {
-  const [code, setCode] = useState("");
+  onSwitchToCode,
+}: EmailEntryProps) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^[0-9]{7}$/.test(code)) {
-      setError("Código precisa ter exatamente 7 dígitos.");
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      setError("Digite seu nome (no mínimo 2 caracteres).");
+      return;
+    }
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      setError("Email inválido.");
       return;
     }
     setError(null);
     setBusy(true);
     try {
-      await onSubmit(code);
+      await onSubmit({ email: trimmedEmail, name: trimmedName });
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
+
+  const canSubmit = name.trim().length >= 2 && EMAIL_REGEX.test(email.trim());
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-12 md:px-0">
@@ -80,32 +91,46 @@ export function CodeEntry({
       >
         <div className="flex items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
-            <KeyRound className="size-5" />
+            <Mail className="size-5" />
           </span>
           <div>
-            <div className="text-sm font-medium text-ink">Entre com seu código</div>
+            <div className="text-sm font-medium text-ink">Identifique-se para começar</div>
             <div className="text-[12px] text-gray-500">
-              São os 7 dígitos que sua professora passou.
+              Digite seu nome e email para acessar a prova.
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="student-code">Código do aluno</Label>
+          <Label htmlFor="student-name">Nome completo</Label>
           <Input
-            id="student-code"
-            inputMode="numeric"
-            pattern="[0-9]{7}"
-            maxLength={7}
+            id="student-name"
             autoFocus
-            autoComplete="off"
-            placeholder="0000000"
-            value={code}
+            autoComplete="name"
+            placeholder="Como você quer ser identificado"
+            value={name}
             onChange={(e) => {
-              setCode(e.target.value.replace(/\D/g, "").slice(0, 7));
+              setName(e.target.value);
               if (error) setError(null);
             }}
-            className="font-mono tracking-widest"
+            maxLength={120}
+            aria-invalid={error ? true : undefined}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="student-email">Email</Label>
+          <Input
+            id="student-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="seu@email.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError(null);
+            }}
             aria-invalid={error ? true : undefined}
           />
           {error && <p className="text-xs text-red-600">{error}</p>}
@@ -124,20 +149,18 @@ export function CodeEntry({
           </div>
         )}
 
-        <Button type="submit" variant="primary" size="lg" disabled={busy || code.length < 7}>
-          {busy ? "Buscando..." : "Começar"}
+        <Button type="submit" variant="primary" size="lg" disabled={busy || !canSubmit}>
+          {busy ? "Iniciando..." : "Começar"}
           {!busy && <ArrowRight className="size-4" />}
         </Button>
 
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-[12px] text-gray-500 underline-offset-2 hover:text-ink hover:underline"
-          >
-            Não tenho código — entrar com email
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onSwitchToCode}
+          className="text-[12px] text-gray-500 underline-offset-2 hover:text-ink hover:underline"
+        >
+          Já tenho código de acesso
+        </button>
       </form>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CodeEntry } from "./components/code-entry";
+import { EmailEntry } from "./components/email-entry";
 import { WelcomeScreen } from "./components/welcome-screen";
 import { ExamTaking } from "./components/exam-taking";
 import { ResultScreen } from "./components/result-screen";
@@ -16,7 +17,13 @@ import type {
   SubmitExamResponse,
 } from "./types";
 
-type Step = "entry" | "welcome" | "taking" | "result" | "alreadySubmitted";
+type Step =
+  | "emailEntry"
+  | "codeEntry"
+  | "welcome"
+  | "taking"
+  | "result"
+  | "alreadySubmitted";
 
 interface PrefilledFromToken {
   token: string;
@@ -58,7 +65,7 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
     ? prefilledFromToken.submission.status === "submitted"
       ? "alreadySubmitted"
       : "welcome"
-    : "entry";
+    : "emailEntry";
 
   const [step, setStep] = useState<Step>(initialStep);
   const [studentName, setStudentName] = useState<string>(
@@ -86,6 +93,15 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
     const data = await runBegin({
       shareId: exam.shareId,
       payload: { studentCode: code },
+    });
+    applyBeginResponse(data);
+  }
+
+  async function handleEmailSubmit(input: { email: string; name: string }) {
+    const data = await runBegin({
+      shareId: exam.shareId,
+      payload: input,
+      mode: "byEmail",
     });
     applyBeginResponse(data);
   }
@@ -141,7 +157,21 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  if (step === "entry") {
+  if (step === "emailEntry") {
+    return (
+      <EmailEntry
+        examTitle={exam.title}
+        examDescription={exam.description}
+        questionCount={exam.questions.length}
+        duration={exam.duration}
+        securityLevel={exam.securityLevel}
+        onSubmit={handleEmailSubmit}
+        onSwitchToCode={() => setStep("codeEntry")}
+      />
+    );
+  }
+
+  if (step === "codeEntry") {
     return (
       <CodeEntry
         examTitle={exam.title}
@@ -150,6 +180,7 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
         duration={exam.duration}
         securityLevel={exam.securityLevel}
         onSubmit={handleCodeSubmit}
+        onBack={() => setStep("emailEntry")}
       />
     );
   }
@@ -211,14 +242,20 @@ async function runBegin({
   shareId,
   payload,
   fromToken,
+  mode,
 }: {
   shareId: string;
   payload: Record<string, unknown>;
   fromToken?: boolean;
+  mode?: "byEmail";
 }): Promise<BeginExamResponse> {
-  const path = fromToken
-    ? `/v1/public/exams/${encodeURIComponent(shareId)}/begin-from-token`
-    : `/v1/public/exams/${encodeURIComponent(shareId)}/begin`;
+  const suffix =
+    mode === "byEmail"
+      ? "/begin-by-email"
+      : fromToken
+        ? "/begin-from-token"
+        : "/begin";
+  const path = `/v1/public/exams/${encodeURIComponent(shareId)}${suffix}`;
   const res = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },

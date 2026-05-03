@@ -16,6 +16,10 @@ export function makePublicSubmissionRouter({
   );
   router.post("/v1/public/exams/:shareId/begin", controller.begin);
   router.post(
+    "/v1/public/exams/:shareId/begin-by-email",
+    controller.beginByEmail,
+  );
+  router.post(
     "/v1/public/exams/:shareId/begin-from-token",
     controller.beginFromToken,
   );

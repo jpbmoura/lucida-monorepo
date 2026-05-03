@@ -2,14 +2,18 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { buildDisplayUser } from "@/lib/user-display";
 import { PLAN_LABELS, type KintalUserDetail } from "../types";
+import { KintalImpersonateButton } from "@/features/kintal/impersonate/components/impersonate-button";
 
 interface UserDetailHeaderProps {
   user: KintalUserDetail;
+  /** ID do staff logado — usado pra desabilitar self-impersonate. */
+  realUserId: string | null;
 }
 
-export function UserDetailHeader({ user }: UserDetailHeaderProps) {
+export function UserDetailHeader({ user, realUserId }: UserDetailHeaderProps) {
   const display = buildDisplayUser({ name: user.name, email: user.email });
   const isStaff = user.role === "staff";
+  const isSelf = realUserId !== null && realUserId === user.id;
 
   return (
     <div className="flex flex-col gap-6 border-b border-gray-100 pb-8">
@@ -50,28 +54,36 @@ export function UserDetailHeader({ user }: UserDetailHeaderProps) {
           </div>
         </div>
 
-        {user.subscription ? (
-          <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 text-right">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-gray-400">
-              Plano atual
+        <div className="flex flex-col items-end gap-3 md:flex-row md:items-center">
+          <KintalImpersonateButton
+            targetUserId={user.id}
+            targetName={display.name}
+            disabled={isSelf}
+          />
+
+          {user.subscription ? (
+            <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 text-right">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-gray-400">
+                Plano atual
+              </div>
+              <div className="mt-1 text-base font-medium text-ink">
+                {PLAN_LABELS[user.subscription.planId] ?? user.subscription.planId}
+              </div>
+              <div className="text-xs capitalize text-gray-500">
+                {user.subscription.status}
+              </div>
             </div>
-            <div className="mt-1 text-base font-medium text-ink">
-              {PLAN_LABELS[user.subscription.planId] ?? user.subscription.planId}
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-4 text-right">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-gray-400">
+                Plano atual
+              </div>
+              <div className="mt-1 text-base font-medium text-gray-400">
+                Sem assinatura
+              </div>
             </div>
-            <div className="text-xs capitalize text-gray-500">
-              {user.subscription.status}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-4 text-right">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-gray-400">
-              Plano atual
-            </div>
-            <div className="mt-1 text-base font-medium text-gray-400">
-              Sem assinatura
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

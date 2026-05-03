@@ -3,29 +3,50 @@
 import { useTransition } from "react";
 import { ShieldAlert, X } from "lucide-react";
 import { stopImpersonateAction } from "../actions";
+import { stopKintalImpersonateAction } from "@/features/kintal/impersonate/actions";
+import type { ImpersonateMode } from "@/lib/impersonate-state";
 
 interface ImpersonateBannerProps {
-  /** Nome do professor que está sendo impersonado. */
+  /** Nome do user que está sendo impersonado. */
   actingAsName: string;
-  /** Email do professor — mostrado em telas largas pra confirmar identidade. */
+  /** Email do user — mostrado em telas largas pra confirmar identidade. */
   actingAsEmail: string;
+  /**
+   * Origem do impersonate. `org-admin` = admin de instituição encerra
+   * voltando pra `/analytics` (action analytics). `staff` = staff Kintal
+   * encerra voltando pro detalhe do user (action kintal, com audit log).
+   */
+  mode: ImpersonateMode;
+  /**
+   * `targetUserId` (= `actingAs.id`). Em modo staff, usado pra montar o
+   * redirect de volta pra `/kintal/usuarios/[id]`. Em modo org-admin é
+   * ignorado.
+   */
+  targetUserId: string;
 }
 
 /**
  * Banner full-width amarelo no topo do `/app` quando o user está
- * impersonando outro professor. Botão "Sair" dispara `stopImpersonate` e
- * volta pro `/analytics`.
+ * impersonando outro user. Suporta os dois modos: org admin (volta pra
+ * `/analytics`) e staff Kintal (volta pra `/kintal/usuarios/[id]` e
+ * fecha audit log).
  */
 export function ImpersonateBanner({
   actingAsName,
   actingAsEmail,
+  mode,
+  targetUserId,
 }: ImpersonateBannerProps) {
   const [pending, startTransition] = useTransition();
 
   function handleStop() {
     startTransition(async () => {
       // Server action faz o redirect — nada a fazer aqui.
-      await stopImpersonateAction();
+      if (mode === "staff") {
+        await stopKintalImpersonateAction(`/kintal/usuarios/${targetUserId}`);
+      } else {
+        await stopImpersonateAction();
+      }
     });
   }
 

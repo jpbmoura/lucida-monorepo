@@ -3,6 +3,7 @@ import type {
   OrganizationMembersRepository,
   OrgMember,
   OrgInfo,
+  UserMembership,
 } from "../application/ports/organization-members-repository.js";
 
 /**
@@ -125,6 +126,31 @@ export class BaOrganizationMembersRepository
         { projection: { role: 1 } },
       );
     return doc?.role ?? null;
+  }
+
+  async listMembershipsByUser(userId: string): Promise<UserMembership[]> {
+    let userOid: ObjectId;
+    try {
+      userOid = new ObjectId(userId);
+    } catch {
+      return [];
+    }
+
+    const docs = await this.authDb
+      .collection<{
+        organizationId: ObjectId;
+        role?: "owner" | "admin" | "member";
+        createdAt?: Date;
+      }>("member")
+      .find({ userId: userOid })
+      .sort({ createdAt: 1 })
+      .toArray();
+
+    return docs.map((d) => ({
+      organizationId: String(d.organizationId),
+      role: d.role ?? "member",
+      joinedAt: d.createdAt ?? new Date(0),
+    }));
   }
 }
 

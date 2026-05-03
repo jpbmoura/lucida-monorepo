@@ -24,6 +24,15 @@ export interface StudentRepository {
     ownerId: string,
     matricula: string,
   ): Promise<Student | null>;
+  /**
+   * Busca aluno na turma pelo email (case-insensitive — email é
+   * normalizado lowercase no domain). Usado pelo fluxo de auto-cadastro
+   * via prova pública.
+   */
+  findByClassIdAndEmail(
+    classId: string,
+    email: string,
+  ): Promise<Student | null>;
   countByClassId(classId: string): Promise<number>;
   delete(id: StudentId): Promise<void>;
   deleteByClassId(classId: string): Promise<void>;

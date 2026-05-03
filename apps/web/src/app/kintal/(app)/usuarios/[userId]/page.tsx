@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/lib/api-client";
+import { getServerSession } from "@/lib/get-server-session";
 import { fetchKintalUser } from "@/features/kintal/users/data";
 import { UserDetailHeader } from "@/features/kintal/users/sections/user-detail-header";
 import { EngagementGrid } from "@/features/kintal/users/sections/engagement-grid";
@@ -33,9 +34,16 @@ export default async function KintalUserDetailPage({ params }: PageProps) {
     throw err;
   }
 
+  // O `KintalAppLayout` já garantiu staff. Só precisamos do id real pra
+  // desabilitar o botão de impersonate quando o staff abre o próprio perfil.
+  const session = await getServerSession();
+
   return (
     <div className="mx-auto w-full px-5 py-10 pb-20 md:px-10">
-      <UserDetailHeader user={user} />
+      <UserDetailHeader
+        user={user}
+        realUserId={session?.user.id ?? null}
+      />
 
       <div className="mt-10 flex flex-col gap-6">
         <EngagementGrid data={user.engagement} />

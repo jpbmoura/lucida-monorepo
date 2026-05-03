@@ -18,7 +18,9 @@
       "Bash(npx tsc *)",
       "Bash(pnpm --filter @lucida/web typecheck)",
       "Bash(pnpm --filter @lucida/web build)",
-      "Bash(pnpm --filter @lucida/api lint)"
+      "Bash(pnpm --filter @lucida/api lint)",
+      "Bash(pnpm --filter @lucida/api typecheck)",
+      "Bash(pnpm -r exec tsc --noEmit)"
     ]
   }
 }

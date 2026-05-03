@@ -64,6 +64,7 @@ import { makeAiRouter } from "@/domains/ai-ops/presentation/ai-routes.js";
 import { MongooseSubmissionRepository } from "@/domains/submission/infrastructure/mongoose-submission-repository.js";
 import { GetPublicExamUseCase } from "@/domains/submission/application/get-public-exam.js";
 import { BeginExamUseCase } from "@/domains/submission/application/begin-exam.js";
+import { BeginExamByEmailUseCase } from "@/domains/submission/application/begin-exam-by-email.js";
 import { BeginExamFromTokenUseCase } from "@/domains/submission/application/begin-exam-from-token.js";
 import { ResolveExamLinkTokenUseCase } from "@/domains/submission/application/resolve-exam-link-token.js";
 import { SubmitExamUseCase } from "@/domains/submission/application/submit-exam.js";
@@ -206,6 +207,11 @@ import { MongoKintalReadRepository } from "@/domains/kintal/infrastructure/mongo
 import { MongoStaffRepository } from "@/domains/kintal/infrastructure/mongo-staff-repository.js";
 import { MongoKintalUsersRepository } from "@/domains/kintal/infrastructure/mongo-kintal-users-repository.js";
 import { MongoKintalInstitutionsRepository } from "@/domains/kintal/infrastructure/mongo-kintal-institutions-repository.js";
+import { MongooseImpersonateSessionRepository } from "@/domains/kintal/infrastructure/mongoose-impersonate-session-repository.js";
+import { BaUserLookupById } from "@/domains/iam/infrastructure/ba-user-lookup-by-id.js";
+import { StartKintalImpersonateUseCase } from "@/domains/kintal/application/start-kintal-impersonate.js";
+import { StopKintalImpersonateUseCase } from "@/domains/kintal/application/stop-kintal-impersonate.js";
+import { KintalImpersonateController } from "@/domains/kintal/presentation/kintal-impersonate-controller.js";
 import { GetDashboardMetricsUseCase } from "@/domains/kintal/application/get-dashboard-metrics.js";
 import { ListStaffUseCase } from "@/domains/kintal/application/list-staff.js";
 import { PromoteToStaffUseCase } from "@/domains/kintal/application/promote-to-staff.js";
@@ -351,9 +357,13 @@ export async function buildApp(): Promise<Express> {
   const teacherAssistantsRepository = new MongoTeacherAssistantRepository(
     authDb,
   );
+  // Lookup mínimo de user pelo id — alimenta o modo staff impersonate
+  // no requireAuth e o fallback de nome no analytics.impersonateState.
+  const userLookupById = new BaUserLookupById(authDb);
   const requireAuth = makeRequireAuth(auth, {
     orgMembersRepository,
     teacherAssistantsRepository,
+    userLookup: userLookupById,
     authSecret: env.AUTH_SECRET,
   });
 
@@ -439,6 +449,12 @@ export async function buildApp(): Promise<Express> {
     getPublicExam: new GetPublicExamUseCase(examRepository),
     beginExam: new BeginExamUseCase(
       examRepository,
+      studentRepository,
+      submissionRepository,
+    ),
+    beginExamByEmail: new BeginExamByEmailUseCase(
+      examRepository,
+      classRepository,
       studentRepository,
       submissionRepository,
     ),
@@ -535,6 +551,7 @@ export async function buildApp(): Promise<Express> {
     orgMembersRepository,
     orgInvitationsRepository,
     orgBillingSettingsRepository: orgBillingSettingsRepo,
+    userLookup: userLookupById,
   });
 
   // --- billing controller (precisa do auth pra recuperar email do user no
@@ -770,6 +787,19 @@ export async function buildApp(): Promise<Express> {
 
   const requireStaff = makeRequireStaff();
 
+  // --- kintal impersonate (audit log + start/stop) ---
+  // O cookie `lucida.impersonate` é o mesmo do impersonate de org admin —
+  // o middleware `requireAuth` já distingue os dois caminhos. Aqui o que
+  // adicionamos é a UI staff-only de iniciar e o registro append-only.
+  const impersonateSessionsRepo = new MongooseImpersonateSessionRepository();
+  const kintalImpersonateController = new KintalImpersonateController({
+    startImpersonate: new StartKintalImpersonateUseCase(
+      impersonateSessionsRepo,
+      kintalUsersRepository,
+    ),
+    stopImpersonate: new StopKintalImpersonateUseCase(impersonateSessionsRepo),
+  });
+
   // --- finance (kintal financeiro — staff-only) ---
   // Receita vem do credit_ledger cruzado com catálogo PLANS/TOPUPS;
   // despesas são lançadas manualmente em finance_expenses por enquanto.
@@ -952,6 +982,7 @@ export async function buildApp(): Promise<Express> {
       staffController: kintalStaffController,
       usersController: kintalUsersController,
       institutionsController: kintalInstitutionsController,
+      impersonateController: kintalImpersonateController,
     }),
     makeFinanceRouter({
       requireAuth,

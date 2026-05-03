@@ -67,10 +67,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         {!assistant?.activeTarget &&
           impersonate?.isImpersonating &&
-          impersonate.actingAs && (
+          impersonate.actingAs &&
+          impersonate.mode && (
             <ImpersonateBanner
               actingAsName={impersonate.actingAs.name}
               actingAsEmail={impersonate.actingAs.email}
+              mode={impersonate.mode}
+              targetUserId={impersonate.actingAs.id}
             />
           )}
         <Topbar

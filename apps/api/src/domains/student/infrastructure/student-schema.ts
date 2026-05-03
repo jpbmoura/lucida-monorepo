@@ -50,6 +50,16 @@ studentSchema.index(
     partialFilterExpression: { organizationId: { $type: "string" } },
   },
 );
+// Email único por turma — cobre o lookup do auto-cadastro via prova
+// pública. Partial filter ignora docs sem email (alunos cadastrados
+// pelo professor podem não ter email), pra não competirem pelo unique.
+studentSchema.index(
+  { classId: 1, email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: "string" } },
+  },
+);
 
 export const StudentModel: Model<StudentDoc> =
   (mongoose.models.Student as Model<StudentDoc> | undefined) ??

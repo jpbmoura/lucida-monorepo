@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import {
   beginExamBody,
+  beginExamByEmailBody,
   beginExamFromTokenBody,
   examIdParam,
   shareIdParam,
@@ -8,6 +9,7 @@ import {
 } from "./submission-schemas.js";
 import type { GetPublicExamUseCase } from "../application/get-public-exam.js";
 import type { BeginExamUseCase } from "../application/begin-exam.js";
+import type { BeginExamByEmailUseCase } from "../application/begin-exam-by-email.js";
 import type { BeginExamFromTokenUseCase } from "../application/begin-exam-from-token.js";
 import type { ResolveExamLinkTokenUseCase } from "../application/resolve-exam-link-token.js";
 import type { SubmitExamUseCase } from "../application/submit-exam.js";
@@ -16,6 +18,7 @@ import type { ListSubmissionsByExamUseCase } from "../application/list-submissio
 interface Deps {
   getPublicExam: GetPublicExamUseCase;
   beginExam: BeginExamUseCase;
+  beginExamByEmail: BeginExamByEmailUseCase;
   beginExamFromToken: BeginExamFromTokenUseCase;
   resolveExamLinkToken: ResolveExamLinkTokenUseCase;
   submitExam: SubmitExamUseCase;
@@ -50,6 +53,21 @@ export class SubmissionController {
       const data = await this.deps.beginExam.execute({
         shareId,
         studentCode: body.studentCode,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  beginByEmail: RequestHandler = async (req, res, next) => {
+    try {
+      const { shareId } = shareIdParam.parse(req.params);
+      const body = beginExamByEmailBody.parse(req.body);
+      const data = await this.deps.beginExamByEmail.execute({
+        shareId,
+        email: body.email,
+        name: body.name,
       });
       res.json({ data });
     } catch (err) {

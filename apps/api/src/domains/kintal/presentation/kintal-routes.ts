@@ -3,6 +3,7 @@ import type { KintalController } from "./kintal-controller.js";
 import type { KintalStaffController } from "./kintal-staff-controller.js";
 import type { KintalUsersController } from "./kintal-users-controller.js";
 import type { KintalInstitutionsController } from "./kintal-institutions-controller.js";
+import type { KintalImpersonateController } from "./kintal-impersonate-controller.js";
 
 interface MakeKintalRouterDeps {
   requireAuth: RequestHandler;
@@ -11,6 +12,7 @@ interface MakeKintalRouterDeps {
   staffController: KintalStaffController;
   usersController: KintalUsersController;
   institutionsController: KintalInstitutionsController;
+  impersonateController: KintalImpersonateController;
 }
 
 export function makeKintalRouter({
@@ -20,6 +22,7 @@ export function makeKintalRouter({
   staffController,
   usersController,
   institutionsController,
+  impersonateController,
 }: MakeKintalRouterDeps): Router {
   const router = Router();
   // Todas as rotas do Kintal são staff-only — encadeia requireAuth +
@@ -117,6 +120,22 @@ export function makeKintalRouter({
     requireAuth,
     requireStaff,
     institutionsController.adjustCredits,
+  );
+
+  // ─── Impersonate (staff "vira" o user pra navegar como ele) ────────
+  // Start exige staff. Stop é safe pra qualquer auth — se não há sessão
+  // aberta, é no-op (idempotente). O cookie compartilhado com /analytics
+  // significa que o middleware resolve ambos caminhos automaticamente.
+  router.post(
+    "/api/kintal/impersonate",
+    requireAuth,
+    requireStaff,
+    impersonateController.start,
+  );
+  router.delete(
+    "/api/kintal/impersonate",
+    requireAuth,
+    impersonateController.stop,
   );
 
   return router;
