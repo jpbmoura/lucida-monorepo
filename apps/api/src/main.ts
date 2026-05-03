@@ -210,6 +210,7 @@ import { MongoKintalInstitutionsRepository } from "@/domains/kintal/infrastructu
 import { MongooseImpersonateSessionRepository } from "@/domains/kintal/infrastructure/mongoose-impersonate-session-repository.js";
 import { BaUserLookupById } from "@/domains/iam/infrastructure/ba-user-lookup-by-id.js";
 import { StartKintalImpersonateUseCase } from "@/domains/kintal/application/start-kintal-impersonate.js";
+import { StartInstitutionImpersonateUseCase } from "@/domains/kintal/application/start-institution-impersonate.js";
 import { StopKintalImpersonateUseCase } from "@/domains/kintal/application/stop-kintal-impersonate.js";
 import { KintalImpersonateController } from "@/domains/kintal/presentation/kintal-impersonate-controller.js";
 import { GetDashboardMetricsUseCase } from "@/domains/kintal/application/get-dashboard-metrics.js";
@@ -798,10 +799,15 @@ export async function buildApp(): Promise<Express> {
   // o middleware `requireAuth` já distingue os dois caminhos. Aqui o que
   // adicionamos é a UI staff-only de iniciar e o registro append-only.
   const impersonateSessionsRepo = new MongooseImpersonateSessionRepository();
+  const startKintalImpersonateUseCase = new StartKintalImpersonateUseCase(
+    impersonateSessionsRepo,
+    kintalUsersRepository,
+  );
   const kintalImpersonateController = new KintalImpersonateController({
-    startImpersonate: new StartKintalImpersonateUseCase(
-      impersonateSessionsRepo,
-      kintalUsersRepository,
+    startImpersonate: startKintalImpersonateUseCase,
+    startInstitutionImpersonate: new StartInstitutionImpersonateUseCase(
+      kintalInstitutionsRepository,
+      startKintalImpersonateUseCase,
     ),
     stopImpersonate: new StopKintalImpersonateUseCase(impersonateSessionsRepo),
   });

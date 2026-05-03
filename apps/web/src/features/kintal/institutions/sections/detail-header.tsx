@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
+import { InstitutionImpersonateButton } from "@/features/kintal/impersonate/components/institution-impersonate-button";
 import type { KintalInstitutionDetail } from "../types";
 
 export function InstitutionDetailHeader({
@@ -13,6 +14,10 @@ export function InstitutionDetailHeader({
     month: "long",
     year: "numeric",
   });
+  // Botão fica desabilitado quando não há owner (org criada inconsistente
+  // ou owner removido manualmente). Backend bloqueia também — UI só
+  // antecipa.
+  const owner = institution.members.find((m) => m.role === "owner") ?? null;
 
   return (
     <div className="border-b border-gray-100 pb-6">
@@ -45,6 +50,14 @@ export function InstitutionDetailHeader({
               {created}
             </div>
           </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <InstitutionImpersonateButton
+            organizationId={institution.id}
+            institutionName={institution.name}
+            ownerName={owner?.name ?? owner?.email ?? null}
+            disabled={!owner || archived}
+          />
         </div>
       </div>
     </div>

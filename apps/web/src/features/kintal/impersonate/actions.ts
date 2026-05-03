@@ -62,6 +62,54 @@ export async function startKintalImpersonateAction(
 }
 
 /**
+ * Inicia impersonate "como instituição": backend resolve o owner da org
+ * e dispara o mesmo fluxo de user impersonate. Em sucesso redireciona
+ * pra `/app` — daí o owner navega normalmente em `/analytics` da org.
+ */
+export async function startInstitutionImpersonateAction(
+  organizationId: string,
+): Promise<ActionResult> {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_URL}/api/kintal/institutions/${encodeURIComponent(organizationId)}/impersonate`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: cookieHeader,
+        },
+        cache: "no-store",
+      },
+    );
+  } catch {
+    return { ok: false, error: "Falha de conexão com a API." };
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    try {
+      const parsed = JSON.parse(body) as { message?: string };
+      return {
+        ok: false,
+        error: parsed.message ?? "Não foi possível iniciar.",
+      };
+    } catch {
+      return { ok: false, error: "Não foi possível iniciar." };
+    }
+  }
+
+  applySetCookies(res, cookieStore);
+  redirect("/app");
+}
+
+/**
  * Encerra impersonate. Best-effort — mesmo com erro de rede, redireciona.
  * `redirectTo` permite voltar pra origem (ex: detalhe do user no Kintal).
  */

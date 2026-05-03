@@ -6,11 +6,14 @@ import {
 } from "@/domains/iam/infrastructure/impersonate-cookie.js";
 import { env } from "@/env.js";
 import type { StartKintalImpersonateUseCase } from "../application/start-kintal-impersonate.js";
+import type { StartInstitutionImpersonateUseCase } from "../application/start-institution-impersonate.js";
 import type { StopKintalImpersonateUseCase } from "../application/stop-kintal-impersonate.js";
 import { startImpersonateBody } from "./kintal-impersonate-schemas.js";
+import { institutionParam } from "./kintal-institutions-schemas.js";
 
 interface Deps {
   startImpersonate: StartKintalImpersonateUseCase;
+  startInstitutionImpersonate: StartInstitutionImpersonateUseCase;
   stopImpersonate: StopKintalImpersonateUseCase;
 }
 
@@ -47,6 +50,41 @@ export class KintalImpersonateController {
         }),
       );
       res.status(200).json({ data: { ok: true, targetUserId } });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  startForInstitution: RequestHandler = async (req, res, next) => {
+    try {
+      const { orgId } = institutionParam.parse(req.params);
+      const staffUserId = req.auth!.realUserId;
+
+      const result = await this.deps.startInstitutionImpersonate.execute({
+        staffUserId,
+        organizationId: orgId,
+        userAgent: req.headers["user-agent"]?.toString() ?? null,
+        ipAddress: extractIp(req) ?? null,
+      });
+
+      const cookieValue = buildImpersonateCookieValue(
+        result.targetUserId,
+        env.AUTH_SECRET,
+      );
+      res.cookie(
+        IMPERSONATE_COOKIE_NAME,
+        cookieValue,
+        impersonateCookieAttributes({
+          isProduction: env.NODE_ENV === "production",
+        }),
+      );
+      res.status(200).json({
+        data: {
+          ok: true,
+          targetUserId: result.targetUserId,
+          organizationId: result.organizationId,
+        },
+      });
     } catch (err) {
       next(err);
     }

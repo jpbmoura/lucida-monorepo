@@ -146,6 +146,12 @@ export function makeKintalRouter({
     requireStaff,
     institutionsController.removeMember,
   );
+  router.post(
+    "/api/kintal/institutions/:orgId/impersonate",
+    requireAuth,
+    requireStaff,
+    impersonateController.startForInstitution,
+  );
 
   // ─── Impersonate (staff "vira" o user pra navegar como ele) ────────
   // Start exige staff. Stop é safe pra qualquer auth — se não há sessão

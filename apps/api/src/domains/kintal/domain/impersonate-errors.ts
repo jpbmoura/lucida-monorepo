@@ -15,3 +15,16 @@ export class ImpersonateTargetNotFoundError extends DomainError {
     super("Usuário alvo não encontrado.");
   }
 }
+
+/**
+ * Tentativa de impersonar uma instituição que não tem owner. Não
+ * resolvemos pra outro role automaticamente — staff precisa promover
+ * alguém antes pra impersonate funcionar.
+ */
+export class InstitutionWithoutOwnerError extends DomainError {
+  readonly code = "INSTITUTION_WITHOUT_OWNER";
+  readonly statusCode = 409;
+  constructor() {
+    super("Instituição sem owner. Promova alguém antes de atuar como.");
+  }
+}
