@@ -50,7 +50,11 @@ export function UsersList({ users }: UsersListProps) {
 }
 
 function UserRow({ user }: { user: KintalUserListItem }) {
-  const display = buildDisplayUser({ name: user.name, email: user.email });
+  const display = buildDisplayUser({
+    name: user.name,
+    email: user.email,
+    fallback: "email",
+  });
   const isStaff = user.role === "staff";
 
   return (

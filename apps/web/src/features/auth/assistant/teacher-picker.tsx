@@ -73,6 +73,7 @@ export function TeacherPicker({ teachers }: Props) {
           const display = buildDisplayUser({
             name: t.teacherName,
             email: t.teacherEmail,
+            fallback: "email",
           });
           const isPending = pendingId === t.teacherUserId;
           return (

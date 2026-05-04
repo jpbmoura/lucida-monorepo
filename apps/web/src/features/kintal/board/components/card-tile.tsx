@@ -89,18 +89,21 @@ export function CardTile({ card, assignee, onClick }: CardTileProps) {
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {assignee ? (
-          <span
-            className="grid size-6 place-items-center rounded-full bg-gradient-to-br from-ink to-gray-600 text-[10px] font-semibold text-white"
-            title={buildDisplayUser({
+          (() => {
+            const display = buildDisplayUser({
               name: assignee.name,
               email: assignee.email,
-            }).name}
-          >
-            {buildDisplayUser({
-              name: assignee.name,
-              email: assignee.email,
-            }).initials}
-          </span>
+              fallback: "email",
+            });
+            return (
+              <span
+                className="grid size-6 place-items-center rounded-full bg-gradient-to-br from-ink to-gray-600 text-[10px] font-semibold text-white"
+                title={display.name}
+              >
+                {display.initials}
+              </span>
+            );
+          })()
         ) : (
           <span className="grid size-6 place-items-center rounded-full border border-dashed border-gray-200 text-[10px] text-gray-400">
             ?

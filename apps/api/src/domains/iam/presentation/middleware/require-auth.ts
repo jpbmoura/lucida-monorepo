@@ -7,6 +7,10 @@ import {
   parseImpersonateCookieValue,
 } from "../../infrastructure/impersonate-cookie.js";
 import {
+  IMPERSONATE_ORG_COOKIE_NAME,
+  parseImpersonateOrgCookieValue,
+} from "../../infrastructure/impersonate-org-cookie.js";
+import {
   ASSISTANT_TARGET_COOKIE_NAME,
   parseAssistantTargetCookieValue,
 } from "../../infrastructure/assistant-target-cookie.js";
@@ -159,7 +163,7 @@ export function makeRequireAuth(
       // Impersonate de staff (Kintal) — tem precedência sobre o de org
       // admin porque o staff vê o sistema todo, não está limitado à
       // própria org. Se o real user é staff e há cookie válido, aceita
-      // o target direto e herda a primeira org do alvo como activeOrg.
+      // o target direto.
       if (
         !isAssistant &&
         userLookup &&
@@ -173,11 +177,22 @@ export function makeRequireAuth(
             userId = target.id;
             email = target.email;
             isImpersonating = true;
-            // Herda a primeira org do alvo (ordem por joinedAt asc) pra
-            // que o /app abra com contexto institucional certo. Quando
-            // o alvo não tem org, fica null — UI mostra "sem org" igual
-            // user puro. Best-effort: erro silencioso preserva o impersonate.
-            if (orgMembers) {
+            // Resolve activeOrganizationId em duas camadas:
+            //   1. Cookie `lucida.impersonate_org` (preferencial): o staff
+            //      iniciou o impersonate pela rota "Atuar como instituição",
+            //      então sabemos exatamente qual org ele quer ver — e
+            //      respeitar isso evita ativar a org errada quando o owner
+            //      alvo pertence a múltiplas instituições.
+            //   2. Heurística (fallback): primeira membership do alvo por
+            //      joinedAt asc. Cobre o caso "Atuar como user" (sem org
+            //      explícita) — aceitável porque é o que o staff conhece
+            //      como org "primária" do user.
+            // Sem org no alvo nem no cookie, fica null e a UI mostra "sem
+            // org" igual user puro.
+            const explicitOrg = readImpersonateOrgTarget(req, secret);
+            if (explicitOrg) {
+              activeOrganizationId = explicitOrg;
+            } else if (orgMembers) {
               try {
                 const memberships =
                   await orgMembers.listMembershipsByUser(targetUserId);
@@ -258,6 +273,21 @@ function readImpersonateTarget(
   const value = cookies[IMPERSONATE_COOKIE_NAME];
   if (typeof value !== "string") return null;
   return parseImpersonateCookieValue(value, secret);
+}
+
+/**
+ * Extrai o `lucida.impersonate_org` do header Cookie. Carimbado pela rota
+ * "Atuar como instituição" do Kintal pra fixar a org ativa do impersonate
+ * de staff — sem ele, cai no heurístico de primeira membership.
+ */
+function readImpersonateOrgTarget(
+  req: { headers: { cookie?: string } },
+  secret: string,
+): string | null {
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const value = cookies[IMPERSONATE_ORG_COOKIE_NAME];
+  if (typeof value !== "string") return null;
+  return parseImpersonateOrgCookieValue(value, secret);
 }
 
 function parseCookieHeader(raw: string | undefined): Record<string, string> {

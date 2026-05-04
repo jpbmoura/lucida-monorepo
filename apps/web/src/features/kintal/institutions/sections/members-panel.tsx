@@ -81,7 +81,11 @@ export function MembersPanel({ orgId, members }: MembersPanelProps) {
       ) : (
         <ul className="flex flex-col">
           {members.map((m, i) => {
-            const display = buildDisplayUser({ name: m.name, email: m.email });
+            const display = buildDisplayUser({
+              name: m.name,
+              email: m.email,
+              fallback: "email",
+            });
             const removable = m.role !== "owner";
             const isRemoving = removingId === m.id;
             return (

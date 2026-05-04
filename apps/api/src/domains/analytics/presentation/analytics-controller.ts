@@ -19,6 +19,7 @@ import {
   buildImpersonateCookieValue,
   impersonateCookieAttributes,
 } from "@/domains/iam/infrastructure/impersonate-cookie.js";
+import { IMPERSONATE_ORG_COOKIE_NAME } from "@/domains/iam/infrastructure/impersonate-org-cookie.js";
 import { env } from "@/env.js";
 import { z } from "zod";
 import {
@@ -437,6 +438,15 @@ export class AnalyticsController {
   stopImpersonate: RequestHandler = async (_req, res, next) => {
     try {
       res.clearCookie(IMPERSONATE_COOKIE_NAME, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "production",
+        path: "/",
+      });
+      // Limpa também o cookie de org — pode estar setado se o impersonate
+      // veio do fluxo "Atuar como instituição" do Kintal e o staff
+      // encerrou pelo banner do /analytics em vez do botão do Kintal.
+      res.clearCookie(IMPERSONATE_ORG_COOKIE_NAME, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.NODE_ENV === "production",

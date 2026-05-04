@@ -4,6 +4,11 @@ import {
   buildImpersonateCookieValue,
   impersonateCookieAttributes,
 } from "@/domains/iam/infrastructure/impersonate-cookie.js";
+import {
+  IMPERSONATE_ORG_COOKIE_NAME,
+  buildImpersonateOrgCookieValue,
+  impersonateOrgCookieAttributes,
+} from "@/domains/iam/infrastructure/impersonate-org-cookie.js";
 import { env } from "@/env.js";
 import type { StartKintalImpersonateUseCase } from "../application/start-kintal-impersonate.js";
 import type { StartInstitutionImpersonateUseCase } from "../application/start-institution-impersonate.js";
@@ -49,6 +54,15 @@ export class KintalImpersonateController {
           isProduction: env.NODE_ENV === "production",
         }),
       );
+      // "Atuar como user" não tem contexto de org — limpa o cookie de
+      // org caso ele tenha sobrado de uma sessão anterior de "atuar como
+      // instituição", senão o middleware fixaria a org errada.
+      res.clearCookie(IMPERSONATE_ORG_COOKIE_NAME, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "production",
+        path: "/",
+      });
       res.status(200).json({ data: { ok: true, targetUserId } });
     } catch (err) {
       next(err);
@@ -78,6 +92,20 @@ export class KintalImpersonateController {
           isProduction: env.NODE_ENV === "production",
         }),
       );
+      // Carimba a org escolhida no cookie auxiliar pra o middleware
+      // ativar exatamente essa instituição — sem isso, ele cairia no
+      // heurístico `listMembershipsByUser[0]` e poderia fixar uma org
+      // diferente caso o owner alvo pertença a múltiplas.
+      res.cookie(
+        IMPERSONATE_ORG_COOKIE_NAME,
+        buildImpersonateOrgCookieValue(
+          result.organizationId,
+          env.AUTH_SECRET,
+        ),
+        impersonateOrgCookieAttributes({
+          isProduction: env.NODE_ENV === "production",
+        }),
+      );
       res.status(200).json({
         data: {
           ok: true,
@@ -98,6 +126,12 @@ export class KintalImpersonateController {
         reason: "manual",
       });
       res.clearCookie(IMPERSONATE_COOKIE_NAME, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "production",
+        path: "/",
+      });
+      res.clearCookie(IMPERSONATE_ORG_COOKIE_NAME, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.NODE_ENV === "production",

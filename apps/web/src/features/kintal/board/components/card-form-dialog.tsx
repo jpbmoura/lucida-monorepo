@@ -239,8 +239,11 @@ export function CardFormDialog({
                   { value: "", label: "— Sem responsável —" },
                   ...staff.map((m) => ({
                     value: m.id,
-                    label: buildDisplayUser({ name: m.name, email: m.email })
-                      .name,
+                    label: buildDisplayUser({
+                      name: m.name,
+                      email: m.email,
+                      fallback: "email",
+                    }).name,
                   })),
                 ]}
                 disabled={isPending}

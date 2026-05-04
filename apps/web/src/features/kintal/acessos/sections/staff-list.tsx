@@ -65,6 +65,7 @@ function StaffRow({
   const display = buildDisplayUser({
     name: member.name,
     email: member.email,
+    fallback: "email",
   });
 
   return (
