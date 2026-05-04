@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/features/app/layout/sidebar";
 import { Topbar } from "@/features/app/layout/topbar";
-import { getServerSession } from "@/lib/get-server-session";
+import { getEffectiveUser } from "@/lib/get-effective-user";
 import { buildDisplayUser } from "@/lib/user-display";
 import {
   fetchActiveOrganization,
@@ -18,14 +18,14 @@ import { ImpersonateBanner } from "@/features/analytics/impersonate/components/i
 import { AssistantBanner } from "@/features/auth/assistant/assistant-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession();
-  if (!session) {
+  const effective = await getEffectiveUser();
+  if (!effective) {
     redirect("/sign-in?next=/app");
   }
 
   const display = buildDisplayUser({
-    name: session.user.name,
-    email: session.user.email,
+    name: effective.name,
+    email: effective.email,
   });
 
   // Antes de tudo: se o user é auxiliar (tem vínculos teacher_assistants

@@ -106,7 +106,9 @@ export async function startInstitutionImpersonateAction(
   }
 
   applySetCookies(res, cookieStore);
-  redirect("/app");
+  // Diferente do impersonate de user (que vai pro `/app`), aqui o
+  // staff quer ver o painel de admin da instituição — `/analytics`.
+  redirect("/analytics");
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getServerSession } from "@/lib/get-server-session";
+import { getEffectiveUser } from "@/lib/get-effective-user";
 import { buildDisplayUser } from "@/lib/user-display";
 import {
   fetchOverview,
@@ -22,15 +22,15 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const session = await getServerSession();
-  if (!session) redirect("/sign-in?next=/app");
+  const effective = await getEffectiveUser();
+  if (!effective) redirect("/sign-in?next=/app");
 
   const sp = await searchParams;
   const period = parsePeriod(sp.period);
 
   const display = buildDisplayUser({
-    name: session.user.name,
-    email: session.user.email,
+    name: effective.name,
+    email: effective.email,
   });
 
   const overview = await fetchOverview(period);

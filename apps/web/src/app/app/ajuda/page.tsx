@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getServerSession } from "@/lib/get-server-session";
+import { getEffectiveUser } from "@/lib/get-effective-user";
 import { buildDisplayUser } from "@/lib/user-display";
 import { HelpPage } from "@/features/app/help/help-page";
 
@@ -9,12 +9,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AjudaRoute() {
-  const session = await getServerSession();
-  if (!session) redirect("/sign-in?next=/app/ajuda");
+  const effective = await getEffectiveUser();
+  if (!effective) redirect("/sign-in?next=/app/ajuda");
 
   const display = buildDisplayUser({
-    name: session.user.name,
-    email: session.user.email,
+    name: effective.name,
+    email: effective.email,
   });
 
   return <HelpPage userName={display.name} userEmail={display.email} />;
