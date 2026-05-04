@@ -18,9 +18,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const inviteSchema = z.object({
   email: z.string().email("E-mail inválido"),
+  role: z.enum(["member", "admin"]),
 });
 
 type InviteValues = z.infer<typeof inviteSchema>;
@@ -31,9 +33,11 @@ interface InviteTeacherDialogProps {
 }
 
 /**
- * Convida um professor via `authClient.organization.inviteMember`. O role é
- * fixo em "member" no MVP — admin/owner ficam pra depois. Após sucesso,
- * dispara `router.refresh()` pra o server component pai re-buscar a lista.
+ * Convida alguém pra instituição via `authClient.organization.inviteMember`.
+ * O convidado escolhe entre "Professor" (member) e "Administrador" (admin) —
+ * admin ganha acesso ao painel /analytics e pode gerenciar membros e
+ * cobrança. Após sucesso, dispara `router.refresh()` pra re-buscar a lista
+ * no server component pai.
  */
 export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogProps) {
   const router = useRouter();
@@ -41,20 +45,20 @@ export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogP
 
   const form = useForm<InviteValues>({
     resolver: zodResolver(inviteSchema),
-    defaultValues: { email: "" },
+    defaultValues: { email: "", role: "member" },
   });
 
   useEffect(() => {
     if (!open) return;
     setServerError(null);
-    form.reset({ email: "" });
+    form.reset({ email: "", role: "member" });
   }, [open, form]);
 
   async function onSubmit(values: InviteValues) {
     setServerError(null);
     const res = await authClient.organization.inviteMember({
       email: values.email,
-      role: "member",
+      role: values.role,
     });
     if (res.error) {
       setServerError(
@@ -67,6 +71,8 @@ export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogP
     router.refresh();
   }
 
+  const selectedRole = form.watch("role");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -75,11 +81,11 @@ export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogP
             <span className="grid size-8 place-items-center rounded-lg bg-analytics-primary/10 text-analytics-primary">
               <UserPlus className="size-4" />
             </span>
-            Convidar professor
+            Convidar para a instituição
           </DialogTitle>
           <DialogDescription>
-            O professor recebe um e-mail com o link de aceite. Ao aceitar, ele
-            entra na instituição e passa a aparecer aqui.
+            O convidado recebe um e-mail com o link de aceite. Ao aceitar, ele
+            entra na instituição com a função escolhida.
           </DialogDescription>
         </DialogHeader>
 
@@ -89,12 +95,12 @@ export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogP
           noValidate
         >
           <div className="flex flex-col gap-2">
-            <Label htmlFor="invite-email">E-mail do professor</Label>
+            <Label htmlFor="invite-email">E-mail</Label>
             <Input
               id="invite-email"
               type="email"
               autoComplete="off"
-              placeholder="professor@escola.com.br"
+              placeholder="contato@escola.com.br"
               autoFocus
               aria-invalid={form.formState.errors.email ? true : undefined}
               {...form.register("email")}
@@ -105,6 +111,52 @@ export function InviteTeacherDialog({ open, onOpenChange }: InviteTeacherDialogP
               </p>
             )}
           </div>
+
+          <fieldset className="flex flex-col gap-2">
+            <Label>Função</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    value: "member",
+                    label: "Professor",
+                    hint: "Cria turmas, provas e acessa só os próprios dados.",
+                  },
+                  {
+                    value: "admin",
+                    label: "Administrador",
+                    hint: "Vê o painel da instituição, gerencia membros e cobrança.",
+                  },
+                ] as const
+              ).map((opt) => {
+                const selected = selectedRole === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() =>
+                      form.setValue("role", opt.value, {
+                        shouldValidate: true,
+                      })
+                    }
+                    className={cn(
+                      "rounded-xl border px-3 py-2.5 text-left transition-colors",
+                      selected
+                        ? "border-analytics-primary bg-analytics-primary/5"
+                        : "border-gray-100 bg-white hover:border-gray-200",
+                    )}
+                  >
+                    <div className="text-sm font-medium text-ink">
+                      {opt.label}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-gray-500">
+                      {opt.hint}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {serverError && (
             <div

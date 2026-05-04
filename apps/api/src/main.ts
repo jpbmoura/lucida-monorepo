@@ -236,6 +236,7 @@ import { KintalController } from "@/domains/kintal/presentation/kintal-controlle
 import { KintalStaffController } from "@/domains/kintal/presentation/kintal-staff-controller.js";
 import { KintalUsersController } from "@/domains/kintal/presentation/kintal-users-controller.js";
 import { KintalInstitutionsController } from "@/domains/kintal/presentation/kintal-institutions-controller.js";
+import { KintalAssistantsController } from "@/domains/kintal/presentation/kintal-assistants-controller.js";
 import { makeKintalRouter } from "@/domains/kintal/presentation/kintal-routes.js";
 import { makeRequireStaff } from "@/domains/kintal/presentation/require-staff.js";
 
@@ -938,19 +939,32 @@ export async function buildApp(): Promise<Express> {
   });
 
   // --- assistant (delegação auxiliar→professor) ---
+  // Use cases compartilhados entre o controller do /analytics (org admin)
+  // e o do Kintal (staff) — só muda quem chama e como o orgId é resolvido.
+  const createAssistantUseCase = new CreateAssistantUseCase(
+    teacherAssistantsRepository,
+    orgMembersRepository,
+    auth,
+    authDb,
+  );
+  const listAssistantsForTeacherUseCase = new ListAssistantsForTeacherUseCase(
+    teacherAssistantsRepository,
+  );
+  const revokeAssistantUseCase = new RevokeAssistantUseCase(
+    teacherAssistantsRepository,
+  );
   const assistantController = new AssistantController({
     listTeachers: new ListTeachersForAssistantUseCase(teacherAssistantsRepository),
     selectTarget: new SelectAssistantTargetUseCase(teacherAssistantsRepository),
-    createAssistant: new CreateAssistantUseCase(
-      teacherAssistantsRepository,
-      orgMembersRepository,
-      auth,
-      authDb,
-    ),
-    listAssistantsForTeacher: new ListAssistantsForTeacherUseCase(
-      teacherAssistantsRepository,
-    ),
-    revokeAssistant: new RevokeAssistantUseCase(teacherAssistantsRepository),
+    createAssistant: createAssistantUseCase,
+    listAssistantsForTeacher: listAssistantsForTeacherUseCase,
+    revokeAssistant: revokeAssistantUseCase,
+  });
+  const kintalAssistantsController = new KintalAssistantsController({
+    institutions: kintalInstitutionsRepository,
+    createAssistant: createAssistantUseCase,
+    listAssistantsForTeacher: listAssistantsForTeacherUseCase,
+    revokeAssistant: revokeAssistantUseCase,
   });
 
   const routers = [
@@ -995,6 +1009,7 @@ export async function buildApp(): Promise<Express> {
       usersController: kintalUsersController,
       institutionsController: kintalInstitutionsController,
       impersonateController: kintalImpersonateController,
+      assistantsController: kintalAssistantsController,
     }),
     makeFinanceRouter({
       requireAuth,

@@ -2,13 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Loader2, Trash2, User, UserPlus, Users } from "lucide-react";
+import {
+  Crown,
+  Loader2,
+  ShieldCheck,
+  Trash2,
+  User,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildDisplayUser } from "@/lib/user-display";
 import { cn } from "@/lib/utils";
 import { removeInstitutionMemberAction } from "../data";
 import type { KintalInstitutionMember } from "../types";
 import { AddMemberDialog } from "../components/add-member-dialog";
+import { MemberAssistantsDialog } from "../components/member-assistants-dialog";
 
 const ROLE_LABEL: Record<KintalInstitutionMember["role"], string> = {
   owner: "Owner",
@@ -26,6 +35,9 @@ export function MembersPanel({ orgId, members }: MembersPanelProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // ID do membro cujo dialog de auxiliares está aberto. Único por vez.
+  const [assistantsForMember, setAssistantsForMember] =
+    useState<KintalInstitutionMember | null>(null);
 
   async function handleRemove(member: KintalInstitutionMember) {
     if (member.role === "owner") return;
@@ -117,6 +129,15 @@ export function MembersPanel({ orgId, members }: MembersPanelProps) {
                     year: "numeric",
                   })}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setAssistantsForMember(m)}
+                  aria-label={`Gerenciar auxiliares de ${display.name}`}
+                  title="Gerenciar auxiliares"
+                  className="grid size-7 shrink-0 place-items-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-ink"
+                >
+                  <ShieldCheck className="size-3.5" />
+                </button>
                 {removable && (
                   <button
                     type="button"
@@ -143,6 +164,20 @@ export function MembersPanel({ orgId, members }: MembersPanelProps) {
         open={addOpen}
         onOpenChange={setAddOpen}
       />
+      {assistantsForMember && (
+        <MemberAssistantsDialog
+          orgId={orgId}
+          member={{
+            id: assistantsForMember.id,
+            name: assistantsForMember.name,
+            email: assistantsForMember.email,
+          }}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setAssistantsForMember(null);
+          }}
+        />
+      )}
     </section>
   );
 }

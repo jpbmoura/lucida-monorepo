@@ -4,6 +4,7 @@ import type { KintalStaffController } from "./kintal-staff-controller.js";
 import type { KintalUsersController } from "./kintal-users-controller.js";
 import type { KintalInstitutionsController } from "./kintal-institutions-controller.js";
 import type { KintalImpersonateController } from "./kintal-impersonate-controller.js";
+import type { KintalAssistantsController } from "./kintal-assistants-controller.js";
 
 interface MakeKintalRouterDeps {
   requireAuth: RequestHandler;
@@ -13,6 +14,7 @@ interface MakeKintalRouterDeps {
   usersController: KintalUsersController;
   institutionsController: KintalInstitutionsController;
   impersonateController: KintalImpersonateController;
+  assistantsController: KintalAssistantsController;
 }
 
 export function makeKintalRouter({
@@ -23,6 +25,7 @@ export function makeKintalRouter({
   usersController,
   institutionsController,
   impersonateController,
+  assistantsController,
 }: MakeKintalRouterDeps): Router {
   const router = Router();
   // Todas as rotas do Kintal são staff-only — encadeia requireAuth +
@@ -151,6 +154,26 @@ export function makeKintalRouter({
     requireAuth,
     requireStaff,
     impersonateController.startForInstitution,
+  );
+
+  // ─── Auxiliares por professor (gestão a partir do Kintal) ──────────
+  router.get(
+    "/api/kintal/institutions/:orgId/teachers/:teacherId/assistants",
+    requireAuth,
+    requireStaff,
+    assistantsController.list,
+  );
+  router.post(
+    "/api/kintal/institutions/:orgId/teachers/:teacherId/assistants",
+    requireAuth,
+    requireStaff,
+    assistantsController.create,
+  );
+  router.delete(
+    "/api/kintal/institutions/:orgId/assistants/:linkId",
+    requireAuth,
+    requireStaff,
+    assistantsController.revoke,
   );
 
   // ─── Impersonate (staff "vira" o user pra navegar como ele) ────────

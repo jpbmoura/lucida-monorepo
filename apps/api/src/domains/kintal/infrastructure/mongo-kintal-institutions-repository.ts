@@ -619,13 +619,18 @@ async function fetchUsersMap(
   userIds: string[],
 ): Promise<Map<string, { id: string; name: string | null; email: string }>> {
   if (userIds.length === 0) return new Map();
-  const oids = userIds
-    .map(tryObjectId)
-    .filter((o): o is ObjectId => o !== null);
-  if (oids.length === 0) return new Map();
+  // BA grava `_id` como ObjectId nativo OU como string custom (UUIDs no
+  // signup atual + ids legados do Clerk). Filtrar só por ObjectId perde
+  // todos os UUIDs — precisamos consultar pelos dois formatos.
+  const candidates: BaId[] = [];
+  for (const id of userIds) {
+    candidates.push(id);
+    const oid = tryObjectId(id);
+    if (oid) candidates.push(oid);
+  }
   const docs = await authDb
     .collection<UserDoc>("user")
-    .find({ _id: { $in: oids } })
+    .find({ _id: { $in: candidates } })
     .project<UserDoc>({ name: 1, email: 1 })
     .toArray();
   return new Map(
