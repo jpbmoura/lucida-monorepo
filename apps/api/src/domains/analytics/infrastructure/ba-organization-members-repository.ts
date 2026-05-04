@@ -111,30 +111,25 @@ export class BaOrganizationMembersRepository
     userId: string,
   ): Promise<"owner" | "admin" | "member" | null> {
     let orgOid: ObjectId;
-    let userOid: ObjectId;
     try {
       orgOid = new ObjectId(organizationId);
-      userOid = new ObjectId(userId);
     } catch {
       return null;
     }
+    // userId pode ser ObjectId nativo (BA padrão) ou string Clerk legado.
+    const userCandidates = userIdCandidates(userId);
 
     const doc = await this.authDb
       .collection<{ role?: "owner" | "admin" | "member" }>("member")
       .findOne(
-        { organizationId: orgOid, userId: userOid },
+        { organizationId: orgOid, userId: { $in: userCandidates } },
         { projection: { role: 1 } },
       );
     return doc?.role ?? null;
   }
 
   async listMembershipsByUser(userId: string): Promise<UserMembership[]> {
-    let userOid: ObjectId;
-    try {
-      userOid = new ObjectId(userId);
-    } catch {
-      return [];
-    }
+    const userCandidates = userIdCandidates(userId);
 
     const docs = await this.authDb
       .collection<{
@@ -142,7 +137,7 @@ export class BaOrganizationMembersRepository
         role?: "owner" | "admin" | "member";
         createdAt?: Date;
       }>("member")
-      .find({ userId: userOid })
+      .find({ userId: { $in: userCandidates } })
       .sort({ createdAt: 1 })
       .toArray();
 
@@ -152,6 +147,21 @@ export class BaOrganizationMembersRepository
       joinedAt: d.createdAt ?? new Date(0),
     }));
   }
+}
+
+/**
+ * Gera os candidatos a `userId` pra query no Mongo. Sempre inclui a
+ * string crua (cobre legacy Clerk) e, quando aplicável, o ObjectId
+ * (BA padrão).
+ */
+function userIdCandidates(userId: string): Array<ObjectId | string> {
+  const candidates: Array<ObjectId | string> = [userId];
+  try {
+    candidates.push(new ObjectId(userId));
+  } catch {
+    // userId não é hex de 24 — só a string crua é candidata.
+  }
+  return candidates;
 }
 
 /**

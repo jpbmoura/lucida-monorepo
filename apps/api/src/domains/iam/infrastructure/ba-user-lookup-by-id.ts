@@ -5,23 +5,32 @@ import type {
 } from "../application/ports/user-lookup.js";
 
 /**
- * Impl de `UserLookupById` em cima do BA MongoDB. Convenção de IDs do
- * BA: `_id` é ObjectId nativo no banco; aceita string hex como input
- * e converte. Retorna `null` quando id é inválido ou não existe.
+ * Impl de `UserLookupById` em cima do BA MongoDB. IDs do BA são
+ * normalmente ObjectId nativo (mongodbAdapter padrão), mas users
+ * migrados do Clerk preservaram o id legado como string custom — então
+ * tentamos os dois formatos no `_id`. Retorna `null` quando não existe.
  */
 export class BaUserLookupById implements UserLookupById {
   constructor(private readonly authDb: Db) {}
 
   async findById(userId: string): Promise<UserBasicInfo | null> {
-    let oid: ObjectId;
+    const candidates: Array<ObjectId | string> = [userId];
     try {
-      oid = new ObjectId(userId);
+      const oid = new ObjectId(userId);
+      candidates.push(oid);
     } catch {
-      return null;
+      // userId não é hex de 24 — string crua já é o único candidato.
     }
     const doc = await this.authDb
-      .collection<{ _id: ObjectId; name?: string; email?: string }>("user")
-      .findOne({ _id: oid }, { projection: { name: 1, email: 1 } });
+      .collection<{
+        _id: ObjectId | string;
+        name?: string;
+        email?: string;
+      }>("user")
+      .findOne(
+        { _id: { $in: candidates } },
+        { projection: { name: 1, email: 1 } },
+      );
     if (!doc) return null;
     return {
       id: String(doc._id),
