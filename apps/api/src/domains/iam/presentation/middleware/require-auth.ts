@@ -234,6 +234,27 @@ export function makeRequireAuth(
         }
       }
 
+      // Fallback final: usuário comum sem `activeOrganizationId` na sessão
+      // BA, mas que é member de alguma instituição. Sem isso, o
+      // BillingService cai no caminho de carteira pessoal e ignora regras
+      // institucionais (`unlimited`, `pool`, `pay_per_use`) — o professor
+      // recebe "sem créditos" mesmo quando a instituição cobre o consumo.
+      //
+      // Roda DEPOIS dos blocos de impersonate pra não interferir com
+      // overrides explícitos. Em caso de múltiplas memberships, pega a
+      // primeira por `joinedAt asc` (mesma heurística do staff impersonate).
+      if (!activeOrganizationId && orgMembers) {
+        try {
+          const memberships =
+            await orgMembers.listMembershipsByUser(userId);
+          if (memberships.length > 0) {
+            activeOrganizationId = memberships[0]!.organizationId;
+          }
+        } catch {
+          // best-effort — falha de lookup não bloqueia auth.
+        }
+      }
+
       req.auth = {
         userId,
         email,
