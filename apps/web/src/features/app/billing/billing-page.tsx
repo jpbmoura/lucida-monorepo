@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime, formatTimeUntil } from "@/lib/relative-time";
+import type { InstitutionalBillingContext, OrgBillingMode } from "@/lib/active-organization";
 import type {
   BalanceDTO,
   CreditSource,
@@ -21,6 +22,7 @@ import { PlanCard } from "./components/plan-card";
 import { CheckoutSuccessBanner } from "./components/checkout-success-banner";
 import { TopupsSection } from "./components/topups-section";
 import { InvoicesSection } from "./components/invoices-section";
+import { InstitutionalBillingBanner } from "./components/institutional-billing-banner";
 
 interface BillingPageProps {
   balance: BalanceDTO;
@@ -28,6 +30,16 @@ interface BillingPageProps {
   subscription: CurrentSubscriptionDTO | null;
   invoices: InvoiceListItemDTO[];
   checkoutSuccess: boolean;
+  /**
+   * Contexto de cobrança institucional. `null` = professor avulso, mostra
+   * UI normal (saldo, plano, topups, faturas). Quando preenchido, troca a
+   * UI por uma versão institucional — banner contextual + ledger pra
+   * auditoria.
+   */
+  institutionalContext: InstitutionalBillingContext | null;
+  /** Necessário pro banner escolher ícone e tom — só preenchido junto
+   *  com `institutionalContext`. */
+  billingMode: OrgBillingMode | null;
 }
 
 export function BillingPage({
@@ -36,7 +48,14 @@ export function BillingPage({
   subscription,
   invoices,
   checkoutSuccess,
+  institutionalContext,
+  billingMode,
 }: BillingPageProps) {
+  const showInstitutional =
+    institutionalContext !== null &&
+    institutionalContext.hidePersonalWallet &&
+    billingMode !== null;
+
   return (
     <div className="mx-auto w-full px-5 py-8 md:px-10">
       <header className="mb-8">
@@ -45,27 +64,48 @@ export function BillingPage({
           Créditos e plano
         </div>
         <h1 className="text-3xl font-medium leading-tight tracking-tighter text-ink md:text-4xl">
-          Saldo e{" "}
-          <span className="font-serif font-normal italic text-brand-primary">
-            assinatura
-          </span>
+          {showInstitutional ? (
+            <>
+              Cobertura{" "}
+              <span className="font-serif font-normal italic text-brand-primary">
+                institucional
+              </span>
+            </>
+          ) : (
+            <>
+              Saldo e{" "}
+              <span className="font-serif font-normal italic text-brand-primary">
+                assinatura
+              </span>
+            </>
+          )}
         </h1>
         <p className="mt-2 max-w-xl text-[15px] text-gray-500">
-          Você paga pelo que a IA faz por você. Cada ação consome créditos
-          proporcionais ao material e à complexidade.
+          {showInstitutional
+            ? "Sua instituição cobre os créditos que você consome. Abaixo, o histórico das suas ações pra auditoria."
+            : "Você paga pelo que a IA faz por você. Cada ação consome créditos proporcionais ao material e à complexidade."}
         </p>
       </header>
 
-      {checkoutSuccess && <CheckoutSuccessBanner />}
+      {checkoutSuccess && !showInstitutional && <CheckoutSuccessBanner />}
 
-      <section className="mb-10 grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
-        <BalanceHero total={balance.total} breakdown={balance.breakdown} />
-        <PlanCard subscription={subscription} />
-      </section>
+      {showInstitutional ? (
+        <InstitutionalBillingBanner
+          context={institutionalContext}
+          mode={billingMode}
+        />
+      ) : (
+        <>
+          <section className="mb-10 grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
+            <BalanceHero total={balance.total} breakdown={balance.breakdown} />
+            <PlanCard subscription={subscription} />
+          </section>
 
-      <TopupsSection />
+          <TopupsSection />
 
-      <InvoicesSection items={invoices} />
+          <InvoicesSection items={invoices} />
+        </>
+      )}
 
       <section className="mb-4">
         <header className="mb-5 flex flex-col gap-1">
@@ -73,10 +113,12 @@ export function BillingPage({
             Histórico
           </div>
           <h2 className="text-2xl font-medium tracking-tight text-ink">
-            Últimas transações
+            {showInstitutional ? "Suas ações" : "Últimas transações"}
           </h2>
           <p className="text-sm text-gray-500">
-            Cada linha é uma entrada no seu ledger — imutável e auditável.
+            {showInstitutional
+              ? "Cada linha é uma ação sua descontada da cobertura institucional — imutável e auditável."
+              : "Cada linha é uma entrada no seu ledger — imutável e auditável."}
           </p>
         </header>
         <LedgerTable items={ledger} />

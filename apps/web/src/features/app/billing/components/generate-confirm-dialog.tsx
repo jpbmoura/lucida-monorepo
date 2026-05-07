@@ -31,9 +31,9 @@ interface GenerateConfirmDialogProps {
  * Mostrado antes de gerar prova. Duas variantes:
  *
  *   - Professor avulso: busca saldo pessoal e pré-valida contra a estimativa.
- *   - Professor institucional em pool/pay_per_use: esconde saldo pessoal
- *     (não é fonte do débito), mostra "Pago pela instituição". O check real
- *     continua no backend — aqui é só transparência.
+ *   - Professor institucional em pool/pay_per_use/unlimited: esconde saldo
+ *     pessoal (não é fonte do débito), mostra "Pago pela instituição". O
+ *     check real continua no backend — aqui é só transparência.
  *
  * Quando a estimativa falha (estimate=null, !estimateLoading) ou está
  * carregando, não bloqueamos por saldo — o backend faz o check definitivo.
@@ -67,7 +67,9 @@ export function GenerateConfirmDialog({
         if (canceled) return;
         setBalance(balanceBody?.data?.total ?? null);
         const mode = orgBody?.data?.billingMode ?? null;
-        setOrgPays(mode === "pool" || mode === "pay_per_use");
+        setOrgPays(
+          mode === "pool" || mode === "pay_per_use" || mode === "unlimited",
+        );
       })
       .finally(() => {
         if (!canceled) setLoading(false);
