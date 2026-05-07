@@ -139,7 +139,7 @@ export function makeIamRouter(
 }
 
 interface UserDoc {
-  _id: ObjectId | string;
+  _id: ObjectId;
   id?: string;
   email: string;
   name?: string | null;
@@ -180,19 +180,15 @@ async function loadUser(
     })
   | null
 > {
-  // `_id` pode ser ObjectId nativo (BA padrão) ou string custom (legacy
-  // Clerk migrado preservou o id). Tentar só ObjectId silenciosamente
-  // perde users migrados — `/v1/me` em modo auxiliar fica sem dados do
-  // teacher e o handler cai no `session.user` (auxiliar) por engano.
-  const candidates: Array<ObjectId | string> = [userId];
+  let oid: ObjectId;
   try {
-    candidates.push(new ObjectId(userId));
+    oid = new ObjectId(userId);
   } catch {
-    // userId não é hex de 24 — só a string crua é candidata.
+    return null;
   }
   const doc = (await authDb
     .collection<UserDoc>("user")
-    .findOne({ _id: { $in: candidates } })) as UserDoc | null;
+    .findOne({ _id: oid })) as UserDoc | null;
   if (!doc) return null;
   return {
     id: String(doc._id),

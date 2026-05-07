@@ -118,23 +118,12 @@ export class MongoAudienceResolver implements AudienceResolver {
   private async findUserById(
     userId: string,
   ): Promise<{ id: string; email?: string } | null> {
-    const collection = this.authDb.collection<{
-      _id: ObjectId | string;
-      id?: string;
-      email?: string;
-    }>("user");
-    // BA mongodb adapter: `_id` em ObjectId, `id` (lógico) raramente.
-    if (ObjectId.isValid(userId)) {
-      const doc = await collection.findOne({
-        _id: new ObjectId(userId),
-      });
-      if (doc) return { id: String(doc._id), email: doc.email };
-    }
-    const byLogical = await collection.findOne({ id: userId });
-    if (byLogical) {
-      return { id: String(byLogical._id), email: byLogical.email };
-    }
-    return null;
+    if (!ObjectId.isValid(userId)) return null;
+    const doc = await this.authDb
+      .collection<{ _id: ObjectId; email?: string }>("user")
+      .findOne({ _id: new ObjectId(userId) });
+    if (!doc) return null;
+    return { id: String(doc._id), email: doc.email };
   }
 
   private async findOrgById(

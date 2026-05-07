@@ -42,27 +42,16 @@ interface OrganizationDoc {
   archivedAt?: Date | null;
 }
 
-/**
- * Users e memberships podem ter `_id`/`userId` em dois formatos:
- * - ObjectId nativo (default do mongodbAdapter do BetterAuth).
- * - string custom (users migrados do Clerk preservaram o id legado).
- *
- * Tipamos como união pra refletir o que vem do banco e evitar coerção
- * cega via `new ObjectId(x)` — que estoura BSONError quando x não é
- * hex de 24 caracteres.
- */
-type BaId = ObjectId | string;
-
 interface MemberDoc {
-  _id: BaId;
-  organizationId: BaId;
-  userId: BaId;
+  _id: ObjectId;
+  organizationId: ObjectId;
+  userId: ObjectId;
   role?: "owner" | "admin" | "member";
   createdAt?: Date;
 }
 
 interface UserDoc {
-  _id: BaId;
+  _id: ObjectId;
   name?: string | null;
   email?: string;
 }
@@ -297,11 +286,8 @@ export class MongoKintalInstitutionsRepository
     }
 
     // 1. Resolve o owner: reusa user existente sem org, ou cria um novo.
-    //    `ownerId` é mantido no formato nativo do banco (ObjectId ou
-    //    string Clerk legacy) — não tentamos `new ObjectId(...)` porque
-    //    users migrados podem ter id custom.
     const existingUser = await this.users.findOne({ email: input.ownerEmail });
-    let ownerId: BaId;
+    let ownerId: ObjectId;
     let ownerExisted: boolean;
     if (existingUser) {
       const hasOrg = await this.userHasMembership(existingUser._id);
@@ -392,7 +378,7 @@ export class MongoKintalInstitutionsRepository
       email: input.userEmail,
     });
 
-    let userId: BaId;
+    let userId: ObjectId;
     let userExisted: boolean;
     if (existingUser) {
       // Regra "1 user = 1 org" — se já tem alguma membership, recusa
@@ -494,18 +480,16 @@ export class MongoKintalInstitutionsRepository
   // ─── helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Busca um user pelo id em string vindo do path/HTTP. Tenta tanto
-   * ObjectId (formato BA padrão) quanto string crua (legacy Clerk).
-   * Retorna o doc com `_id` no formato real do banco.
+   * Busca um user pelo id em string vindo do path/HTTP. `_id` é sempre
+   * ObjectId nativo do BA — input não-hex retorna null direto.
    */
   private async findUserByPublicId(idStr: string): Promise<UserDoc | null> {
-    const candidates: BaId[] = [idStr];
     const oid = tryObjectId(idStr);
-    if (oid) candidates.push(oid);
-    return this.users.findOne({ _id: { $in: candidates } });
+    if (!oid) return null;
+    return this.users.findOne({ _id: oid });
   }
 
-  private async userHasMembership(userId: BaId): Promise<boolean> {
+  private async userHasMembership(userId: ObjectId): Promise<boolean> {
     const found = await this.members.findOne({ userId });
     return found !== null;
   }
@@ -520,7 +504,7 @@ export class MongoKintalInstitutionsRepository
     email: string;
     name: string;
     password: string;
-  }): Promise<BaId> {
+  }): Promise<ObjectId> {
     try {
       await this.auth.api.signUpEmail({
         body: {
@@ -619,18 +603,12 @@ async function fetchUsersMap(
   userIds: string[],
 ): Promise<Map<string, { id: string; name: string | null; email: string }>> {
   if (userIds.length === 0) return new Map();
-  // BA grava `_id` como ObjectId nativo OU como string custom (UUIDs no
-  // signup atual + ids legados do Clerk). Filtrar só por ObjectId perde
-  // todos os UUIDs — precisamos consultar pelos dois formatos.
-  const candidates: BaId[] = [];
-  for (const id of userIds) {
-    candidates.push(id);
-    const oid = tryObjectId(id);
-    if (oid) candidates.push(oid);
-  }
+  const oids = userIds
+    .map((id) => tryObjectId(id))
+    .filter((o): o is ObjectId => o !== null);
   const docs = await authDb
     .collection<UserDoc>("user")
-    .find({ _id: { $in: candidates } })
+    .find({ _id: { $in: oids } })
     .project<UserDoc>({ name: 1, email: 1 })
     .toArray();
   return new Map(

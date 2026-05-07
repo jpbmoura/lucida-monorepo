@@ -1,6 +1,6 @@
 // Helpers compartilhados pelas fases. Todos puros, sem side effects.
 
-import { randomUUID } from "node:crypto";
+import { ObjectId } from "mongodb";
 
 export interface PhaseCounts {
   processed: number;
@@ -32,8 +32,15 @@ export function legacyIdToString(raw: unknown): string {
   return String(raw);
 }
 
+/**
+ * Gera id de user/exam/student/etc no formato BA-nativo (ObjectId hex de
+ * 24 chars). A migração legacy original usava `randomUUID()` aqui e
+ * gerou ~3.6k users com `_id` em formato UUID, o que quebrava todo
+ * lookup feito via `new ObjectId(_id)`. Depois da normalização one-shot
+ * em `normalize-legacy-user-ids/`, voltamos pro formato canônico do BA.
+ */
 export function newId(): string {
-  return randomUUID();
+  return new ObjectId().toHexString();
 }
 
 // ────────────────────────────────────────────────────────────────────────────

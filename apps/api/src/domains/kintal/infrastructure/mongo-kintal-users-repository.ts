@@ -153,7 +153,7 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
   }
 
   async findById(userId: string): Promise<KintalUserDetail | null> {
-    const row = await findOneByLogicalOrPrimaryId(this.users, userId);
+    const row = await findOneByPrimaryId(this.users, userId);
     if (!row) return null;
 
     const id = baUserId(row);
@@ -276,23 +276,8 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
     const update: Record<string, unknown> = { $set: set };
     if (Object.keys(unset).length > 0) update.$unset = unset;
 
-    const byLogicalId = await this.users.updateOne(
-      { id: userId } as Filter<Record<string, unknown>>,
-      update,
-    );
-    if (byLogicalId.matchedCount > 0) return;
-
-    if (ObjectId.isValid(userId)) {
-      const oid = new ObjectId(userId);
-      const byOid = await this.users.updateOne(
-        { _id: oid } as unknown as Filter<Record<string, unknown>>,
-        update,
-      );
-      if (byOid.matchedCount > 0) return;
-    }
-
     await this.users.updateOne(
-      { _id: userId } as unknown as Filter<Record<string, unknown>>,
+      { _id: new ObjectId(userId) } as unknown as Filter<Record<string, unknown>>,
       update,
     );
   }
@@ -304,34 +289,12 @@ function baUserId(row: BaUserDoc): string {
   return row.id ?? String(row._id);
 }
 
-async function findOneByLogicalOrPrimaryId(
+async function findOneByPrimaryId(
   collection: ReturnType<Db["collection"]>,
   userId: string,
 ): Promise<BaUserDoc | null> {
-  // Tenta o campo lógico `id` primeiro — algumas versões do BA mongodb
-  // adapter mantêm um espelho string desse campo separado do `_id`.
-  const byLogical = (await collection.findOne({
-    id: userId,
-  } as Filter<Record<string, unknown>>)) as unknown as BaUserDoc | null;
-  if (byLogical) return byLogical;
-
-  // BA mongodb adapter atual guarda `_id` como ObjectId nativo. A API
-  // expõe o hex (via `String(_id)`) — pra rebuscar precisamos casar de
-  // volta. Falhamos silenciosamente em ids não-hex (ex: legacy).
-  if (ObjectId.isValid(userId)) {
-    const oid = new ObjectId(userId);
-    const byOid = (await collection.findOne({
-      _id: oid,
-    } as unknown as Filter<Record<string, unknown>>)) as unknown as
-      | BaUserDoc
-      | null;
-    if (byOid) return byOid;
-  }
-
-  // Último fallback: adapters antigos/seed scripts que guardam `_id` como
-  // string crua.
   return (await collection.findOne({
-    _id: userId,
+    _id: new ObjectId(userId),
   } as unknown as Filter<Record<string, unknown>>)) as unknown as BaUserDoc | null;
 }
 
@@ -600,24 +563,13 @@ async function fetchUserOrganizations(
   authDb: Db,
   userId: string,
 ): Promise<KintalUserOrgInfo[]> {
-  // `member.userId` pode estar como ObjectId nativo (users criados via BA)
-  // ou string crua (users migrados do Clerk preservaram o id legado).
-  // Consulta os dois formatos pra cobrir ambos — mesmo padrão do
-  // `findUserByPublicId` em mongo-kintal-institutions-repository.ts.
-  const candidates: Array<ObjectId | string> = [userId];
-  try {
-    candidates.push(new ObjectId(userId));
-  } catch {
-    // userId não é hex válido de 24 chars — só a forma string serve.
-  }
-
   const memberDocs = await authDb
     .collection<{
       organizationId: ObjectId;
       role?: "owner" | "admin" | "member";
       createdAt?: Date;
     }>("member")
-    .find({ userId: { $in: candidates } })
+    .find({ userId: new ObjectId(userId) })
     .toArray();
   if (memberDocs.length === 0) return [];
 

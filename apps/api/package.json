@@ -15,6 +15,7 @@
     "migrate:legacy": "tsx scripts/migrate-from-legacy/index.ts",
     "migrate:legacy-rename": "tsx scripts/rename-legacy-collections/index.ts",
     "migrate:billing-scope": "tsx scripts/migrate-billing-scope/index.ts",
+    "migrate:normalize-user-ids": "tsx scripts/normalize-legacy-user-ids/index.ts",
     "seed:test-org": "tsx scripts/seed-test-org/index.ts",
     "seed:roadmap": "tsx scripts/seed-roadmap/index.ts",
     "backfill:student-org": "tsx scripts/backfill-student-org/index.ts",

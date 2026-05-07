@@ -1,3 +1,4 @@
+import { ObjectId } from "mongodb";
 import {
   bumpExtra,
   coerceDate,
@@ -124,8 +125,12 @@ export async function runUsersPhase(ctx: MigrationContext): Promise<void> {
       const updatedAt = coerceDate(legacy.updatedAt, createdAt);
 
       if (!ctx.dryRun) {
+        // `_id` precisa ser ObjectId nativo (não string hex) — senão BA
+        // armazena como string e quebra todo lookup `new ObjectId(_id)`.
+        // O `userMap` segue guardando o hex em string pra alimentar FKs
+        // de outras fases, que são `type: String` nos schemas Mongoose.
         await baCol.insertOne({
-          _id: baId as unknown as never,
+          _id: new ObjectId(baId) as unknown as never,
           id: baId,
           email,
           emailVerified: !isSynthetic,
