@@ -105,13 +105,19 @@ export function makeIamRouter(
             (effective.addressStateUf as string | null | undefined) ?? null,
           addressCountry:
             (effective.addressCountry as string | null | undefined) ?? null,
-          // Estado do modo auxiliar — frontend usa pra banner + bloqueios
-          // de UI (não permitir compras, etc).
+          // Estado do modo auxiliar — frontend usa pra banner. `realUser`
+          // carrega o nome+email do auxiliar real (session.user), não do
+          // professor que ele está atuando — o banner mostra "Você
+          // (auxiliar) está acessando a conta de (professor)".
           assistantMode: ctx.isAssistant,
           realUser: ctx.isAssistant
             ? {
                 id: ctx.realUserId,
                 email: ctx.realEmail,
+                name:
+                  typeof session.user.name === "string"
+                    ? session.user.name
+                    : "",
               }
             : null,
         },
@@ -133,7 +139,7 @@ export function makeIamRouter(
 }
 
 interface UserDoc {
-  _id: ObjectId;
+  _id: ObjectId | string;
   id?: string;
   email: string;
   name?: string | null;
@@ -174,15 +180,19 @@ async function loadUser(
     })
   | null
 > {
-  let oid: ObjectId;
+  // `_id` pode ser ObjectId nativo (BA padrão) ou string custom (legacy
+  // Clerk migrado preservou o id). Tentar só ObjectId silenciosamente
+  // perde users migrados — `/v1/me` em modo auxiliar fica sem dados do
+  // teacher e o handler cai no `session.user` (auxiliar) por engano.
+  const candidates: Array<ObjectId | string> = [userId];
   try {
-    oid = new ObjectId(userId);
+    candidates.push(new ObjectId(userId));
   } catch {
-    return null;
+    // userId não é hex de 24 — só a string crua é candidata.
   }
   const doc = (await authDb
     .collection<UserDoc>("user")
-    .findOne({ _id: oid })) as UserDoc | null;
+    .findOne({ _id: { $in: candidates } })) as UserDoc | null;
   if (!doc) return null;
   return {
     id: String(doc._id),

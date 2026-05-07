@@ -5,6 +5,13 @@ export interface AssistantTargetSummary {
   teacherUserId: string;
   teacherName: string | null;
   teacherEmail: string;
+  /**
+   * Dados do **próprio auxiliar** (real user). Usado no banner pra deixar
+   * claro que ele está atuando em outra conta — "Você (X) está acessando
+   * a conta de (Y)".
+   */
+  assistantName: string | null;
+  assistantEmail: string;
 }
 
 export interface AssistantState {
@@ -40,17 +47,25 @@ export async function fetchAssistantState(): Promise<AssistantState> {
         id: string;
         name?: string;
         email: string;
+        realUser?: {
+          id: string;
+          email: string;
+          name?: string;
+        } | null;
       };
     }>("/v1/me").catch(() => null),
   ]);
 
   let activeTarget: AssistantTargetSummary | null = null;
-  if (me?.data.assistantMode) {
-    // /v1/me em assistantMode devolve dados do EFFECTIVE user (professor).
+  if (me?.data.assistantMode && me.data.realUser) {
+    // /v1/me em assistantMode devolve dados do EFFECTIVE user (professor)
+    // no topo, e os dados do auxiliar real em `realUser`.
     activeTarget = {
       teacherUserId: me.data.id,
       teacherName: me.data.name ?? null,
       teacherEmail: me.data.email,
+      assistantName: me.data.realUser.name ?? null,
+      assistantEmail: me.data.realUser.email,
     };
   }
 

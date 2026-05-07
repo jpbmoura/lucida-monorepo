@@ -7,17 +7,22 @@ import { Repeat, ShieldCheck } from "lucide-react";
 interface Props {
   teacherName: string | null;
   teacherEmail: string;
+  assistantName: string | null;
+  assistantEmail: string;
   canSwitch: boolean;
 }
 
 /**
  * Banner persistente no topo do /app quando a sessão é de um auxiliar.
- * Reforça contexto ("você está atuando como X") e dá saída rápida pro
- * seletor.
+ * Reforça o contexto ("Você [auxiliar] está acessando a conta de
+ * [professor]") e deixa explícito que a auditoria registra o auxiliar,
+ * não o professor.
  */
 export function AssistantBanner({
   teacherName,
   teacherEmail,
+  assistantName,
+  assistantEmail,
   canSwitch,
 }: Props) {
   const router = useRouter();
@@ -42,11 +47,15 @@ export function AssistantBanner({
         <div className="flex items-center gap-2 text-sm text-amber-900">
           <ShieldCheck className="size-4" />
           <span>
-            Você está logado como auxiliar de{" "}
+            Você (
+            <strong className="font-semibold">
+              {assistantName ?? assistantEmail}
+            </strong>
+            ) está acessando a conta de{" "}
             <strong className="font-semibold">
               {teacherName ?? teacherEmail}
             </strong>
-            . Tudo que fizer fica registrado em nome do professor.
+            . Suas alterações ficam registradas em seu nome.
           </span>
         </div>
         {canSwitch && (

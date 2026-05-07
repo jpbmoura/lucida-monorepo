@@ -62,6 +62,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <AssistantBanner
             teacherName={assistant.activeTarget.teacherName}
             teacherEmail={assistant.activeTarget.teacherEmail}
+            assistantName={assistant.activeTarget.assistantName}
+            assistantEmail={assistant.activeTarget.assistantEmail}
             canSwitch={assistant.availableTeachers > 1}
           />
         )}
