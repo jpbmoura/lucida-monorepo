@@ -30,7 +30,9 @@ export function impersonateOrgCookieAttributes(input: {
     sameSite: "lax",
     secure: input.isProduction,
     path: "/",
-    maxAge: IMPERSONATE_ORG_TTL_SECONDS,
+    // Express `res.cookie` espera `maxAge` em **milissegundos**.
+    // Converte aqui pra manter o constant em segundos (mais legível).
+    maxAge: IMPERSONATE_ORG_TTL_SECONDS * 1000,
   };
 }
 

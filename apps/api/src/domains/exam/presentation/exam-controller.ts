@@ -12,8 +12,6 @@ import type { GetExamUseCase } from "../application/get-exam.js";
 import type { UpdateExamUseCase } from "../application/update-exam.js";
 import type { DeleteExamUseCase } from "../application/delete-exam.js";
 import type { ExportExamDocxUseCase } from "../application/export-exam-docx.js";
-import { ExamNotFoundError } from "../domain/exam-errors.js";
-import { ExamModel } from "../infrastructure/exam-schema.js";
 
 interface Deps {
   createExam: CreateExamUseCase;
@@ -69,22 +67,6 @@ export class ExamController {
       });
       res.json({ data: exam });
     } catch (err) {
-      // [ASSIST-DEBUG] log temporário — remove após diagnosticar 404 intermitente.
-      if (err instanceof ExamNotFoundError) {
-        try {
-          const { id } = examIdParam.parse(req.params);
-          const raw = await ExamModel.findById(id).lean<{
-            _id: unknown;
-            ownerId?: string;
-            classId?: string;
-          }>();
-          console.log(
-            `[ASSIST-DEBUG] exam-404 examId=${id} examExists=${raw !== null} examOwnerId=${raw?.ownerId ?? "(none)"} reqUserId=${req.auth?.userId} reqRealUserId=${req.auth?.realUserId} isAssistant=${req.auth?.isAssistant}`,
-          );
-        } catch {
-          // ignora — log é best-effort.
-        }
-      }
       next(err);
     }
   };

@@ -130,28 +130,13 @@ export function makeRequireAuth(
       // um auxiliar não tem porque ter cookie de impersonate, e os dois
       // caminhos não se misturam. Se o cookie do auxiliar resolve um
       // vínculo válido, paramos por aqui.
-      // [ASSIST-DEBUG] log temporário — remover após diagnosticar 404 intermitente.
-      const assistDebugPath = req.url ?? "";
-      const assistDebugIsTrackedRoute =
-        assistDebugPath.includes("/v1/exams/") ||
-        assistDebugPath.includes("/v1/classes/");
       if (teacherAssistants && secret) {
         const targetTeacherId = readAssistantTarget(req, secret);
-        if (assistDebugIsTrackedRoute) {
-          console.log(
-            `[ASSIST-DEBUG] cookie-read path=${assistDebugPath} realUserId=${realUserId} cookieTeacherId=${targetTeacherId ?? "(none)"} cookiePresent=${targetTeacherId !== null}`,
-          );
-        }
         if (targetTeacherId && targetTeacherId !== realUserId) {
           const link = await teacherAssistants.findActiveLink({
             assistantUserId: realUserId,
             teacherUserId: targetTeacherId,
           });
-          if (assistDebugIsTrackedRoute) {
-            console.log(
-              `[ASSIST-DEBUG] link-lookup path=${assistDebugPath} linkFound=${link !== null} linkTeacherUserId=${link?.teacherUserId ?? "(null)"}`,
-            );
-          }
           if (link) {
             userId = link.teacherUserId;
             // Override pra que BillingTargetResolver mande pro scope=org
@@ -174,11 +159,6 @@ export function makeRequireAuth(
             isAssistant = true;
           }
         }
-      }
-      if (assistDebugIsTrackedRoute) {
-        console.log(
-          `[ASSIST-DEBUG] resolved path=${assistDebugPath} userId=${userId} realUserId=${realUserId} isAssistant=${isAssistant}`,
-        );
       }
 
       // Impersonate de staff (Kintal) — tem precedência sobre o de org

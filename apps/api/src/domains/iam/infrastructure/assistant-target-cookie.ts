@@ -29,7 +29,9 @@ export function assistantTargetCookieAttributes(input: {
     sameSite: "lax",
     secure: input.isProduction,
     path: "/",
-    maxAge: ASSISTANT_TARGET_TTL_SECONDS,
+    // Express `res.cookie` espera `maxAge` em **milissegundos**.
+    // Converte aqui pra manter o constant em segundos (mais legível).
+    maxAge: ASSISTANT_TARGET_TTL_SECONDS * 1000,
   };
 }
 
