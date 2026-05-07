@@ -9,6 +9,8 @@ import type { ListClassesUseCase } from "../application/list-classes.js";
 import type { GetClassUseCase } from "../application/get-class.js";
 import type { UpdateClassUseCase } from "../application/update-class.js";
 import type { DeleteClassUseCase } from "../application/delete-class.js";
+import { ClassNotFoundError } from "../domain/class-errors.js";
+import { ClassModel } from "../infrastructure/class-schema.js";
 
 interface Deps {
   createClass: CreateClassUseCase;
@@ -53,6 +55,22 @@ export class ClassController {
       });
       res.json({ data: result });
     } catch (err) {
+      // [ASSIST-DEBUG] log temporário — remove após diagnosticar 404 intermitente.
+      if (err instanceof ClassNotFoundError) {
+        try {
+          const { id } = classIdParam.parse(req.params);
+          const raw = await ClassModel.findById(id).lean<{
+            _id: unknown;
+            ownerId?: string;
+            name?: string;
+          }>();
+          console.log(
+            `[ASSIST-DEBUG] class-404 classId=${id} classExists=${raw !== null} classOwnerId=${raw?.ownerId ?? "(none)"} reqUserId=${req.auth?.userId} reqRealUserId=${req.auth?.realUserId} isAssistant=${req.auth?.isAssistant}`,
+          );
+        } catch {
+          // ignora — log é best-effort.
+        }
+      }
       next(err);
     }
   };
