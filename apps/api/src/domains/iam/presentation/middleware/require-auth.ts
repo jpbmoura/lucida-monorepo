@@ -39,9 +39,10 @@ export interface AuthContext {
   isImpersonating: boolean;
   /**
    * True quando a sessão é de um auxiliar atendendo um professor (modo
-   * "atuação delegada"). Implica `isImpersonating: true`. Distingue do
-   * impersonate de admin org via cookie pra que `denyAssistant` consiga
-   * bloquear ações sensíveis sem afetar admins.
+   * "atuação delegada"). Implica `isImpersonating: true`. Auxiliares
+   * têm acesso total à conta do professor — a flag fica disponível
+   * pra UI exibir o badge "Visualizando como X" e diferenciar do
+   * impersonate de admin org via cookie.
    */
   isAssistant: boolean;
   sessionId: string;

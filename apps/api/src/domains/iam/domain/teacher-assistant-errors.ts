@@ -27,15 +27,6 @@ export class AssistantAlreadyLinkedError extends DomainError {
   }
 }
 
-/** Email do auxiliar já está em uso por outro user. */
-export class AssistantEmailTakenError extends DomainError {
-  readonly code = "ASSISTANT_EMAIL_TAKEN";
-  readonly statusCode = 409;
-  constructor(email: string) {
-    super(`O email ${email} já está cadastrado.`);
-  }
-}
-
 /** Professor alvo não pertence à org. */
 export class TeacherNotInOrganizationError extends DomainError {
   readonly code = "TEACHER_NOT_IN_ORGANIZATION";
@@ -49,19 +40,6 @@ export class InvalidAssistantInputError extends DomainError {
   readonly code = "INVALID_ASSISTANT_INPUT";
   readonly statusCode = 400;
   constructor(message: string) {
-    super(message);
-  }
-}
-
-/**
- * Auxiliares não podem executar essa ação — ex.: comprar créditos,
- * trocar senha, gerenciar outros auxiliares. Bloqueio aplicado por
- * middleware `denyAssistant`.
- */
-export class AssistantActionForbiddenError extends DomainError {
-  readonly code = "ASSISTANT_ACTION_FORBIDDEN";
-  readonly statusCode = 403;
-  constructor(message = "Esta ação não está disponível para auxiliares.") {
     super(message);
   }
 }

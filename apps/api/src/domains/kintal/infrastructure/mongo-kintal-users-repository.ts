@@ -600,13 +600,15 @@ async function fetchUserOrganizations(
   authDb: Db,
   userId: string,
 ): Promise<KintalUserOrgInfo[]> {
-  // BA guarda `member.userId` como ObjectId nativo. Se o user veio com
-  // logical id (raro em multi-adapter), o cast falha → sem orgs.
-  let userOid: ObjectId;
+  // `member.userId` pode estar como ObjectId nativo (users criados via BA)
+  // ou string crua (users migrados do Clerk preservaram o id legado).
+  // Consulta os dois formatos pra cobrir ambos — mesmo padrão do
+  // `findUserByPublicId` em mongo-kintal-institutions-repository.ts.
+  const candidates: Array<ObjectId | string> = [userId];
   try {
-    userOid = new ObjectId(userId);
+    candidates.push(new ObjectId(userId));
   } catch {
-    return [];
+    // userId não é hex válido de 24 chars — só a forma string serve.
   }
 
   const memberDocs = await authDb
@@ -615,7 +617,7 @@ async function fetchUserOrganizations(
       role?: "owner" | "admin" | "member";
       createdAt?: Date;
     }>("member")
-    .find({ userId: userOid })
+    .find({ userId: { $in: candidates } })
     .toArray();
   if (memberDocs.length === 0) return [];
 

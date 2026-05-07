@@ -11,7 +11,6 @@ import { createApp } from "@/app.js";
 import { createAuth } from "@/domains/iam/infrastructure/better-auth/auth.js";
 import { getAuthDb } from "@/domains/iam/infrastructure/better-auth/mongo-client.js";
 import { makeRequireAuth } from "@/domains/iam/presentation/middleware/require-auth.js";
-import { denyAssistant } from "@/domains/iam/presentation/middleware/deny-assistant.js";
 import { MongoTeacherAssistantRepository } from "@/domains/iam/infrastructure/mongo-teacher-assistant-repository.js";
 import { CreateAssistantUseCase } from "@/domains/iam/application/create-assistant.js";
 import { ListAssistantsForTeacherUseCase } from "@/domains/iam/application/list-assistants-for-teacher.js";

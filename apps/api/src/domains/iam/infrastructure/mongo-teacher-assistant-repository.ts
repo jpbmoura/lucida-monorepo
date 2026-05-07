@@ -182,17 +182,20 @@ async function fetchUsers(
   userIds: string[],
 ): Promise<Map<string, UserRow>> {
   if (userIds.length === 0) return new Map();
-  const oids = userIds
-    .map(tryObjectId)
-    .filter((o): o is ObjectId => o !== null);
-  if (oids.length === 0) return new Map();
+  // Users podem estar como ObjectId (BA-nativo) ou string (legacy Clerk
+  // migrado preservou o id). Consulta os dois formatos — descartar
+  // qualquer um deles esconde o user da listagem.
+  const candidates = userIds.flatMap(idCandidates);
+  if (candidates.length === 0) return new Map();
 
   const docs = await authDb
-    .collection<{ _id: ObjectId; name?: string | null; email?: string }>(
-      "user",
-    )
-    .find({ _id: { $in: oids } })
-    .project<{ _id: ObjectId; name?: string | null; email?: string }>({
+    .collection<{
+      _id: ObjectId | string;
+      name?: string | null;
+      email?: string;
+    }>("user")
+    .find({ _id: { $in: candidates } })
+    .project<{ _id: ObjectId | string; name?: string | null; email?: string }>({
       name: 1,
       email: 1,
     })
@@ -211,15 +214,15 @@ async function fetchOrganizations(
   orgIds: string[],
 ): Promise<Map<string, { id: string; name: string | null }>> {
   if (orgIds.length === 0) return new Map();
-  const oids = orgIds
-    .map(tryObjectId)
-    .filter((o): o is ObjectId => o !== null);
-  if (oids.length === 0) return new Map();
+  // Orgs são sempre BA-nativas (ObjectId), mas mantém o mesmo padrão
+  // defensivo do `fetchUsers` por consistência.
+  const candidates = orgIds.flatMap(idCandidates);
+  if (candidates.length === 0) return new Map();
 
   const docs = await authDb
-    .collection<{ _id: ObjectId; name?: string }>("organization")
-    .find({ _id: { $in: oids } })
-    .project<{ _id: ObjectId; name?: string }>({ name: 1 })
+    .collection<{ _id: ObjectId | string; name?: string }>("organization")
+    .find({ _id: { $in: candidates } })
+    .project<{ _id: ObjectId | string; name?: string }>({ name: 1 })
     .toArray();
 
   return new Map(
@@ -233,34 +236,32 @@ async function fetchOrganizations(
 /**
  * Confere que o professor ainda é member da org. Vínculo cujo professor
  * deixou a org fica órfão e some do seletor (sem precisar de cron).
+ *
+ * `member.userId` segue a forma do `user._id` (ObjectId pra users
+ * BA-nativos, string pra legacy Clerk). Pra cada par (teacher, org),
+ * monta o produto cartesiano dos candidatos — assim a query bate
+ * independente do formato em que o id foi armazenado.
  */
 async function fetchActiveMemberships(
   authDb: Db,
   docs: TeacherAssistantDoc[],
 ): Promise<Set<string>> {
   if (docs.length === 0) return new Set();
-  const pairs = docs
-    .map((d) => {
-      const userOid = tryObjectId(d.teacherUserId);
-      const orgOid = tryObjectId(d.organizationId);
-      if (!userOid || !orgOid) return null;
-      return { userOid, orgOid, key: membershipKey(d) };
-    })
-    .filter(
-      (p): p is { userOid: ObjectId; orgOid: ObjectId; key: string } =>
-        p !== null,
+  const orClauses = docs.flatMap((d) => {
+    const userCandidates = idCandidates(d.teacherUserId);
+    const orgCandidates = idCandidates(d.organizationId);
+    return userCandidates.flatMap((userId) =>
+      orgCandidates.map((organizationId) => ({ userId, organizationId })),
     );
-  if (pairs.length === 0) return new Set();
+  });
+  if (orClauses.length === 0) return new Set();
 
   const memberDocs = await authDb
-    .collection<{ userId: ObjectId; organizationId: ObjectId }>("member")
-    .find({
-      $or: pairs.map((p) => ({
-        userId: p.userOid,
-        organizationId: p.orgOid,
-      })),
-    })
-    .project<{ userId: ObjectId; organizationId: ObjectId }>({
+    .collection<{ userId: ObjectId | string; organizationId: ObjectId | string }>(
+      "member",
+    )
+    .find({ $or: orClauses })
+    .project<{ userId: ObjectId | string; organizationId: ObjectId | string }>({
       userId: 1,
       organizationId: 1,
     })
@@ -277,10 +278,18 @@ function membershipKey(doc: TeacherAssistantDoc): string {
   return `${doc.teacherUserId}|${doc.organizationId}`;
 }
 
-function tryObjectId(value: string): ObjectId | null {
+/**
+ * Devolve os dois formatos possíveis pra um id BA: a string crua (que
+ * cobre legacy Clerk) e — quando o valor é hex de 24 chars — também o
+ * ObjectId equivalente. Evita o "fantasma" de users migrados não
+ * aparecerem em queries que assumiam só ObjectId.
+ */
+function idCandidates(value: string): Array<ObjectId | string> {
+  const out: Array<ObjectId | string> = [value];
   try {
-    return new ObjectId(value);
+    out.push(new ObjectId(value));
   } catch {
-    return null;
+    // value não é hex de 24 — só a string crua é candidata.
   }
+  return out;
 }

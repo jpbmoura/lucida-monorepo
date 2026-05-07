@@ -5,7 +5,6 @@ import type { TeacherAssistantRepository } from "../domain/teacher-assistant-rep
 import { TeacherAssistant } from "../domain/teacher-assistant.js";
 import {
   AssistantAlreadyLinkedError,
-  AssistantEmailTakenError,
   InvalidAssistantInputError,
   TeacherNotInOrganizationError,
 } from "../domain/teacher-assistant-errors.js";
@@ -27,13 +26,13 @@ export interface CreateAssistantResult {
 
 /**
  * Cria um auxiliar pra um professor da instituição. Se o user auxiliar
- * já existe (mesmo email), reusa — senão cria via BA com email/senha
- * definidos pelo admin (emailVerified=true, igual seed/institutions).
+ * já existe (mesmo email), reusa — qualquer conta serve, inclusive
+ * professores, owners de instituição e staff. Senão cria via BA com
+ * email/senha definidos pelo admin (emailVerified=true, igual
+ * seed/institutions).
  *
  * Validações:
  *  - Professor é member da org.
- *  - Email do auxiliar não está em uso por outro user (a menos que ele
- *    seja um auxiliar pré-existente, caso em que reusa).
  *  - Não existe vínculo ativo (assistant, teacher) duplicado.
  */
 export class CreateAssistantUseCase {
@@ -75,15 +74,6 @@ export class CreateAssistantUseCase {
 
     let assistantUserId: string;
     if (existing) {
-      // Reusa. Mas se esse user já é member de QUALQUER org, recusa —
-      // não dá pra deixar um professor virar auxiliar (rebaixaria
-      // permissões e bagunçaria sessão).
-      const isMember = await this.authDb
-        .collection("member")
-        .findOne({ userId: existing._id });
-      if (isMember) {
-        throw new AssistantEmailTakenError(email);
-      }
       assistantUserId = String(existing._id);
     } else {
       try {
