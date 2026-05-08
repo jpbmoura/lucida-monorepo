@@ -2,12 +2,17 @@
 // Single source of truth pro script de normalização — todo lugar que
 // armazena id de user precisa estar listado aqui, ou vira órfão na
 // migração. Quando criar um schema novo com user FK, **atualize aqui**.
+//
+// IMPORTANTE: o nome da collection deve bater EXATAMENTE com o que o
+// Mongo armazena. Quase todos os schemas Mongoose declaram explicitamente
+// `{ collection: "snake_case" }` em vez de aceitar a pluralização default.
+// Use o valor declarado no schema, não a pluralização Mongoose.
 
 export type FieldKind = "string" | "objectid";
 export type Source = "ba" | "mongoose";
 
 export interface FkSpec {
-  /** Nome da collection no Mongo (Mongoose pluraliza modelos pra lowercase). */
+  /** Nome físico da collection no Mongo. */
   collection: string;
   /** Campo dentro do doc que carrega o id. */
   field: string;
@@ -25,7 +30,7 @@ export interface FkSpec {
   source: Source;
   /**
    * Filtro adicional pra restringir o update — usado quando o campo é
-   * polimórfico. Ex: `creditwallets.ownerId` carrega userId só quando
+   * polimórfico. Ex: `credit_wallets.ownerId` carrega userId só quando
    * `scope === "user"`; no scope "org" o ownerId é orgId e não pode ser
    * tocado.
    */
@@ -49,15 +54,15 @@ const BA_FKS: FkSpec[] = [
  */
 const MONGOOSE_FKS: FkSpec[] = [
   // api-access
-  { collection: "apikeys", field: "createdByUserId", kind: "string", source: "mongoose" },
-  { collection: "webhookendpoints", field: "createdByUserId", kind: "string", source: "mongoose" },
+  { collection: "api_keys", field: "createdByUserId", kind: "string", source: "mongoose" },
+  { collection: "webhook_endpoints", field: "createdByUserId", kind: "string", source: "mongoose" },
 
   // billing — `ownerId` é polimórfico (user/org). Filtra por scope quando aplicável.
-  { collection: "creditwallets", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
-  { collection: "ledgerentries", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
-  { collection: "ledgerentries", field: "actorUserId", kind: "string", source: "mongoose" },
+  { collection: "credit_wallets", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
+  { collection: "credit_ledger", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
+  { collection: "credit_ledger", field: "actorUserId", kind: "string", source: "mongoose" },
   { collection: "subscriptions", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
-  { collection: "pixtopupintents", field: "ownerId", kind: "string", source: "mongoose" },
+  { collection: "pix_topup_intents", field: "ownerId", kind: "string", source: "mongoose" },
   { collection: "invoices", field: "ownerId", kind: "string", source: "mongoose", match: { scope: "user" } },
 
   // núcleo pedagógico
@@ -65,31 +70,31 @@ const MONGOOSE_FKS: FkSpec[] = [
   { collection: "exams", field: "ownerId", kind: "string", source: "mongoose" },
   { collection: "students", field: "ownerId", kind: "string", source: "mongoose" },
   { collection: "submissions", field: "ownerId", kind: "string", source: "mongoose" },
-  { collection: "scans", field: "ownerId", kind: "string", source: "mongoose" },
+  { collection: "scan_results", field: "ownerId", kind: "string", source: "mongoose" },
 
   // iam
-  { collection: "teacherassistants", field: "teacherUserId", kind: "string", source: "mongoose" },
-  { collection: "teacherassistants", field: "assistantUserId", kind: "string", source: "mongoose" },
-  { collection: "teacherassistants", field: "createdBy", kind: "string", source: "mongoose" },
+  { collection: "teacher_assistants", field: "teacherUserId", kind: "string", source: "mongoose" },
+  { collection: "teacher_assistants", field: "assistantUserId", kind: "string", source: "mongoose" },
+  { collection: "teacher_assistants", field: "createdBy", kind: "string", source: "mongoose" },
 
   // finance
-  { collection: "expenses", field: "createdByUserId", kind: "string", source: "mongoose" },
+  { collection: "finance_expenses", field: "createdByUserId", kind: "string", source: "mongoose" },
 
   // kanban (interno do Kintal)
-  { collection: "kanbancards", field: "assigneeId", kind: "string", source: "mongoose" },
-  { collection: "kanbancards", field: "createdById", kind: "string", source: "mongoose" },
+  { collection: "kanban_cards", field: "assigneeId", kind: "string", source: "mongoose" },
+  { collection: "kanban_cards", field: "createdById", kind: "string", source: "mongoose" },
 
   // kintal
-  { collection: "impersonatesessions", field: "staffUserId", kind: "string", source: "mongoose" },
-  { collection: "impersonatesessions", field: "targetUserId", kind: "string", source: "mongoose" },
+  { collection: "impersonate_sessions", field: "staffUserId", kind: "string", source: "mongoose" },
+  { collection: "impersonate_sessions", field: "targetUserId", kind: "string", source: "mongoose" },
 
   // notifications
   { collection: "notifications", field: "recipientUserId", kind: "string", source: "mongoose" },
   { collection: "notifications", field: "senderUserId", kind: "string", source: "mongoose" },
 
   // roadmap
-  { collection: "roadmapitems", field: "createdBy", kind: "string", source: "mongoose" },
-  { collection: "roadmapvotes", field: "userId", kind: "string", source: "mongoose" },
+  { collection: "roadmap_items", field: "createdBy", kind: "string", source: "mongoose" },
+  { collection: "roadmap_votes", field: "userId", kind: "string", source: "mongoose" },
 
   // tickets / suporte
   { collection: "tickets", field: "userId", kind: "string", source: "mongoose" },

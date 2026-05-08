@@ -84,6 +84,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           initials={display.initials}
           initialBalance={balance?.total ?? null}
           orgName={activeOrg?.name ?? null}
+          isOrgAdmin={
+            activeOrg?.myRole === "owner" || activeOrg?.myRole === "admin"
+          }
           hideBalance={orgPays}
         />
         {/* LowBalanceAlert é sobre saldo pessoal — some quando a instituição

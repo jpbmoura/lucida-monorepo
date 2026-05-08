@@ -23,7 +23,10 @@
       "Bash(pnpm -r exec tsc --noEmit)",
       "PowerShell(pnpm --filter @lucida/api typecheck 2>&1; Write-Output \"EXIT=$LASTEXITCODE\")",
       "PowerShell(pnpm typecheck 2>&1; Write-Output \"EXIT=$LASTEXITCODE\")",
-      "Bash(node scripts/export-user-exam-links.mjs demetriuslopes@gmail.com)"
+      "Bash(node scripts/export-user-exam-links.mjs demetriuslopes@gmail.com)",
+      "Bash(pnpm --filter @lucida/api diagnose:legacy-ids)",
+      "Bash(pnpm --filter @lucida/api diagnose:legacy-ids -- --email=projetopsiqs@gmail.com)",
+      "Bash(wmic process *)"
     ]
   }
 }

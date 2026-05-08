@@ -177,12 +177,34 @@ interface UserRow {
   email: string;
 }
 
+/**
+ * Pula ids que não são ObjectId hex válido em vez de explodir. Pós-
+ * normalização (`migrate:normalize-user-ids`), todo `_id` deveria ser
+ * hex de 24 chars — mas se algum doc órfão escapou (ex: link criado
+ * antes da migra com user que não foi processado), tolera com warning
+ * em vez de derrubar a request inteira.
+ */
+function toValidObjectIds(values: string[]): ObjectId[] {
+  const out: ObjectId[] = [];
+  for (const v of values) {
+    if (ObjectId.isValid(v)) {
+      out.push(new ObjectId(v));
+    } else {
+      console.warn(
+        `[teacher-assistants] ignorando id em formato não-hex: ${v}`,
+      );
+    }
+  }
+  return out;
+}
+
 async function fetchUsers(
   authDb: Db,
   userIds: string[],
 ): Promise<Map<string, UserRow>> {
   if (userIds.length === 0) return new Map();
-  const oids = userIds.map((id) => new ObjectId(id));
+  const oids = toValidObjectIds(userIds);
+  if (oids.length === 0) return new Map();
 
   const docs = await authDb
     .collection<{
@@ -210,7 +232,8 @@ async function fetchOrganizations(
   orgIds: string[],
 ): Promise<Map<string, { id: string; name: string | null }>> {
   if (orgIds.length === 0) return new Map();
-  const oids = orgIds.map((id) => new ObjectId(id));
+  const oids = toValidObjectIds(orgIds);
+  if (oids.length === 0) return new Map();
 
   const docs = await authDb
     .collection<{ _id: ObjectId; name?: string }>("organization")
@@ -228,17 +251,27 @@ async function fetchOrganizations(
 
 /**
  * Confere que o professor ainda é member da org. Vínculo cujo professor
- * deixou a org fica órfão e some do seletor (sem precisar de cron).
+ * deixou a org fica órfão e some do seletor (sem precisar de cron). Pares
+ * com id em formato inválido são silenciosamente descartados — caem em
+ * `validMembership = false` e o vínculo some do picker.
  */
 async function fetchActiveMemberships(
   authDb: Db,
   docs: TeacherAssistantDoc[],
 ): Promise<Set<string>> {
   if (docs.length === 0) return new Set();
-  const pairs = docs.map((d) => ({
-    userId: new ObjectId(d.teacherUserId),
-    organizationId: new ObjectId(d.organizationId),
-  }));
+  const pairs = docs.flatMap((d) => {
+    if (!ObjectId.isValid(d.teacherUserId) || !ObjectId.isValid(d.organizationId)) {
+      return [];
+    }
+    return [
+      {
+        userId: new ObjectId(d.teacherUserId),
+        organizationId: new ObjectId(d.organizationId),
+      },
+    ];
+  });
+  if (pairs.length === 0) return new Set();
 
   const memberDocs = await authDb
     .collection<{ userId: ObjectId; organizationId: ObjectId }>("member")

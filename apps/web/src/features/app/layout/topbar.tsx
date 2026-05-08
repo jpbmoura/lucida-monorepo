@@ -12,6 +12,11 @@ interface TopbarProps {
    *  avulso — o eyebrow "Via X" não é renderizado. */
   orgName: string | null;
   /**
+   * True quando o user é owner/admin da org ativa. Define se o eyebrow
+   * vira link clicável pro /analytics ou só um label decorativo.
+   */
+  isOrgAdmin: boolean;
+  /**
    * Quando a instituição paga pela ação (pool ou pay_per_use), a wallet
    * pessoal fica congelada/irrelevante — escondemos o BalanceWidget pra
    * não confundir o professor com um saldo que ele não pode gastar.
@@ -25,12 +30,15 @@ export function Topbar({
   initials,
   initialBalance,
   orgName,
+  isOrgAdmin,
   hideBalance,
 }: TopbarProps) {
   return (
     <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between gap-4 border-b border-gray-100 bg-white/85 px-5 backdrop-blur md:px-10">
       <div className="flex min-w-0 items-center gap-3">
-        {orgName && <InstitutionalEyebrow orgName={orgName} />}
+        {orgName && (
+          <InstitutionalEyebrow orgName={orgName} isAdmin={isOrgAdmin} />
+        )}
       </div>
 
       <div className="flex items-center gap-4">

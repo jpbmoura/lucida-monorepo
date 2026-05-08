@@ -44,6 +44,7 @@ interface Args {
   dryRun: boolean;
   validateOnly: boolean;
   cleanupOnly: boolean;
+  rewriteOnly: boolean;
   mapPath: string | null;
 }
 
@@ -53,6 +54,7 @@ function parseArgs(argv: string[]): Args {
     dryRun: false,
     validateOnly: false,
     cleanupOnly: false,
+    rewriteOnly: false,
     mapPath: null,
   };
   for (const arg of argv) {
@@ -60,10 +62,17 @@ function parseArgs(argv: string[]): Args {
     else if (arg === "--dry-run") out.dryRun = true;
     else if (arg === "--validate-only") out.validateOnly = true;
     else if (arg === "--cleanup-only") out.cleanupOnly = true;
+    else if (arg === "--rewrite-only") out.rewriteOnly = true;
     else if (arg.startsWith("--map=")) out.mapPath = arg.slice("--map=".length);
   }
   // Default: dry-run quando nenhuma flag de execução foi passada.
-  if (!out.apply && !out.dryRun && !out.validateOnly && !out.cleanupOnly) {
+  if (
+    !out.apply &&
+    !out.dryRun &&
+    !out.validateOnly &&
+    !out.cleanupOnly &&
+    !out.rewriteOnly
+  ) {
     out.dryRun = true;
   }
   return out;
@@ -77,7 +86,17 @@ async function main(): Promise<void> {
   console.log(" Normalize legacy user._id → ObjectId");
   console.log("──────────────────────────────────────────────────────");
   console.log(
-    ` Mode: ${args.apply ? "APPLY ⚠️" : args.validateOnly ? "VALIDATE-ONLY" : args.cleanupOnly ? "CLEANUP-ONLY" : "DRY-RUN"}`,
+    ` Mode: ${
+      args.apply
+        ? "APPLY ⚠️"
+        : args.validateOnly
+          ? "VALIDATE-ONLY"
+          : args.cleanupOnly
+            ? "CLEANUP-ONLY"
+            : args.rewriteOnly
+              ? "REWRITE-ONLY ⚠️"
+              : "DRY-RUN"
+    }`,
   );
   console.log(` Map:  ${mapPath}`);
   console.log("");
@@ -119,6 +138,10 @@ async function main(): Promise<void> {
     }
     if (args.cleanupOnly) {
       await runCleanup(authDb, map, mapPath);
+      return;
+    }
+    if (args.rewriteOnly) {
+      await runRewriteOnly(authDb, map);
       return;
     }
     if (args.apply) {
@@ -266,6 +289,130 @@ async function rewriteFks(authDb: Db, entry: IdMapEntry): Promise<void> {
     };
     const replacement = fk.kind === "objectid" ? newOid : entry.newId;
     await col.updateMany(filter, { $set: { [fk.field]: replacement } });
+  }
+}
+
+// ─── Fase: rewrite-only ─────────────────────────────────────────────────
+
+/**
+ * Doc-driven rewrite: pra cada (collection, field) do inventário, busca
+ * apenas os docs que ainda têm o legacyId (small set), e reescreve em
+ * `bulkWrite`. Vastly mais rápido que iterar 3634 users × 27 collections
+ * (a versão antiga `--apply`-style fazia ~98k updateMany sequenciais).
+ *
+ * Idempotente: se nada está em legacy, o find devolve 0 e a fase pula.
+ *
+ * Antes do loop, pré-revoga links duplicados em `teacher_assistants`
+ * pra evitar violação do índice parcial unique `uniq_active_link`.
+ */
+async function runRewriteOnly(authDb: Db, map: IdMap): Promise<void> {
+  console.log("──────────────────────────────────────────────────────");
+  console.log(" Rewrite-only (doc-driven): varre só os FKs órfãos");
+  console.log("──────────────────────────────────────────────────────");
+
+  const legacyToHex = new Map(map.entries.map((e) => [e.legacyId, e.newId]));
+
+  await preRevokeDuplicateAssistantLinks(authDb, map);
+
+  for (const fk of USER_FK_INVENTORY) {
+    const col = authDb.collection(fk.collection);
+    const filter: Record<string, unknown> = {
+      ...(fk.match ?? {}),
+      [fk.field]: { $in: Array.from(legacyToHex.keys()) },
+    };
+    const docs = (await col
+      .find(filter)
+      .project({ _id: 1, [fk.field]: 1 })
+      .toArray()) as Array<{ _id: unknown; [k: string]: unknown }>;
+
+    if (docs.length === 0) continue;
+
+    const ops = docs.map((doc) => {
+      const legacy = String(doc[fk.field]);
+      const newVal = legacyToHex.get(legacy);
+      if (!newVal) {
+        // Doc tem id legacy fora do map. Não toca pra não corromper.
+        return null;
+      }
+      const replacement = fk.kind === "objectid" ? new ObjectId(newVal) : newVal;
+      return {
+        updateOne: {
+          filter: { _id: doc._id as never },
+          update: { $set: { [fk.field]: replacement } },
+        },
+      };
+    });
+    const validOps = ops.filter(
+      (o): o is NonNullable<typeof o> => o !== null,
+    );
+    if (validOps.length === 0) continue;
+
+    const result = await col.bulkWrite(validOps, { ordered: false });
+    console.log(
+      `   ${fk.collection}.${fk.field}: ${result.modifiedCount} reescritos (${docs.length - validOps.length} pulados — id fora do map)`,
+    );
+  }
+
+  console.log("");
+  console.log(" Rewrite-only concluído. Rode `--validate-only` pra confirmar.");
+}
+
+/**
+ * Encontra docs ativos em `teacher_assistants` cujo `(teacherUserId,
+ * assistantUserId)` — depois de remapeado via id-map — colidiria com
+ * outro doc ativo já em hex. Soft-revoga o doc legacy (mantém pra
+ * auditoria). Pré-condição pro rewriteFks rodar sem violar o índice
+ * parcial unique `uniq_active_link`.
+ */
+async function preRevokeDuplicateAssistantLinks(
+  authDb: Db,
+  map: IdMap,
+): Promise<void> {
+  const col = authDb.collection<{
+    _id: unknown;
+    teacherUserId: string;
+    assistantUserId: string;
+    revokedAt: Date | null;
+  }>("teacher_assistants");
+
+  const legacyToHex = new Map(map.entries.map((e) => [e.legacyId, e.newId]));
+  const legacyIds = map.entries.map((e) => e.legacyId);
+
+  const docs = await col
+    .find({
+      revokedAt: null,
+      $or: [
+        { teacherUserId: { $in: legacyIds } },
+        { assistantUserId: { $in: legacyIds } },
+      ],
+    })
+    .toArray();
+
+  let revoked = 0;
+  for (const doc of docs) {
+    const newTeacher = legacyToHex.get(doc.teacherUserId) ?? doc.teacherUserId;
+    const newAssistant =
+      legacyToHex.get(doc.assistantUserId) ?? doc.assistantUserId;
+    const dup = await col.findOne({
+      _id: { $ne: doc._id },
+      revokedAt: null,
+      teacherUserId: newTeacher,
+      assistantUserId: newAssistant,
+    });
+    if (!dup) continue;
+
+    await col.updateOne(
+      { _id: doc._id },
+      { $set: { revokedAt: new Date(), updatedAt: new Date() } },
+    );
+    revoked++;
+    console.log(
+      `   Soft-revoke ${String(doc._id)} → duplica de ${String(dup._id)} (teacher=${newTeacher}, assistant=${newAssistant})`,
+    );
+  }
+  if (revoked > 0) {
+    console.log(`   ${revoked} link(s) duplicado(s) revogados antes do rewrite.`);
+    console.log("");
   }
 }
 
