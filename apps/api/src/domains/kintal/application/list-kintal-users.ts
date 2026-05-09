@@ -2,14 +2,17 @@ import type {
   KintalUserListItem,
   KintalUsersRepository,
   ListKintalUsersFilter,
+  ListSubscriptionFilter,
 } from "./ports/kintal-users-repository.js";
 
 export interface ListKintalUsersInput {
   q?: string;
-  subscription?: "any" | "with" | "without";
+  subscription?: ListSubscriptionFilter;
   role?: "any" | "user" | "staff";
-  limit?: number;
-  before?: Date;
+  /** Janela pra "novos usuários". Backend converte pra `createdAfter`. */
+  createdWithin?: "today" | "7d" | "30d";
+  page?: number;
+  pageSize?: number;
 }
 
 export interface KintalUserListItemDTO {
@@ -26,23 +29,71 @@ export interface KintalUserListItemDTO {
   subscription: { planId: string; status: string } | null;
 }
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+export interface ListKintalUsersResultDTO {
+  items: KintalUserListItemDTO[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
 
 export class ListKintalUsersUseCase {
   constructor(private readonly users: KintalUsersRepository) {}
 
-  async execute(input: ListKintalUsersInput): Promise<KintalUserListItemDTO[]> {
+  async execute(
+    input: ListKintalUsersInput,
+  ): Promise<ListKintalUsersResultDTO> {
+    const page = input.page && input.page > 0 ? input.page : 1;
+    const pageSize = clampPageSize(input.pageSize);
     const filter: ListKintalUsersFilter = {
       q: input.q?.trim() || undefined,
       subscription: input.subscription ?? "any",
       role: input.role ?? "any",
-      limit: Math.min(MAX_LIMIT, input.limit ?? DEFAULT_LIMIT),
-      before: input.before,
+      createdAfter: createdAfterFromWindow(input.createdWithin),
+      page,
+      pageSize,
     };
-    const items = await this.users.list(filter);
-    return items.map(toDTO);
+    const result = await this.users.list(filter);
+    return {
+      items: result.items.map(toDTO),
+      total: result.total,
+      page,
+      pageSize,
+      hasMore: result.hasMore,
+    };
   }
+}
+
+function clampPageSize(raw: number | undefined): number {
+  if (!raw || raw <= 0) return DEFAULT_PAGE_SIZE;
+  return Math.min(raw, MAX_PAGE_SIZE);
+}
+
+function createdAfterFromWindow(
+  win: ListKintalUsersInput["createdWithin"],
+): Date | undefined {
+  if (!win) return undefined;
+  const now = new Date();
+  const startOfDay = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  if (win === "today") return startOfDay;
+  if (win === "7d") {
+    const d = new Date(startOfDay);
+    d.setDate(d.getDate() - 6);
+    return d;
+  }
+  if (win === "30d") {
+    const d = new Date(startOfDay);
+    d.setDate(d.getDate() - 29);
+    return d;
+  }
+  return undefined;
 }
 
 function toDTO(u: KintalUserListItem): KintalUserListItemDTO {

@@ -1,8 +1,9 @@
 import "server-only";
 import { apiFetch } from "@/lib/api-client";
 
-export type TicketStatus = "new" | "in_progress" | "done";
-export type TicketOrigin = "email" | "form";
+export type TicketStatus = "new" | "in_progress" | "done" | "read";
+export type TicketBox = "inbox" | "outbox";
+export type TicketOrigin = "email" | "form" | "staff";
 export type TicketMessageDirection = "inbound" | "outbound";
 export type TicketMessageKind = "manual" | "auto";
 
@@ -65,17 +66,26 @@ export interface TicketDetailDTO extends TicketListItemDTO {
   relatedTickets: RelatedTicketDTO[];
 }
 
+export interface CountsByStatus {
+  new: number;
+  in_progress: number;
+  done: number;
+  read: number;
+}
+
+export interface CountsByBox {
+  inbox: CountsByStatus;
+  outbox: CountsByStatus;
+}
+
 export interface TicketsListResponse {
   items: TicketListItemDTO[];
-  counts: {
-    new: number;
-    in_progress: number;
-    done: number;
-  };
+  counts: CountsByBox;
 }
 
 export interface FetchTicketsOptions {
   status?: TicketStatus;
+  box?: TicketBox;
 }
 
 export async function fetchTickets(
@@ -83,6 +93,7 @@ export async function fetchTickets(
 ): Promise<TicketsListResponse> {
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
+  if (opts.box) params.set("box", opts.box);
   const qs = params.toString() ? `?${params.toString()}` : "";
   const res = await apiFetch<{ data: TicketsListResponse }>(
     `/v1/tickets${qs}`,

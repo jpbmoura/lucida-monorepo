@@ -8,6 +8,7 @@ import {
   Check,
   CornerDownLeft,
   Loader2,
+  Mail,
   MessageCircle,
   Paperclip,
   RotateCcw,
@@ -54,6 +55,20 @@ export function EmailDetail({ ticket, customer }: Props) {
     }
   }
 
+  async function markRead() {
+    setActionError(null);
+    try {
+      const res = await fetch(
+        `/v1/tickets/${encodeURIComponent(ticket.id)}/read`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error("Falha ao marcar como lido.");
+      startTransition(() => router.refresh());
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
+  }
+
   async function reopen() {
     setActionError(null);
     try {
@@ -69,14 +84,17 @@ export function EmailDetail({ ticket, customer }: Props) {
   }
 
   const customerLabel = ticket.customerName ?? ticket.customerEmail;
-  // Volta sempre pra view de origem. Quando concluído, volta pra
-  // /emails?status=done pra não jogar o staff numa lista que parece vazia.
+  // Volta pra caixa correta. Outbox = ticket iniciado pelo staff
+  // (origin="staff"); inbox = qualquer outra origem. Quando concluído na
+  // inbox, mantém a aba Todos pra não jogar o staff numa lista vazia.
   const backHref =
-    ticket.status === "done"
-      ? "/kintal/emails?status=done"
+    ticket.origin === "staff"
+      ? "/kintal/emails?box=outbox"
       : ticket.status === "new"
-        ? "/kintal/emails?status=new"
-        : "/kintal/emails";
+        ? "/kintal/emails?box=inbox&status=new"
+        : ticket.status === "in_progress"
+          ? "/kintal/emails?box=inbox&status=in_progress"
+          : "/kintal/emails?box=inbox";
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-10">
@@ -119,6 +137,7 @@ export function EmailDetail({ ticket, customer }: Props) {
                   status={ticket.status}
                   isPending={isPending}
                   onMarkDone={markDone}
+                  onMarkRead={markRead}
                   onReopen={reopen}
                 />
               </div>
@@ -177,6 +196,14 @@ function HeaderStatus({
       </span>
     );
   }
+  if (status === "read") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-500">
+        <Mail className="size-3" />
+        Lido
+      </span>
+    );
+  }
   if (status === "new") {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
@@ -204,14 +231,17 @@ function HeaderActions({
   status,
   isPending,
   onMarkDone,
+  onMarkRead,
   onReopen,
 }: {
   status: TicketStatus;
   isPending: boolean;
   onMarkDone: () => void;
+  onMarkRead: () => void;
   onReopen: () => void;
 }) {
-  if (status === "done") {
+  // Estados terminais (done, read) → botão único de Reabrir.
+  if (status === "done" || status === "read") {
     return (
       <Button
         type="button"
@@ -229,21 +259,38 @@ function HeaderActions({
       </Button>
     );
   }
+  // Ativos (new, in_progress) → oferece tanto Concluir quanto Lido.
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onMarkDone}
-      disabled={isPending}
-    >
-      {isPending ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : (
-        <Check className="size-3.5" />
-      )}
-      Concluir
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onMarkRead}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Mail className="size-3.5" />
+        )}
+        Lido
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onMarkDone}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Check className="size-3.5" />
+        )}
+        Concluir
+      </Button>
+    </div>
   );
 }
 

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { fetchTickets, type TicketStatus } from "@/features/kintal/emails/data";
+import {
+  fetchTickets,
+  type TicketBox,
+  type TicketStatus,
+} from "@/features/kintal/emails/data";
 import {
   EmailsList,
   type EmailsFilter,
@@ -10,18 +14,26 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ box?: string; status?: string }>;
 }
 
 const STATUSES: TicketStatus[] = ["new", "in_progress", "done"];
+const BOXES: TicketBox[] = ["inbox", "outbox"];
 
 export default async function KintalEmailsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const filter: EmailsFilter = STATUSES.includes(sp.status as TicketStatus)
-    ? (sp.status as TicketStatus)
-    : "all";
+  const box: TicketBox = BOXES.includes(sp.box as TicketBox)
+    ? (sp.box as TicketBox)
+    : "inbox";
+
+  // Status só faz sentido pra inbox; outbox é lista plana.
+  const filter: EmailsFilter =
+    box === "inbox" && STATUSES.includes(sp.status as TicketStatus)
+      ? (sp.status as TicketStatus)
+      : "all";
 
   const data = await fetchTickets({
+    box,
     status: filter === "all" ? undefined : filter,
   });
 
@@ -39,11 +51,11 @@ export default async function KintalEmailsPage({ searchParams }: PageProps) {
           Tudo que chega em <strong>contato@lucidaexam.com</strong> ou pelo
           formulário <strong>/app/ajuda</strong>. Responda direto daqui — a
           resposta sai pelo Resend e cai de volta aqui se o cliente continuar
-          a conversa.
+          a conversa. Use <strong>Novo email</strong> pra iniciar uma conversa.
         </p>
       </header>
 
-      <EmailsList data={data} activeFilter={filter} />
+      <EmailsList data={data} activeBox={box} activeFilter={filter} />
     </div>
   );
 }

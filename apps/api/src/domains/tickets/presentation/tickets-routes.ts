@@ -34,6 +34,14 @@ export function makeTicketsStaffRouter({
 }: AuthedDeps): Router {
   const router = Router();
   router.get("/v1/tickets", requireAuth, requireStaff, controller.list);
+  router.post("/v1/tickets", requireAuth, requireStaff, controller.compose);
+  // Bulk antes de `/:id` pra não casar como id="bulk".
+  router.post(
+    "/v1/tickets/bulk/status",
+    requireAuth,
+    requireStaff,
+    controller.bulkStatus,
+  );
   router.get("/v1/tickets/:id", requireAuth, requireStaff, controller.get);
   router.post(
     "/v1/tickets/:id/replies",
@@ -46,6 +54,12 @@ export function makeTicketsStaffRouter({
     requireAuth,
     requireStaff,
     controller.markDone,
+  );
+  router.post(
+    "/v1/tickets/:id/read",
+    requireAuth,
+    requireStaff,
+    controller.markRead,
   );
   router.post(
     "/v1/tickets/:id/reopen",

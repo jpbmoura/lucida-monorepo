@@ -5,8 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  CREATED_WITHIN_FILTERS,
   ROLE_FILTERS,
   SUBSCRIPTION_FILTERS,
+  type CreatedWithinFilter,
   type RoleFilter,
   type SubscriptionFilter,
 } from "../types";
@@ -15,13 +17,19 @@ interface UsersFiltersProps {
   q: string;
   subscription: SubscriptionFilter;
   role: RoleFilter;
+  createdWithin: CreatedWithinFilter;
 }
 
-// Filtros server-driven via searchParams. O input de busca tem debounce
-// curto (250ms) pra evitar refetchar a cada tecla. Os pills de subscription/
-// role atualizam imediatamente. Tudo passa por router.replace pro RSC
-// recarregar a tela com os novos filtros.
-export function UsersFilters({ q, subscription, role }: UsersFiltersProps) {
+// Filtros server-driven via searchParams. Search aplica no blur ou Enter
+// (não é instant-search) — staff tem controle total sobre quando recarrega.
+// Pills/dropdowns de subscription/role/cadastro aplicam imediato no clique
+// (clique já é uma ação intencional). Trocar qualquer filtro reseta page=1.
+export function UsersFilters({
+  q,
+  subscription,
+  role,
+  createdWithin,
+}: UsersFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -32,59 +40,86 @@ export function UsersFilters({ q, subscription, role }: UsersFiltersProps) {
 
   function pushParam(key: string, value: string | null) {
     const sp = new URLSearchParams(searchParams.toString());
-    if (value === null || value === "" || value === "any") {
+    if (value === null || value === "" || value === "any" || value === "all") {
       sp.delete(key);
     } else {
       sp.set(key, value);
     }
+    // Trocar qualquer filtro volta pra página 1 — paginação fica
+    // dessincronizada se mantemos a mesma page após filtrar.
+    sp.delete("page");
     const qs = sp.toString();
     startTransition(() => {
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     });
   }
 
-  useEffect(() => {
-    if (draft === q) return;
-    const id = setTimeout(() => pushParam("q", draft.trim() || null), 250);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
+  function commitSearch() {
+    const trimmed = draft.trim();
+    if (trimmed === q) return;
+    pushParam("q", trimmed || null);
+  }
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div className="relative w-full md:max-w-sm">
-        <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-        <input
-          type="search"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Buscar por nome ou e-mail..."
-          className="h-11 w-full rounded-pill border border-gray-200 bg-white pl-11 pr-10 text-sm text-ink transition-colors placeholder:text-gray-400 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
-        />
-        {draft && (
-          <button
-            type="button"
-            onClick={() => setDraft("")}
-            aria-label="Limpar busca"
-            className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-ink"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-sm">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitSearch}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitSearch();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setDraft(q);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            placeholder="Buscar por nome ou e-mail (Enter pra aplicar)..."
+            className="h-11 w-full rounded-pill border border-gray-200 bg-white pl-11 pr-10 text-sm text-ink transition-colors placeholder:text-gray-400 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
+          />
+          {draft && (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft("");
+                pushParam("q", null);
+              }}
+              aria-label="Limpar busca"
+              className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-ink"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <PillGroup
+            label="Tipo"
+            value={role}
+            options={ROLE_FILTERS}
+            onChange={(v) => pushParam("role", v)}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <PillGroup
+          label="Cadastro"
+          value={createdWithin}
+          options={CREATED_WITHIN_FILTERS}
+          onChange={(v) => pushParam("createdWithin", v)}
+        />
         <PillGroup
           label="Assinatura"
           value={subscription}
           options={SUBSCRIPTION_FILTERS}
           onChange={(v) => pushParam("subscription", v)}
-        />
-        <PillGroup
-          label="Tipo"
-          value={role}
-          options={ROLE_FILTERS}
-          onChange={(v) => pushParam("role", v)}
         />
       </div>
     </div>

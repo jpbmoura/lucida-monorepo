@@ -23,8 +23,21 @@ export class KintalUsersController {
   list: RequestHandler = async (req, res, next) => {
     try {
       const query = listKintalUsersQuery.parse(req.query);
-      const items = await this.deps.listUsers.execute(query);
-      res.json({ users: items });
+      const result = await this.deps.listUsers.execute({
+        q: query.q,
+        subscription: query.subscription,
+        role: query.role,
+        createdWithin: query.createdWithin,
+        page: query.page,
+        pageSize: query.pageSize ?? query.limit,
+      });
+      res.json({
+        users: result.items,
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        hasMore: result.hasMore,
+      });
     } catch (err) {
       next(err);
     }

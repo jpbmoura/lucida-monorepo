@@ -13,6 +13,14 @@ export interface TicketMailer {
    * cliente de email.
    */
   sendReply(input: SendReplyInput): Promise<{ providerMessageId: string }>;
+
+  /**
+   * Envia email novo iniciado pelo staff (compose new no Kintal). Sem
+   * In-Reply-To — é o início da conversa. Mantém o mesmo Message-ID +
+   * plus-address do Reply-To pra que o cliente consiga responder e
+   * cair na mesma thread.
+   */
+  sendNew(input: SendNewInput): Promise<{ providerMessageId: string }>;
 }
 
 export interface SendReplyInput {
@@ -27,4 +35,16 @@ export interface SendReplyInput {
   bodyText: string;
   /** Message-ID da última mensagem do cliente, se houver — vai pro In-Reply-To. */
   inReplyTo?: string | null;
+}
+
+export interface SendNewInput {
+  ticketId: string;
+  /** UUID local da mensagem — vira parte do Message-ID. */
+  messageId: string;
+  /** Email do destinatário. */
+  toEmail: string;
+  /** Assunto — passado como digitado pelo staff (sem "Re:"). */
+  subject: string;
+  /** Texto puro escrito pelo staff. */
+  bodyText: string;
 }

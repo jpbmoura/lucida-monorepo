@@ -91,7 +91,7 @@ const ticketSchema = new Schema<TicketDoc>(
     status: {
       type: String,
       required: true,
-      enum: ["new", "in_progress", "done"],
+      enum: ["new", "in_progress", "done", "read"],
       index: true,
     },
     customerEmail: { type: String, required: true, index: true },
@@ -100,7 +100,8 @@ const ticketSchema = new Schema<TicketDoc>(
     origin: {
       type: String,
       required: true,
-      enum: ["email", "form"],
+      enum: ["email", "form", "staff"],
+      index: true,
     },
     messages: { type: [ticketMessageSchema], default: [] },
     doneAt: { type: Date, default: null },

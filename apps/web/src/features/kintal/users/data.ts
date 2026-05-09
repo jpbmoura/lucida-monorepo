@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import type {
   AdjustCreditsActionResult,
+  CreatedWithinFilter,
   GetKintalUserResponse,
   KintalUserDetail,
-  KintalUserListItem,
   KintalUsersActionResult,
   ListKintalUsersResponse,
   RoleFilter,
@@ -17,25 +17,30 @@ interface ListKintalUsersFilters {
   q?: string;
   subscription?: SubscriptionFilter;
   role?: RoleFilter;
-  limit?: number;
+  createdWithin?: CreatedWithinFilter;
+  page?: number;
+  pageSize?: number;
 }
 
 export async function fetchKintalUsers(
   filters: ListKintalUsersFilters,
-): Promise<KintalUserListItem[]> {
+): Promise<ListKintalUsersResponse> {
   const sp = new URLSearchParams();
   if (filters.q) sp.set("q", filters.q);
   if (filters.subscription && filters.subscription !== "any") {
     sp.set("subscription", filters.subscription);
   }
   if (filters.role && filters.role !== "any") sp.set("role", filters.role);
-  if (filters.limit) sp.set("limit", String(filters.limit));
+  if (filters.createdWithin && filters.createdWithin !== "all") {
+    sp.set("createdWithin", filters.createdWithin);
+  }
+  if (filters.page && filters.page > 1) sp.set("page", String(filters.page));
+  if (filters.pageSize) sp.set("pageSize", String(filters.pageSize));
 
   const qs = sp.toString();
-  const data = await apiFetch<ListKintalUsersResponse>(
+  return apiFetch<ListKintalUsersResponse>(
     `/api/kintal/users${qs ? `?${qs}` : ""}`,
   );
-  return data.users;
 }
 
 export async function fetchKintalUser(

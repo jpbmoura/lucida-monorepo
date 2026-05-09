@@ -1,5 +1,12 @@
-export type SubscriptionFilter = "any" | "with" | "without";
+export type SubscriptionFilter =
+  | "any"
+  | "without"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "paused";
 export type RoleFilter = "any" | "user" | "staff";
+export type CreatedWithinFilter = "all" | "today" | "7d" | "30d";
 
 export interface KintalUserListItem {
   id: string;
@@ -101,6 +108,10 @@ export interface KintalUserDetail {
 
 export interface ListKintalUsersResponse {
   users: KintalUserListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 export interface GetKintalUserResponse {
@@ -115,10 +126,16 @@ export type AdjustCreditsActionResult =
   | { ok: true; newBalance: number; delta: number }
   | { ok: false; code: string; message: string };
 
-export const SUBSCRIPTION_FILTERS: { value: SubscriptionFilter; label: string }[] = [
-  { value: "any", label: "Todos" },
-  { value: "with", label: "Com assinatura" },
+export const SUBSCRIPTION_FILTERS: {
+  value: SubscriptionFilter;
+  label: string;
+}[] = [
+  { value: "any", label: "Qualquer" },
   { value: "without", label: "Sem assinatura" },
+  { value: "active", label: "Ativa" },
+  { value: "past_due", label: "Inadimplente" },
+  { value: "canceled", label: "Cancelada" },
+  { value: "paused", label: "Pausada" },
 ];
 
 export const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
@@ -127,12 +144,33 @@ export const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
   { value: "staff", label: "Staff" },
 ];
 
+export const CREATED_WITHIN_FILTERS: {
+  value: CreatedWithinFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "Todos" },
+  { value: "today", label: "Hoje" },
+  { value: "7d", label: "7 dias" },
+  { value: "30d", label: "30 dias" },
+];
+
 export function isSubscriptionFilter(v: string): v is SubscriptionFilter {
-  return v === "any" || v === "with" || v === "without";
+  return (
+    v === "any" ||
+    v === "without" ||
+    v === "active" ||
+    v === "past_due" ||
+    v === "canceled" ||
+    v === "paused"
+  );
 }
 
 export function isRoleFilter(v: string): v is RoleFilter {
   return v === "any" || v === "user" || v === "staff";
+}
+
+export function isCreatedWithinFilter(v: string): v is CreatedWithinFilter {
+  return v === "all" || v === "today" || v === "7d" || v === "30d";
 }
 
 export const PLAN_LABELS: Record<string, string> = {

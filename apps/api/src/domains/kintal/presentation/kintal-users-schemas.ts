@@ -2,10 +2,18 @@ import { z } from "zod";
 
 export const listKintalUsersQuery = z.object({
   q: z.string().optional(),
-  subscription: z.enum(["any", "with", "without"]).optional(),
+  subscription: z
+    .enum(["any", "without", "active", "past_due", "canceled", "paused"])
+    .optional(),
   role: z.enum(["any", "user", "staff"]).optional(),
+  createdWithin: z.enum(["today", "7d", "30d"]).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(200).optional(),
+  /**
+   * Mantido por retrocompatibilidade — quando passado sem `pageSize`
+   * vira o pageSize. Novos consumidores devem usar `page`/`pageSize`.
+   */
   limit: z.coerce.number().int().min(1).max(200).optional(),
-  before: z.coerce.date().optional(),
 });
 
 export const userIdParams = z.object({

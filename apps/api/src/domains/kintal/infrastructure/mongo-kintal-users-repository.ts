@@ -19,6 +19,7 @@ import type {
   KintalUserOrgInfo,
   KintalUsersRepository,
   ListKintalUsersFilter,
+  ListKintalUsersResult,
   SubscriptionStatus,
 } from "../application/ports/kintal-users-repository.js";
 
@@ -79,8 +80,12 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
     return this.authDb.collection("user");
   }
 
-  async list(filter: ListKintalUsersFilter): Promise<KintalUserListItem[]> {
-    const limit = filter.limit ?? 50;
+  async list(
+    filter: ListKintalUsersFilter,
+  ): Promise<ListKintalUsersResult> {
+    const pageSize = clampPageSize(filter.pageSize);
+    const page = filter.page && filter.page > 0 ? filter.page : 1;
+    const skip = (page - 1) * pageSize;
 
     const mongoFilter: Filter<Record<string, unknown>> = {};
     if (filter.q) {
@@ -95,24 +100,48 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
     } else if (filter.role === "user") {
       mongoFilter.role = { $ne: "staff" };
     }
-    if (filter.before) {
-      mongoFilter.createdAt = { $lt: filter.before };
+    if (filter.createdAfter) {
+      mongoFilter.createdAt = { $gte: filter.createdAfter };
     }
 
-    // Busca um pool maior — depois filtramos por subscription e cortamos no
-    // limit. Cap em 500 evita escan inteiro da coleção em filtros amplos.
-    const fetchSize =
-      filter.subscription && filter.subscription !== "any"
-        ? Math.min(500, limit * 4)
-        : limit;
+    // Pré-filtragem por subscription: como `subscriptions` vive num DB
+    // diferente do `user` (BA), não podemos $lookup. Estratégia: buscar
+    // os ownerIds que batem com o filtro de assinatura primeiro, depois
+    // restringir o `users.find` por `_id IN/NIN`. Permite skip+limit +
+    // count exatos (vs filtragem em-memória que destruía paginação).
+    if (filter.subscription && filter.subscription !== "any") {
+      const ownerIdsForSubFilter = await fetchOwnerIdsForSubscription(
+        filter.subscription,
+      );
+      const oids = ownerIdsToObjectIds(ownerIdsForSubFilter);
 
-    const rows = (await this.users
-      .find(mongoFilter)
-      .sort({ createdAt: -1 })
-      .limit(fetchSize)
-      .toArray()) as unknown as BaUserDoc[];
+      if (filter.subscription === "without") {
+        // Sem assinatura ativa = NOT IN (active|past_due). Curtos os ativos
+        // (poucos milhares no máximo), `$nin` é viável.
+        if (oids.length > 0) mongoFilter._id = { $nin: oids };
+      } else {
+        // Status específico — IN. Se a lista estiver vazia, retorna nada.
+        if (oids.length === 0) {
+          return { items: [], total: 0, hasMore: false };
+        }
+        mongoFilter._id = { $in: oids };
+      }
+    }
 
-    if (rows.length === 0) return [];
+    const usersCollection = this.users;
+    const [rows, total] = await Promise.all([
+      usersCollection
+        .find(mongoFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .toArray() as unknown as Promise<BaUserDoc[]>,
+      usersCollection.countDocuments(mongoFilter),
+    ]);
+
+    if (rows.length === 0) {
+      return { items: [], total, hasMore: false };
+    }
 
     const ownerIds = rows.map((r) => baUserId(r));
     const [subs, wallets] = await Promise.all([
@@ -123,7 +152,7 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
     const subByOwner = new Map(subs.map((s) => [s.ownerId, s]));
     const balByOwner = new Map(wallets.map((w) => [w._id, w.total]));
 
-    let items = rows.map<KintalUserListItem>((r) => {
+    const items = rows.map<KintalUserListItem>((r) => {
       const id = baUserId(r);
       const sub = subByOwner.get(id) ?? null;
       return {
@@ -143,13 +172,11 @@ export class MongoKintalUsersRepository implements KintalUsersRepository {
       };
     });
 
-    if (filter.subscription === "with") {
-      items = items.filter((i) => i.subscription !== null);
-    } else if (filter.subscription === "without") {
-      items = items.filter((i) => i.subscription === null);
-    }
-
-    return items.slice(0, limit);
+    return {
+      items,
+      total,
+      hasMore: skip + items.length < total,
+    };
   }
 
   async findById(userId: string): Promise<KintalUserDetail | null> {
@@ -705,4 +732,46 @@ function round1(value: number): number {
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
+function clampPageSize(raw: number | undefined): number {
+  if (!raw || raw <= 0) return DEFAULT_PAGE_SIZE;
+  return Math.min(raw, MAX_PAGE_SIZE);
+}
+
+/**
+ * Busca todos os ownerIds (string) que batem com o filtro de assinatura.
+ * Pra `"without"` retorna a lista de ownerIds com assinatura ativa
+ * (active|past_due) — caller usa `$nin` em cima disso.
+ *
+ * Volume esperado é baixo (centenas/milhares); query não tem limit
+ * propositalmente. Se virar gargalo, indexar `subscriptions.status`.
+ */
+async function fetchOwnerIdsForSubscription(
+  filter: Exclude<ListKintalUsersFilter["subscription"], undefined | "any">,
+): Promise<string[]> {
+  const statuses: SubscriptionStatus[] =
+    filter === "without"
+      ? ["active", "past_due"]
+      : [filter];
+  const docs = await SubscriptionModel.find({
+    status: { $in: statuses },
+  })
+    .select("ownerId")
+    .lean<Array<{ ownerId: string }>>()
+    .exec();
+  // Dedup — pode haver subscriptions múltiplas pra mesmo owner durante
+  // migrações de plano.
+  return [...new Set(docs.map((d) => d.ownerId))];
+}
+
+function ownerIdsToObjectIds(ids: string[]): ObjectId[] {
+  const out: ObjectId[] = [];
+  for (const id of ids) {
+    if (ObjectId.isValid(id)) out.push(new ObjectId(id));
+  }
+  return out;
 }

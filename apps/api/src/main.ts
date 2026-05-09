@@ -170,10 +170,13 @@ import {
 } from "@/domains/tickets/infrastructure/resend-ticket-mailer.js";
 import { HandleInboundEmailUseCase } from "@/domains/tickets/application/handle-inbound-email.js";
 import { ReplyToTicketUseCase } from "@/domains/tickets/application/reply-to-ticket.js";
+import { SendNewEmailUseCase } from "@/domains/tickets/application/send-new-email.js";
 import {
   CloseTicketUseCase,
+  MarkReadTicketUseCase,
   ReopenTicketUseCase,
 } from "@/domains/tickets/application/close-ticket.js";
+import { BulkUpdateStatusUseCase } from "@/domains/tickets/application/bulk-update-status.js";
 import { ListTicketsUseCase } from "@/domains/tickets/application/list-tickets.js";
 import { GetTicketUseCase } from "@/domains/tickets/application/get-ticket.js";
 import { TicketsController } from "@/domains/tickets/presentation/tickets-controller.js";
@@ -647,13 +650,23 @@ export async function buildApp(): Promise<Express> {
   const replyToTicketUseCase = ticketMailer
     ? new ReplyToTicketUseCase(ticketRepository, ticketMailer)
     : null;
+  const sendNewEmailUseCase = ticketMailer
+    ? new SendNewEmailUseCase(
+        ticketRepository,
+        ticketMailer,
+        new BaUserLookup(authDb),
+      )
+    : null;
   const ticketsController = new TicketsController({
     handleInboundEmail: handleInboundEmailUseCase,
     list: new ListTicketsUseCase(ticketRepository),
     get: new GetTicketUseCase(ticketRepository),
     reply: replyToTicketUseCase,
+    sendNew: sendNewEmailUseCase,
     markDone: new CloseTicketUseCase(ticketRepository),
+    markRead: new MarkReadTicketUseCase(ticketRepository),
     reopen: new ReopenTicketUseCase(ticketRepository),
+    bulkUpdateStatus: new BulkUpdateStatusUseCase(ticketRepository),
     repository: ticketRepository,
   });
 

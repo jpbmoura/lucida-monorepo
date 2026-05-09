@@ -22,6 +22,22 @@ export class CloseTicketUseCase {
   }
 }
 
+/**
+ * Marca ticket como `read` — terminal igual a `done`, mas pra emails
+ * que não viraram thread (notificações automáticas, marketing). Cliente
+ * respondendo reabre automático (mesma lógica de done).
+ */
+export class MarkReadTicketUseCase {
+  constructor(private readonly tickets: TicketRepository) {}
+
+  async execute(input: CloseTicketInput): Promise<void> {
+    const ticket = await this.tickets.findById(TicketId.of(input.ticketId));
+    if (!ticket) throw new TicketNotFoundError();
+    ticket.markRead();
+    await this.tickets.save(ticket);
+  }
+}
+
 /** Reabertura manual via UI (auto-reabrir acontece em addInboundMessage). */
 export class ReopenTicketUseCase {
   constructor(private readonly tickets: TicketRepository) {}

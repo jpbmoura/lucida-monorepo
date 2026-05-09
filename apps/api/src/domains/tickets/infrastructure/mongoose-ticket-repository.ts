@@ -3,14 +3,18 @@ import { Ticket } from "../domain/ticket.js";
 import { TicketId } from "../domain/ticket-id.js";
 import { TicketMessage } from "../domain/ticket-message.js";
 import type {
+  CountsByBox,
   ListTicketsOptions,
+  TicketBox,
   TicketRepository,
 } from "../domain/ticket-repository.js";
-import type { TicketStatus } from "../domain/ticket-status.js";
 import { TicketModel, type TicketDoc } from "./ticket-schema.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+const INBOX_ORIGINS = ["email", "form"] as const;
+const OUTBOX_ORIGINS = ["staff"] as const;
 
 export class MongooseTicketRepository implements TicketRepository {
   nextId(): TicketId {
@@ -75,6 +79,7 @@ export class MongooseTicketRepository implements TicketRepository {
     const limit = clampLimit(opts.limit);
     const filter: Record<string, unknown> = {};
     if (opts.status) filter.status = opts.status;
+    if (opts.box) filter.origin = { $in: originsForBox(opts.box) };
     if (opts.before) filter.updatedAt = { $lt: opts.before };
     const docs = await TicketModel.find(filter)
       .sort({ updatedAt: -1 })
@@ -100,14 +105,46 @@ export class MongooseTicketRepository implements TicketRepository {
     return docs.map(toEntity);
   }
 
-  countByStatus(status: TicketStatus): Promise<number> {
-    return TicketModel.countDocuments({ status }).exec();
+  async countByBoxAndStatus(): Promise<CountsByBox> {
+    // Agrega num só round-trip pra evitar 6 queries.
+    const rows = await TicketModel.aggregate<{
+      _id: { box: TicketBox; status: TicketDoc["status"] };
+      count: number;
+    }>([
+      {
+        $project: {
+          status: 1,
+          box: {
+            $cond: [
+              { $in: ["$origin", [...OUTBOX_ORIGINS]] },
+              "outbox",
+              "inbox",
+            ],
+          },
+        },
+      },
+      { $group: { _id: { box: "$box", status: "$status" }, count: { $sum: 1 } } },
+    ]).exec();
+
+    const counts: CountsByBox = {
+      inbox: { new: 0, in_progress: 0, done: 0, read: 0 },
+      outbox: { new: 0, in_progress: 0, done: 0, read: 0 },
+    };
+    for (const row of rows) {
+      const { box, status } = row._id;
+      if (counts[box]) counts[box][status] = row.count;
+    }
+    return counts;
   }
 }
 
 function clampLimit(raw: number | undefined): number {
   if (!raw || raw <= 0) return DEFAULT_LIMIT;
   return Math.min(raw, MAX_LIMIT);
+}
+
+function originsForBox(box: TicketBox): readonly string[] {
+  return box === "outbox" ? OUTBOX_ORIGINS : INBOX_ORIGINS;
 }
 
 function toEntity(doc: TicketDoc): Ticket {

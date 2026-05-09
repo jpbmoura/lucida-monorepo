@@ -1,7 +1,12 @@
 import type { RequestHandler } from "express";
 import { env } from "@/env.js";
 import { markEventProcessed } from "@/domains/billing/infrastructure/webhook-idempotency.js";
-import type { CloseTicketUseCase, ReopenTicketUseCase } from "../application/close-ticket.js";
+import type {
+  CloseTicketUseCase,
+  MarkReadTicketUseCase,
+  ReopenTicketUseCase,
+} from "../application/close-ticket.js";
+import type { BulkUpdateStatusUseCase } from "../application/bulk-update-status.js";
 import type { GetTicketUseCase } from "../application/get-ticket.js";
 import type {
   HandleInboundEmailInput,
@@ -9,6 +14,7 @@ import type {
 } from "../application/handle-inbound-email.js";
 import type { ListTicketsUseCase } from "../application/list-tickets.js";
 import type { ReplyToTicketUseCase } from "../application/reply-to-ticket.js";
+import type { SendNewEmailUseCase } from "../application/send-new-email.js";
 import type { Ticket } from "../domain/ticket.js";
 import { TicketId } from "../domain/ticket-id.js";
 import type { TicketMessage } from "../domain/ticket-message.js";
@@ -20,7 +26,13 @@ import {
   resendInboundEventSchema,
 } from "../infrastructure/resend/resend-inbound-event-schema.js";
 import { verifyResendInboundWebhook } from "../infrastructure/resend/resend-inbound-verify.js";
-import { listTicketsQuery, replyBody, ticketIdParam } from "./tickets-schemas.js";
+import {
+  bulkUpdateStatusBody,
+  composeBody,
+  listTicketsQuery,
+  replyBody,
+  ticketIdParam,
+} from "./tickets-schemas.js";
 
 interface Deps {
   /** Opcional — null quando Resend Inbound (TICKETS_INBOUND_SECRET) não configurado. */
@@ -28,8 +40,12 @@ interface Deps {
   list: ListTicketsUseCase;
   get: GetTicketUseCase;
   reply: ReplyToTicketUseCase | null;
+  /** Opcional — null quando TICKETS_FROM_EMAIL não configurado. */
+  sendNew: SendNewEmailUseCase | null;
   markDone: CloseTicketUseCase;
+  markRead: MarkReadTicketUseCase;
   reopen: ReopenTicketUseCase;
+  bulkUpdateStatus: BulkUpdateStatusUseCase;
   /**
    * Repositório usado pra hidratar o detalhe com `relatedTickets` (outras
    * threads do mesmo customerEmail). Inicial pequeno, fica inline aqui em
@@ -169,8 +185,10 @@ export class TicketsController {
   list: RequestHandler = async (req, res, next) => {
     try {
       const query = listTicketsQuery.parse(req.query);
+      const box = query.box ?? "inbox";
       const items = await this.deps.list.execute({
         status: query.status,
+        box,
         limit: query.limit,
         before: query.before,
       });
@@ -228,10 +246,45 @@ export class TicketsController {
     }
   };
 
+  compose: RequestHandler = async (req, res, next) => {
+    try {
+      if (!this.deps.sendNew) {
+        res.status(503).json({
+          code: "TICKETS_NOT_CONFIGURED",
+          message: "Tickets não está habilitado neste ambiente.",
+        });
+        return;
+      }
+      const body = composeBody.parse(req.body);
+      const ctx = req.auth!;
+      const result = await this.deps.sendNew.execute({
+        customerEmail: body.customerEmail,
+        customerName: body.customerName ?? null,
+        subject: body.subject,
+        bodyText: body.bodyText,
+        staffEmail: ctx.realEmail ?? "",
+        staffName: null,
+      });
+      res.status(201).json({ data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   markDone: RequestHandler = async (req, res, next) => {
     try {
       const { id } = ticketIdParam.parse(req.params);
       await this.deps.markDone.execute({ ticketId: id });
+      res.json({ data: { ok: true } });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  markRead: RequestHandler = async (req, res, next) => {
+    try {
+      const { id } = ticketIdParam.parse(req.params);
+      await this.deps.markRead.execute({ ticketId: id });
       res.json({ data: { ok: true } });
     } catch (err) {
       next(err);
@@ -243,6 +296,19 @@ export class TicketsController {
       const { id } = ticketIdParam.parse(req.params);
       await this.deps.reopen.execute({ ticketId: id });
       res.json({ data: { ok: true } });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  bulkStatus: RequestHandler = async (req, res, next) => {
+    try {
+      const body = bulkUpdateStatusBody.parse(req.body);
+      const result = await this.deps.bulkUpdateStatus.execute({
+        ids: body.ids,
+        status: body.status,
+      });
+      res.json({ data: result });
     } catch (err) {
       next(err);
     }

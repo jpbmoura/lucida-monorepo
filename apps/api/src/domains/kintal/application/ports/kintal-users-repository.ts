@@ -103,17 +103,45 @@ export interface KintalUserDetail extends KintalUserListItem {
   organizations: KintalUserOrgInfo[];
 }
 
+/**
+ * Filtro de assinatura na listagem.
+ *  - "any"      → sem filtro
+ *  - "without"  → users sem assinatura ativa (active|past_due)
+ *  - "active"|"past_due"|"canceled"|"paused" → match exato no status
+ *
+ * Não há mais opção "with" genérica; pra ver "qualquer assinatura ativa"
+ * use `"active"` (cobre o caso comum) ou combine queries pelo lado do
+ * cliente. Caso de "past_due" é rico o suficiente pra ter filtro próprio.
+ */
+export type ListSubscriptionFilter =
+  | "any"
+  | "without"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "paused";
+
 export interface ListKintalUsersFilter {
   /** Search livre — bate em name/email (case-insensitive, regex segura). */
   q?: string;
-  /** "with"/"without" filtra por presença de assinatura ativa. */
-  subscription?: "any" | "with" | "without";
+  /** Filtro de assinatura (status específico ou ausência). */
+  subscription?: ListSubscriptionFilter;
   /** Filtro por role: "user" (sem role) | "staff" | "any". */
   role?: "any" | "user" | "staff";
-  /** Limite de retorno. Default 50, max 200. */
-  limit?: number;
-  /** Cursor por createdAt (paginação simples). */
-  before?: Date;
+  /** Filtra por `createdAt: { $gte: createdAfter }` — useful pra "novos". */
+  createdAfter?: Date;
+  /** Página 1-indexada. Default 1. */
+  page?: number;
+  /** Tamanho da página. Default 50, max 200. */
+  pageSize?: number;
+}
+
+export interface ListKintalUsersResult {
+  items: KintalUserListItem[];
+  /** Total de matches no DB (após todos os filtros aplicados). */
+  total: number;
+  /** True quando há mais resultados além desta página. */
+  hasMore: boolean;
 }
 
 /**
@@ -122,7 +150,7 @@ export interface ListKintalUsersFilter {
  * N+1 nos consumidores.
  */
 export interface KintalUsersRepository {
-  list(filter: ListKintalUsersFilter): Promise<KintalUserListItem[]>;
+  list(filter: ListKintalUsersFilter): Promise<ListKintalUsersResult>;
   findById(userId: string): Promise<KintalUserDetail | null>;
 
   /**

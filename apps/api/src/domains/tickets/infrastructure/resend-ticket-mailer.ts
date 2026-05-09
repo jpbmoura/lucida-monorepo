@@ -1,6 +1,7 @@
 import { env } from "@/env.js";
 import { sendEmail } from "@/domains/iam/infrastructure/better-auth/send-email.js";
 import type {
+  SendNewInput,
   SendReplyInput,
   TicketMailer,
 } from "../application/ticket-mailer.js";
@@ -67,6 +68,43 @@ export class ResendTicketMailer implements TicketMailer {
 
     return { providerMessageId: result.resendId };
   }
+
+  async sendNew(
+    input: SendNewInput,
+  ): Promise<{ providerMessageId: string }> {
+    const fromParts = parseEmailAddress(this.fromEmail);
+    if (!fromParts) {
+      throw new Error(
+        `TICKETS_FROM_EMAIL inválido: ${this.fromEmail}`,
+      );
+    }
+    const messageIdHeader = buildOutboundMessageId(
+      input.ticketId,
+      input.messageId,
+      fromParts.domain,
+    );
+    const replyTo = buildReplyTo(input.ticketId, this.fromEmail);
+    const template = ticketReplyTemplate({ bodyText: input.bodyText });
+
+    // Sem In-Reply-To/References — é início de conversa. O Message-ID
+    // permite que o cliente, ao responder, mande In-Reply-To apontando
+    // pra ele e a gente correlacione via findByOutboundMessageId.
+    const headers: Record<string, string> = {
+      "Message-ID": messageIdHeader,
+    };
+
+    const result = await sendEmail({
+      from: this.fromEmail,
+      to: input.toEmail,
+      subject: input.subject,
+      html: template.html,
+      text: template.text,
+      replyTo: replyTo ?? undefined,
+      headers,
+    });
+
+    return { providerMessageId: result.resendId };
+  }
 }
 
 /**
@@ -76,6 +114,11 @@ export class ResendTicketMailer implements TicketMailer {
  */
 export class UnavailableTicketMailer implements TicketMailer {
   async sendReply(): Promise<never> {
+    throw new Error(
+      "Tickets não configurado. Defina TICKETS_FROM_EMAIL pra habilitar.",
+    );
+  }
+  async sendNew(): Promise<never> {
     throw new Error(
       "Tickets não configurado. Defina TICKETS_FROM_EMAIL pra habilitar.",
     );
