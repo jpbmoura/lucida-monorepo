@@ -29,13 +29,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   });
 
   // Antes de tudo: se o user é auxiliar (tem vínculos teacher_assistants
-  // ativos) mas NÃO escolheu um professor pra atender ainda, redireciona
-  // pro seletor. Mesma chamada serve pra montar o banner depois.
+  // ativos) mas NÃO escolheu nada ainda (nem professor, nem "própria
+  // conta"), redireciona pro seletor. Mesma chamada serve pra montar o
+  // banner depois. `selfMode` significa que ele já escolheu a própria
+  // conta no /auxiliar/escolher — deixa passar.
   const assistant = await fetchAssistantState().catch(() => null);
   if (
     assistant &&
     assistant.availableTeachers > 0 &&
-    !assistant.activeTarget
+    !assistant.activeTarget &&
+    !assistant.selfMode
   ) {
     redirect("/auxiliar/escolher");
   }
@@ -64,7 +67,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             teacherEmail={assistant.activeTarget.teacherEmail}
             assistantName={assistant.activeTarget.assistantName}
             assistantEmail={assistant.activeTarget.assistantEmail}
-            canSwitch={assistant.availableTeachers > 1}
           />
         )}
         {!assistant?.activeTarget &&
@@ -88,6 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             activeOrg?.myRole === "owner" || activeOrg?.myRole === "admin"
           }
           hideBalance={orgPays}
+          isAssistant={(assistant?.availableTeachers ?? 0) > 0}
         />
         {/* LowBalanceAlert é sobre saldo pessoal — some quando a instituição
             paga pela ação (pool/pay_per_use). O saldo pessoal fica congelado

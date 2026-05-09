@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ClickableCard, ClickableCardActions } from "@/components/ui/clickable-card";
 import { cn } from "@/lib/utils";
 import { deleteExamAction } from "@/features/app/provas/actions";
 import { DeleteExamDialog } from "@/features/app/provas/components/delete-exam-dialog";
@@ -81,19 +82,16 @@ function ExamRow({
   isLast: boolean;
 }) {
   return (
-    <li
+    <ClickableCard
+      as="li"
+      href={`/app/provas/${exam.id}`}
+      ariaLabel={`Abrir ${exam.title}`}
       className={cn(
-        "relative flex items-center gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
+        "flex items-center gap-5 px-6 py-4 transition-colors hover:bg-gray-50",
         !isLast && "border-b border-gray-100",
       )}
     >
-      <Link
-        href={`/app/provas/${exam.id}`}
-        className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
-        aria-label={`Abrir ${exam.title}`}
-      />
-
-      <div className="relative z-0 min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-ink">
           {exam.title}
         </div>
@@ -123,7 +121,7 @@ function ExamRow({
         </div>
       </div>
 
-      <div className="relative z-0 hidden min-w-28 items-center justify-end gap-1.5 text-xs text-gray-500 sm:flex">
+      <div className="hidden min-w-28 items-center justify-end gap-1.5 text-xs text-gray-500 sm:flex">
         <Users className="size-3.5 text-gray-400" />
         <span className="tabular-nums">
           {exam.submissionsCount}{" "}
@@ -131,7 +129,7 @@ function ExamRow({
         </span>
       </div>
 
-      <div className="relative z-0 hidden min-w-14 text-right text-sm sm:block">
+      <div className="hidden min-w-14 text-right text-sm sm:block">
         {exam.averageScore !== null ? (
           <span className="font-medium tabular-nums text-ink">
             {exam.averageScore.toLocaleString("pt-BR", {
@@ -144,8 +142,10 @@ function ExamRow({
         )}
       </div>
 
-      <ExamRowMenu exam={exam} classId={classId} />
-    </li>
+      <ClickableCardActions>
+        <ExamRowMenu exam={exam} classId={classId} />
+      </ClickableCardActions>
+    </ClickableCard>
   );
 }
 
@@ -191,7 +191,7 @@ function ExamRowMenu({
           stop(e);
           setOpen((v) => !v);
         }}
-        className="grid size-8 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-ink z-0"
+        className="grid size-8 place-items-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-ink"
       >
         <MoreHorizontal className="size-4" />
       </button>

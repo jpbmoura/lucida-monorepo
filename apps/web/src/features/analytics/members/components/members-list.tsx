@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Users } from "lucide-react";
+import { ClickableCard, ClickableCardActions } from "@/components/ui/clickable-card";
 import type { MemberDTO } from "../data";
 import { RevokeMemberButton } from "./revoke-member-button";
 
@@ -31,22 +31,17 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
         {members.map((m) => {
           const canRevoke = m.role !== "owner" && m.id !== currentUserId;
           return (
-            // `relative` pra posicionar o `<Link>` overlay absoluto. O botão
-            // de revogar fica num `relative z-10` pra ficar "por cima" do
-            // link de navegação e receber o click sozinho.
-            <li
+            <ClickableCard
               key={m.id}
-              className="group relative flex items-center gap-4 py-3 transition-colors first:pt-0 last:pb-0 hover:bg-gray-50/40"
+              as="li"
+              href={`/analytics/professores/${m.id}`}
+              ariaLabel={`Ver detalhes de ${m.name}`}
+              className="flex items-center gap-4 py-3 transition-colors first:pt-0 last:pb-0 hover:bg-gray-50/40"
             >
-              <Link
-                href={`/analytics/professores/${m.id}`}
-                aria-label={`Ver detalhes de ${m.name}`}
-                className="absolute inset-0 z-0 rounded-md focus-visible:outline-2 focus-visible:outline-analytics-primary"
-              />
-              <div className="pointer-events-none grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-analytics-primary to-analytics-dark-01 text-[12px] font-semibold text-white">
+              <div className="grid size-9 shrink-0 place-items-center rounded-full bg-linear-to-br from-analytics-primary to-analytics-dark-01 text-[12px] font-semibold text-white">
                 {initials(m.name)}
               </div>
-              <div className="pointer-events-none min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium text-ink">
                     {m.name}
@@ -72,14 +67,14 @@ export function MembersList({ members, currentUserId }: MembersListProps) {
               </div>
 
               {canRevoke && (
-                <div className="relative z-10">
+                <ClickableCardActions>
                   <RevokeMemberButton
                     memberName={m.name}
                     memberEmail={m.email}
                   />
-                </div>
+                </ClickableCardActions>
               )}
-            </li>
+            </ClickableCard>
           );
         })}
       </ul>

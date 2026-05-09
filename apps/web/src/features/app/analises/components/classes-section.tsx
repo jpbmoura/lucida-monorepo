@@ -1,10 +1,10 @@
-import Link from "next/link";
 import {
   AlertCircle,
   ArrowRight,
   Trophy,
   Users,
 } from "lucide-react";
+import { ClickableCard } from "@/components/ui/clickable-card";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { deriveTurmaInitials } from "@/features/app/turmas/utils";
@@ -57,54 +57,48 @@ function ClassRankingPanel({
           </div>
         </div>
       </header>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50/60 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500">
-            <th className="px-5 py-2.5">Turma</th>
-            <th className="hidden px-5 py-2.5 text-right md:table-cell">Alunos</th>
-            <th className="hidden px-5 py-2.5 text-right md:table-cell">Submissões</th>
-            <th className="px-5 py-2.5 text-right">Média</th>
-          </tr>
-        </thead>
-        <tbody>
-          {classes.map((cls, i) => (
-            <tr
-              key={cls.classId}
-              className={cn(
-                "group transition-colors hover:bg-gray-50",
-                i < classes.length - 1 && "border-b border-gray-100",
+      <div className="hidden grid-cols-[1fr_auto_auto_auto] items-center gap-4 border-b border-gray-100 bg-gray-50/60 px-5 py-2.5 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500 md:grid">
+        <span>Turma</span>
+        <span className="min-w-16 text-right">Alunos</span>
+        <span className="min-w-20 text-right">Submissões</span>
+        <span className="min-w-14 text-right">Média</span>
+      </div>
+      <ul>
+        {classes.map((cls, i) => (
+          <ClickableCard
+            key={cls.classId}
+            as="li"
+            href={`/app/analises/turmas/${cls.classId}`}
+            ariaLabel={`Abrir análise de ${cls.className}`}
+            className={cn(
+              "grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-gray-50 md:grid-cols-[1fr_auto_auto_auto]",
+              i < classes.length - 1 && "border-b border-gray-100",
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-primary text-[12px] font-semibold text-white">
+                {deriveTurmaInitials(cls.className)}
+              </span>
+              <span className="truncate text-sm font-medium text-ink transition-colors group-hover:text-brand-primary">
+                {cls.className}
+              </span>
+            </div>
+            <span className="hidden min-w-16 text-right text-sm text-gray-500 tabular-nums md:block">
+              {cls.studentCount}
+            </span>
+            <span className="hidden min-w-20 text-right text-sm text-gray-500 tabular-nums md:block">
+              {cls.submissionsInPeriod}
+            </span>
+            <div className="min-w-14 text-right text-sm">
+              {cls.averageScore !== null ? (
+                <ScoreBadge score={cls.averageScore} />
+              ) : (
+                <span className="text-xs text-gray-400">sem dados</span>
               )}
-            >
-              <td className="px-5 py-3">
-                <Link
-                  href={`/app/analises/turmas/${cls.classId}`}
-                  className="flex items-center gap-3"
-                >
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-primary text-[12px] font-semibold text-white">
-                    {deriveTurmaInitials(cls.className)}
-                  </span>
-                  <span className="truncate font-medium text-ink transition-colors group-hover:text-brand-primary">
-                    {cls.className}
-                  </span>
-                </Link>
-              </td>
-              <td className="hidden px-5 py-3 text-right text-gray-500 tabular-nums md:table-cell">
-                {cls.studentCount}
-              </td>
-              <td className="hidden px-5 py-3 text-right text-gray-500 tabular-nums md:table-cell">
-                {cls.submissionsInPeriod}
-              </td>
-              <td className="px-5 py-3 text-right">
-                {cls.averageScore !== null ? (
-                  <ScoreBadge score={cls.averageScore} />
-                ) : (
-                  <span className="text-xs text-gray-400">sem dados</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </div>
+          </ClickableCard>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -147,15 +141,18 @@ function AtRiskPanel({
       </header>
       <ul>
         {students.map((s, i) => (
-          <li
+          <ClickableCard
             key={s.studentId}
+            as="li"
+            href={`/app/analises/alunos/${s.studentId}`}
+            ariaLabel={`Abrir análise de ${s.studentName}`}
             className={cn(
               "flex items-center gap-3 px-5 py-3 transition-colors hover:bg-gray-50",
               i < students.length - 1 && "border-b border-gray-100",
             )}
           >
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-ink">
+              <div className="truncate text-sm font-medium text-ink transition-colors group-hover:text-brand-primary">
                 {s.studentName}
               </div>
               <div className="mt-0.5 truncate text-[11px] text-gray-500">
@@ -167,14 +164,13 @@ function AtRiskPanel({
               </div>
             </div>
             <ScoreBadge score={s.lastScore} />
-            <Link
-              href={`/app/analises/alunos/${s.studentId}`}
-              aria-label="Abrir análise do aluno"
-              className="shrink-0 text-gray-400 transition-colors hover:text-ink"
+            <span
+              aria-hidden
+              className="shrink-0 text-gray-400 transition-colors group-hover:text-ink"
             >
               <ArrowRight className="size-4" />
-            </Link>
-          </li>
+            </span>
+          </ClickableCard>
         ))}
       </ul>
     </div>

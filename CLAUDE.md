@@ -1,9 +1,9 @@
 # CLAUDE.md — lucida-monorepo
 
-Monorepo unificado da Lucida. Está consolidando os quatro projetos legados que vivem
-no workspace pai (`lucida-api-v2`, `lucida-api`, `lucida-client`, `lucida-lp`) — a maior
-parte das features já foi migrada e este monorepo é o codebase ativo. Veja
-[`../CLAUDE.md`](../CLAUDE.md) para o status do que ainda existe nos projetos antigos.
+Monorepo unificado da Lucida — codebase canônico. Substitui os quatro projetos legados
+(`lucida-api-v2`, `lucida-api`, `lucida-client`, `lucida-lp`) que ainda existem no
+workspace pai apenas como referência histórica. Veja [`../CLAUDE.md`](../CLAUDE.md) para
+o que sobrou neles.
 
 ## Layout
 
@@ -60,7 +60,7 @@ Domínios já migrados:
 
 Stack: `express` 5, `mongoose` 8, `better-auth`, `zod`, `stripe`, `openai`, `resend`,
 `multer`, `pdf-parse`, `mammoth`, `docx`, `youtube-transcript`, `cors`. Dev: `tsx`, `tsc-alias`, `vitest`.
-Path alias `@/*` → `src/*`.
+Path alias `@/*` → `src/*` (resolvido em build pelo `tsc-alias`).
 
 ### `apps/web` — `@lucida/web`
 
@@ -96,6 +96,24 @@ Topologia de rotas — usa route groups e folders top-level pra separar layouts:
 Features (lógica de UI por contexto) em [`apps/web/src/features/`](apps/web/src/features/):
 `marketing`, `auth`, `app`, `analytics`, `kintal`, `roadmap`, `public-exam`, `accept-invite`, `docs`, `notifications`.
 
+Path alias `@/*` → `src/*` (configurado em [`apps/web/tsconfig.json`](apps/web/tsconfig.json)).
+
+## Antes de rodar local
+
+- Node ≥ 20.11, pnpm ≥ 9.12.
+- **MongoDB com replica set** (`--replSet rs0` + `rs.initiate()`) ou Atlas. Sem isso,
+  qualquer débito de crédito quebra — o `AtomicDebitService` usa `session.withTransaction`,
+  que exige replica set.
+- Copiar `apps/api/.env.example` → `apps/api/.env` e `apps/web/.env.example` →
+  `apps/web/.env.local`. Schema completo das envs validado por Zod em
+  [`apps/api/src/env.ts`](apps/api/src/env.ts) (web só usa `NEXT_PUBLIC_API_URL`).
+- Mínimo pra subir api: `MONGODB_URI`, `AUTH_SECRET` (≥ 32 chars), `AUTH_BASE_URL`,
+  `WEB_ORIGIN`, `GOOGLE_CLIENT_ID/SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `OPENAI_API_KEY`.
+- Opcionais — sem eles, a feature correspondente devolve 503/502 mas o resto continua:
+  `OMR_SERVICE_URL` (scan), `STRIPE_*` (checkout/portal), `ABACATEPAY_*` (PIX top-up),
+  `CRON_SECRET` (expiração de wallets), `TICKETS_INBOUND_SECRET` (Resend Inbound),
+  `NFEIO_*` (emissão de NFS-e).
+
 ## Comandos
 
 Rode a partir da raiz do monorepo:
@@ -111,8 +129,8 @@ Rode a partir da raiz do monorepo:
 | `pnpm lint` | Lint recursivo (api: `tsc --noEmit`; web: `next lint`) |
 | `pnpm typecheck` | `tsc --noEmit` em todos os workspaces |
 
-Testes só na api: `pnpm --filter @lucida/api test` (vitest run) ou `test:watch`.
-Web não tem test runner.
+Vitest está instalado e configurado na api (`pnpm --filter @lucida/api test` ou
+`test:watch`), mas o repo ainda não tem testes escritos. Web não tem test runner.
 
 Para rodar comandos em um workspace específico:
 ```
@@ -129,13 +147,16 @@ Vivem em [`apps/api/scripts/`](apps/api/scripts/) e rodam via `pnpm --filter @lu
 | `migrate:legacy` | Importa dados do MongoDB dos projetos legados. |
 | `migrate:legacy-rename` | Renomeia coleções legadas in-place. |
 | `migrate:billing-scope` | Migra escopo billing user → organization. |
+| `migrate:normalize-user-ids` | Normaliza referências legacy de userId pra ObjectId BetterAuth. |
+| `diagnose:legacy-ids` | Audita coleções procurando user IDs no formato antigo. |
 | `seed:test-org` | Cria organização de teste com dados sintéticos. |
 | `seed:roadmap` | Popula itens iniciais do roadmap. |
 | `backfill:student-org` / `backfill:class-org` | Preenche `organizationId` retroativo. |
 | `billing:add-org-credits` | Concede créditos manuais para uma org. |
 
 Há também utilitários soltos em `.mjs` na mesma pasta (`promote-staff.mjs`,
-`reset-password.mjs`, `inspect-accounts.mjs`).
+`reset-password.mjs`, `inspect-accounts.mjs`, `export-user-exam-links.mjs`) — rodar
+diretamente com `node`.
 
 ## Como os apps conversam
 

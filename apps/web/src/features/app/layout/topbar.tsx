@@ -22,6 +22,13 @@ interface TopbarProps {
    * não confundir o professor com um saldo que ele não pode gastar.
    */
   hideBalance: boolean;
+  /**
+   * True quando o user real é auxiliar (tem ≥1 vínculo ativo). Habilita
+   * o atalho "Trocar conta" no menu de perfil — leva pro
+   * /auxiliar/escolher pra trocar entre a própria conta e as contas dos
+   * professores que ele atende.
+   */
+  isAssistant: boolean;
 }
 
 export function Topbar({
@@ -32,6 +39,7 @@ export function Topbar({
   orgName,
   isOrgAdmin,
   hideBalance,
+  isAssistant,
 }: TopbarProps) {
   return (
     <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between gap-4 border-b border-gray-100 bg-white/85 px-5 backdrop-blur md:px-10">
@@ -48,7 +56,12 @@ export function Topbar({
 
         <div className="mx-2 h-6 w-px bg-gray-200" />
 
-        <ProfileMenu name={userName} email={userEmail} initials={initials} />
+        <ProfileMenu
+          name={userName}
+          email={userEmail}
+          initials={initials}
+          isAssistant={isAssistant}
+        />
       </div>
     </header>
   );

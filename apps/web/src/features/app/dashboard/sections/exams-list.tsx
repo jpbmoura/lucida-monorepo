@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, FileText } from "lucide-react";
+import { ClickableCard } from "@/components/ui/clickable-card";
 import { cn } from "@/lib/utils";
 import type { OverviewDTO } from "@/features/app/analises/data";
 
@@ -36,10 +37,13 @@ export function ExamsList({ exams }: ExamsListProps) {
       ) : (
         <ul>
           {exams.map((exam, i) => (
-            <li
+            <ClickableCard
               key={exam.examId}
+              as="li"
+              href={`/app/analises/provas/${exam.examId}`}
+              ariaLabel={`Abrir análise de ${exam.title}`}
               className={cn(
-                "group grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3.5 transition-[padding] hover:pl-1",
+                "grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3.5 transition-[padding] hover:pl-1",
                 i < exams.length - 1 && "border-b border-gray-100",
               )}
             >
@@ -47,12 +51,9 @@ export function ExamsList({ exams }: ExamsListProps) {
                 <FileText className="size-4" />
               </span>
               <div className="min-w-0">
-                <Link
-                  href={`/app/analises/provas/${exam.examId}`}
-                  className="block truncate text-sm font-medium text-ink transition-colors hover:text-brand-primary"
-                >
+                <div className="truncate text-sm font-medium text-ink transition-colors group-hover:text-brand-primary">
                   {exam.title}
-                </Link>
+                </div>
                 <div className="mt-0.5 text-xs text-gray-500">
                   {exam.className}
                   <span className="mx-1.5 text-gray-300">·</span>
@@ -63,14 +64,13 @@ export function ExamsList({ exams }: ExamsListProps) {
                 </div>
               </div>
               <ScoreBadge score={exam.averageScore} />
-              <Link
-                href={`/app/analises/provas/${exam.examId}`}
-                aria-label="Abrir análise"
-                className="shrink-0 text-gray-400 transition-colors hover:text-ink"
+              <span
+                aria-hidden
+                className="shrink-0 text-gray-400 transition-colors group-hover:text-ink"
               >
                 <ArrowRight className="size-4" />
-              </Link>
-            </li>
+              </span>
+            </ClickableCard>
           ))}
         </ul>
       )}

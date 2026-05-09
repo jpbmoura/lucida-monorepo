@@ -32,6 +32,7 @@ export function makeOptionalAuth(auth: Auth): RequestHandler {
           realUserRole,
           isImpersonating: false,
           isAssistant: false,
+          assistantSelfMode: false,
           sessionId: session.session.id,
           activeOrganizationId,
         };

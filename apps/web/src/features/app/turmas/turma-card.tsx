@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { MoreHorizontal, Users, FileText, Zap, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { ClickableCard, ClickableCardActions } from "@/components/ui/clickable-card";
 import type { TurmaDTO } from "./types";
 import { deriveTurmaInitials } from "./utils";
 
@@ -16,14 +16,12 @@ interface TurmaCardProps {
 
 export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
   return (
-    <article className="group relative flex flex-col gap-5 rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:border-gray-200 hover:shadow-soft">
-      <Link
-        href={`/app/turmas/${turma.id}`}
-        aria-label={`Abrir ${turma.name}`}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
-      />
-
-      <header className="relative z-10 flex items-start justify-between gap-3">
+    <ClickableCard
+      href={`/app/turmas/${turma.id}`}
+      ariaLabel={`Abrir ${turma.name}`}
+      className="flex flex-col gap-5 rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:border-gray-200 hover:shadow-soft"
+    >
+      <header className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-primary text-sm font-semibold text-white">
             {deriveTurmaInitials(turma.name)}
@@ -36,10 +34,12 @@ export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
           </div>
         </div>
 
-        <CardMenu onEdit={onEdit} onDelete={onDelete} />
+        <ClickableCardActions>
+          <CardMenu onEdit={onEdit} onDelete={onDelete} />
+        </ClickableCardActions>
       </header>
 
-      <div className="relative z-0 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Chip icon={<Users className="size-3.5" />} label={`${turma.studentsCount} alunos`} />
         <Chip icon={<FileText className="size-3.5" />} label={`${turma.examsCount} provas`} />
         {turma.activeExamsCount > 0 && (
@@ -51,7 +51,7 @@ export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
         )}
       </div>
 
-      <footer className="relative z-0 flex items-center justify-between text-[11px] text-gray-400">
+      <footer className="flex items-center justify-between text-[11px] text-gray-400">
         <span>Atualizada {formatRelativeTime(turma.lastActivityAt, "— sem atividade")}</span>
         <span
           aria-hidden
@@ -60,7 +60,7 @@ export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
           →
         </span>
       </footer>
-    </article>
+    </ClickableCard>
   );
 }
 

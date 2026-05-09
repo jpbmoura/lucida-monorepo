@@ -44,19 +44,27 @@ export default async function AssistantPickerPage() {
             Auxiliar
           </div>
           <h1 className="text-3xl font-medium leading-tight tracking-tighter text-ink md:text-4xl">
-            Escolha o professor que{" "}
+            Escolha qual conta{" "}
             <span className="font-serif font-normal italic text-brand-primary">
-              você vai atender
+              você vai usar agora
             </span>
           </h1>
           <p className="mt-3 text-[15px] text-gray-500">
-            Você está logado como auxiliar. Tudo que fizer dentro do app vai
-            ser registrado em nome do professor escolhido — incluindo provas,
-            turmas e consumo de créditos.
+            Você pode entrar na sua própria conta ou em uma das contas dos
+            professores que você atende. Tudo que você fizer atendendo um
+            professor fica registrado em nome dele — incluindo provas, turmas
+            e consumo de créditos.
           </p>
         </div>
 
-        <TeacherPicker teachers={teachers} />
+        <TeacherPicker
+          teachers={teachers}
+          selfUser={{
+            id: session.user.id,
+            name: session.user.name ?? null,
+            email: session.user.email,
+          }}
+        />
       </section>
     </main>
   );

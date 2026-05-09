@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
@@ -6,6 +5,7 @@ import {
   FileText,
   TrendingUp,
 } from "lucide-react";
+import { ClickableCard } from "@/components/ui/clickable-card";
 import { cn } from "@/lib/utils";
 import { ActivityChart } from "./activity-chart";
 import { DistributionChart } from "./distribution-chart";
@@ -125,8 +125,11 @@ function LowPerformancePanel({
       </header>
       <ul>
         {exams.map((exam, i) => (
-          <li
+          <ClickableCard
             key={exam.examId}
+            as="li"
+            href={`/app/analises/provas/${exam.examId}`}
+            ariaLabel={`Abrir análise de ${exam.title}`}
             className={cn(
               "flex items-center gap-4 px-5 py-3 transition-colors hover:bg-gray-50",
               i < exams.length - 1 && "border-b border-gray-100",
@@ -136,12 +139,9 @@ function LowPerformancePanel({
               <FileText className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <Link
-                href={`/app/analises/provas/${exam.examId}`}
-                className="block truncate text-sm font-medium text-ink transition-colors hover:text-brand-primary"
-              >
+              <div className="truncate text-sm font-medium text-ink transition-colors group-hover:text-brand-primary">
                 {exam.title}
-              </Link>
+              </div>
               <div className="mt-0.5 text-[11px] text-gray-500">
                 {exam.className}
                 <span className="mx-1.5 text-gray-300">·</span>
@@ -152,14 +152,13 @@ function LowPerformancePanel({
               </div>
             </div>
             <ScoreBadge score={exam.averageScore} />
-            <Link
-              href={`/app/analises/provas/${exam.examId}`}
-              aria-label="Abrir análise da prova"
-              className="shrink-0 text-gray-400 transition-colors hover:text-ink"
+            <span
+              aria-hidden
+              className="shrink-0 text-gray-400 transition-colors group-hover:text-ink"
             >
               <ArrowRight className="size-4" />
-            </Link>
-          </li>
+            </span>
+          </ClickableCard>
         ))}
       </ul>
     </div>

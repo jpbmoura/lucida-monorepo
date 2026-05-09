@@ -18,6 +18,19 @@ export class AssistantTargetNotAvailableError extends DomainError {
   }
 }
 
+/**
+ * Tentativa de entrar em modo "atuar como o próprio user" sem ter
+ * vínculo nenhum de auxiliar. Sem vínculos não faz sentido carimbar
+ * o cookie — o user já é o próprio user no fluxo normal.
+ */
+export class NotAnAssistantError extends DomainError {
+  readonly code = "NOT_AN_ASSISTANT";
+  readonly statusCode = 403;
+  constructor() {
+    super("Sua conta não está vinculada como auxiliar de nenhum professor.");
+  }
+}
+
 /** Tentativa de criar dois vínculos ativos pro mesmo (assistant, teacher). */
 export class AssistantAlreadyLinkedError extends DomainError {
   readonly code = "ASSISTANT_ALREADY_LINKED";

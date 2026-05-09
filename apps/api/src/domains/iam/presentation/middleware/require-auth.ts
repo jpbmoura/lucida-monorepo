@@ -45,6 +45,14 @@ export interface AuthContext {
    * impersonate de admin org via cookie.
    */
   isAssistant: boolean;
+  /**
+   * True quando o user é auxiliar (tem ≥1 vínculo ativo) e o cookie
+   * de target aponta pra **ele mesmo** — escolha explícita de "entrar
+   * na própria conta" via /auxiliar/escolher. Usado pelo /app pra
+   * NÃO redirecionar de volta pro seletor. Mutuamente exclusivo com
+   * `isAssistant` (target === self → não impersonifica).
+   */
+  assistantSelfMode: boolean;
   sessionId: string;
   activeOrganizationId: string | null;
 }
@@ -125,6 +133,7 @@ export function makeRequireAuth(
       let email = realEmail;
       let isImpersonating = false;
       let isAssistant = false;
+      let assistantSelfMode = false;
 
       // Modo auxiliar tem precedência sobre o impersonate de admin —
       // um auxiliar não tem porque ter cookie de impersonate, e os dois
@@ -158,6 +167,13 @@ export function makeRequireAuth(
             isImpersonating = true;
             isAssistant = true;
           }
+        } else if (targetTeacherId && targetTeacherId === realUserId) {
+          // Cookie aponta pra própria conta — só conta como "self mode"
+          // se o user é mesmo auxiliar (≥1 vínculo). Sem o check, qualquer
+          // user com cookie carimbado erroneamente seria flageado.
+          const count =
+            await teacherAssistants.countActiveTeachersForAssistant(realUserId);
+          if (count > 0) assistantSelfMode = true;
         }
       }
 
@@ -263,6 +279,7 @@ export function makeRequireAuth(
         realUserRole,
         isImpersonating,
         isAssistant,
+        assistantSelfMode,
         sessionId: session.session.id,
         activeOrganizationId,
       };

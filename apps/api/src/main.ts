@@ -17,6 +17,7 @@ import { ListAssistantsForTeacherUseCase } from "@/domains/iam/application/list-
 import { ListTeachersForAssistantUseCase } from "@/domains/iam/application/list-teachers-for-assistant.js";
 import { RevokeAssistantUseCase } from "@/domains/iam/application/revoke-assistant.js";
 import { SelectAssistantTargetUseCase } from "@/domains/iam/application/select-assistant-target.js";
+import { SelectAssistantSelfTargetUseCase } from "@/domains/iam/application/select-assistant-self-target.js";
 import { AssistantController } from "@/domains/iam/presentation/assistant-controller.js";
 import { makeOptionalAuth } from "@/domains/iam/presentation/middleware/optional-auth.js";
 import { makeIamRouter } from "@/domains/iam/presentation/routes.js";
@@ -955,6 +956,9 @@ export async function buildApp(): Promise<Express> {
   const assistantController = new AssistantController({
     listTeachers: new ListTeachersForAssistantUseCase(teacherAssistantsRepository),
     selectTarget: new SelectAssistantTargetUseCase(teacherAssistantsRepository),
+    selectSelfTarget: new SelectAssistantSelfTargetUseCase(
+      teacherAssistantsRepository,
+    ),
     createAssistant: createAssistantUseCase,
     listAssistantsForTeacher: listAssistantsForTeacherUseCase,
     revokeAssistant: revokeAssistantUseCase,

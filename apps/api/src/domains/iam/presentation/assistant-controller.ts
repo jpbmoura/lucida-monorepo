@@ -3,6 +3,7 @@ import { z } from "zod";
 import { env } from "@/env.js";
 import type { ListTeachersForAssistantUseCase } from "../application/list-teachers-for-assistant.js";
 import type { SelectAssistantTargetUseCase } from "../application/select-assistant-target.js";
+import type { SelectAssistantSelfTargetUseCase } from "../application/select-assistant-self-target.js";
 import type { CreateAssistantUseCase } from "../application/create-assistant.js";
 import type { ListAssistantsForTeacherUseCase } from "../application/list-assistants-for-teacher.js";
 import type { RevokeAssistantUseCase } from "../application/revoke-assistant.js";
@@ -33,6 +34,7 @@ const linkParam = z.object({
 interface Deps {
   listTeachers: ListTeachersForAssistantUseCase;
   selectTarget: SelectAssistantTargetUseCase;
+  selectSelfTarget: SelectAssistantSelfTargetUseCase;
   createAssistant: CreateAssistantUseCase;
   listAssistantsForTeacher: ListAssistantsForTeacherUseCase;
   revokeAssistant: RevokeAssistantUseCase;
@@ -85,6 +87,36 @@ export class AssistantController {
         }),
       );
       res.json({ ok: true, teacherUserId });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /v1/iam/assistant/select-self — auxiliar opta por usar a
+   * própria conta em vez de atender um professor. Carimba o cookie
+   * apontando pro próprio realUserId; o middleware vê target ===
+   * realUserId e pula a impersonação. O cookie persiste a escolha
+   * pra que o /app não jogue de volta no seletor.
+   */
+  selectSelfTarget: RequestHandler = async (req, res, next) => {
+    try {
+      const realUserId = req.auth!.realUserId;
+      await this.deps.selectSelfTarget.execute({
+        assistantUserId: realUserId,
+      });
+      const value = buildAssistantTargetCookieValue(
+        realUserId,
+        env.AUTH_SECRET,
+      );
+      res.cookie(
+        ASSISTANT_TARGET_COOKIE_NAME,
+        value,
+        assistantTargetCookieAttributes({
+          isProduction: env.NODE_ENV === "production",
+        }),
+      );
+      res.json({ ok: true, teacherUserId: realUserId, self: true });
     } catch (err) {
       next(err);
     }

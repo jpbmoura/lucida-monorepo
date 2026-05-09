@@ -110,6 +110,11 @@ export function makeIamRouter(
           // professor que ele está atuando — o banner mostra "Você
           // (auxiliar) está acessando a conta de (professor)".
           assistantMode: ctx.isAssistant,
+          // Auxiliar escolheu "entrar na própria conta" no /auxiliar/escolher.
+          // Sem essa flag, o /app não sabe distinguir "auxiliar nunca
+          // selecionou" de "auxiliar optou por ele mesmo" e faz redirect
+          // de volta pro seletor.
+          assistantSelfMode: ctx.assistantSelfMode,
           realUser: ctx.isAssistant
             ? {
                 id: ctx.realUserId,
@@ -132,6 +137,11 @@ export function makeIamRouter(
     const c = deps.assistantController;
     router.get("/v1/iam/assistant/teachers", requireAuth, c.myTeachers);
     router.post("/v1/iam/assistant/select", requireAuth, c.selectTarget);
+    router.post(
+      "/v1/iam/assistant/select-self",
+      requireAuth,
+      c.selectSelfTarget,
+    );
     router.post("/v1/iam/assistant/clear", requireAuth, c.clearTarget);
   }
 

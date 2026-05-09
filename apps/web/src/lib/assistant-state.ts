@@ -22,6 +22,12 @@ export interface AssistantState {
    * Null = auxiliar logado mas sem cookie de target ainda.
    */
   activeTarget: AssistantTargetSummary | null;
+  /**
+   * Auxiliar optou explicitamente por usar a própria conta
+   * (cookie carimbado com o próprio id). Usado pelo /app pra não
+   * jogar de volta no seletor.
+   */
+  selfMode: boolean;
 }
 
 /**
@@ -44,6 +50,7 @@ export async function fetchAssistantState(): Promise<AssistantState> {
     apiFetch<{
       data: {
         assistantMode?: boolean;
+        assistantSelfMode?: boolean;
         id: string;
         name?: string;
         email: string;
@@ -72,5 +79,6 @@ export async function fetchAssistantState(): Promise<AssistantState> {
   return {
     availableTeachers: teachers.teachers.length,
     activeTarget,
+    selfMode: me?.data.assistantSelfMode ?? false,
   };
 }
