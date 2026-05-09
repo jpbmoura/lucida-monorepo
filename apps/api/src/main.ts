@@ -22,6 +22,15 @@ import { AssistantController } from "@/domains/iam/presentation/assistant-contro
 import { makeOptionalAuth } from "@/domains/iam/presentation/middleware/optional-auth.js";
 import { makeIamRouter } from "@/domains/iam/presentation/routes.js";
 
+import { MongooseCourseRepository } from "@/domains/course/infrastructure/mongoose-course-repository.js";
+import { CreateCourseUseCase } from "@/domains/course/application/create-course.js";
+import { ListCoursesUseCase } from "@/domains/course/application/list-courses.js";
+import { GetCourseUseCase } from "@/domains/course/application/get-course.js";
+import { UpdateCourseUseCase } from "@/domains/course/application/update-course.js";
+import { DeleteCourseUseCase } from "@/domains/course/application/delete-course.js";
+import { CourseController } from "@/domains/course/presentation/course-controller.js";
+import { makeCourseRouter } from "@/domains/course/presentation/course-routes.js";
+
 import { MongooseClassRepository } from "@/domains/class/infrastructure/mongoose-class-repository.js";
 import { CreateClassUseCase } from "@/domains/class/application/create-class.js";
 import { ListClassesUseCase } from "@/domains/class/application/list-classes.js";
@@ -375,17 +384,43 @@ export async function buildApp(): Promise<Express> {
   });
 
   // --- repositories ---
+  const courseRepository = new MongooseCourseRepository();
   const classRepository = new MongooseClassRepository();
   const studentRepository = new MongooseStudentRepository();
   const examRepository = new MongooseExamRepository();
   const submissionRepository = new MongooseSubmissionRepository();
 
+  // --- course domain ---
+  const courseController = new CourseController({
+    createCourse: new CreateCourseUseCase(courseRepository),
+    listCourses: new ListCoursesUseCase(courseRepository, classRepository),
+    getCourse: new GetCourseUseCase(
+      courseRepository,
+      classRepository,
+      studentRepository,
+      examRepository,
+    ),
+    updateCourse: new UpdateCourseUseCase(courseRepository),
+    deleteCourse: new DeleteCourseUseCase(courseRepository, classRepository),
+  });
+
   // --- class domain ---
   const classController = new ClassController({
-    createClass: new CreateClassUseCase(classRepository),
+    createClass: new CreateClassUseCase(classRepository, courseRepository),
     listClasses: new ListClassesUseCase(classRepository, studentRepository, examRepository),
-    getClass: new GetClassUseCase(classRepository, studentRepository, examRepository),
-    updateClass: new UpdateClassUseCase(classRepository),
+    getClass: new GetClassUseCase(
+      classRepository,
+      courseRepository,
+      studentRepository,
+      examRepository,
+    ),
+    updateClass: new UpdateClassUseCase(
+      classRepository,
+      courseRepository,
+      studentRepository,
+      examRepository,
+      submissionRepository,
+    ),
     deleteClass: new DeleteClassUseCase(classRepository, studentRepository, examRepository),
   });
 
@@ -548,6 +583,7 @@ export async function buildApp(): Promise<Express> {
       orgMembersRepository,
       classRepository,
       examRepository,
+      courseRepository,
       ledgerRepository,
     ),
     exportTeacherData: new ExportTeacherDataUseCase(
@@ -892,6 +928,7 @@ export async function buildApp(): Promise<Express> {
     listClasses: new ListPublicClassesUseCase(classRepository, studentRepository),
     createClass: new CreatePublicClassUseCase(
       classRepository,
+      courseRepository,
       orgMembersRepository,
     ),
   });
@@ -985,6 +1022,7 @@ export async function buildApp(): Promise<Express> {
 
   const routers = [
     makeIamRouter(auth, { requireAuth, assistantController, authDb }),
+    makeCourseRouter({ requireAuth, controller: courseController }),
     makeClassRouter({ requireAuth, controller: classController }),
     makeStudentRouter({ requireAuth, controller: studentController }),
     makeExamRouter({ requireAuth, controller: examController }),

@@ -62,6 +62,7 @@ export class CreateExamUseCase {
     const exam = Exam.create({
       id: this.exams.nextId(),
       classId: cls.id.toString(),
+      courseId: cls.courseId,
       ownerId: input.ownerId,
       title: input.title,
       description: input.description,

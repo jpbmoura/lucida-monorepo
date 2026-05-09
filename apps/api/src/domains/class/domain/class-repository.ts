@@ -23,6 +23,10 @@ export interface ClassRepository {
   save(cls: Class): Promise<void>;
   findById(id: ClassId): Promise<Class | null>;
   findByOwner(ownerId: string): Promise<Class[]>;
+  /** Lista turmas do curso. Ordem: createdAt desc. */
+  findByCourse(courseId: string): Promise<Class[]>;
+  /** Conta turmas no curso. Usado pelo guard de delete em Fase 4. */
+  countByCourse(courseId: string): Promise<number>;
   /**
    * Lista turmas da organização, paginada por cursor. Ordenação fixa
    * `createdAt desc, _id desc` (turma mais recente primeiro). Quando

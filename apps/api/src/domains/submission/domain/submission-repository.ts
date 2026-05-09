@@ -19,4 +19,9 @@ export interface SubmissionRepository {
   statsByExamIds(
     examIds: string[],
   ): Promise<Map<string, { submissionsCount: number; averageScore: number }>>;
+  /**
+   * Atualiza o snapshot `courseId` em todas as submissões de uma turma.
+   * Usado pelo UpdateClassUseCase em Fase 4 quando a turma muda de curso.
+   */
+  updateCourseForClass(classId: string, newCourseId: string | null): Promise<void>;
 }

@@ -24,6 +24,7 @@ export class MongooseClassRepository implements ClassRepository {
           grade: cls.grade,
           ownerId: cls.ownerId,
           organizationId: cls.organizationId,
+          courseId: cls.courseId,
         },
         $setOnInsert: {
           _id: cls.id.toString(),
@@ -45,6 +46,18 @@ export class MongooseClassRepository implements ClassRepository {
       .lean<ClassDoc[]>()
       .exec();
     return docs.map(toEntity);
+  }
+
+  async findByCourse(courseId: string): Promise<Class[]> {
+    const docs = await ClassModel.find({ courseId })
+      .sort({ createdAt: -1 })
+      .lean<ClassDoc[]>()
+      .exec();
+    return docs.map(toEntity);
+  }
+
+  async countByCourse(courseId: string): Promise<number> {
+    return ClassModel.countDocuments({ courseId }).exec();
   }
 
   async findByOrganizationPaginated(
@@ -107,6 +120,10 @@ function toEntity(doc: ClassDoc): Class {
     grade: doc.grade ?? null,
     ownerId: doc.ownerId,
     organizationId: doc.organizationId ?? null,
+    // Pós-backfill (Fase 3+) courseId é sempre string. Doc com null aqui
+    // indica backfill incompleto — o save vai falhar pelo `required: true`
+    // e expor o problema. Fallback "" só pra atravessar leitura sem crash.
+    courseId: doc.courseId ?? "",
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   });

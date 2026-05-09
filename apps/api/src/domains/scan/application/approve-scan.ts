@@ -73,6 +73,7 @@ export class ApproveScanUseCase {
       id: submissionId,
       examId: scan.examId,
       classId: scan.classId,
+      courseId: exam.courseId,
       ownerId: scan.ownerId,
       studentId: scan.studentId,
       studentCode: scan.studentCode,

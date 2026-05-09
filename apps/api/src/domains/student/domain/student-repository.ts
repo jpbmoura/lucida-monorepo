@@ -34,8 +34,15 @@ export interface StudentRepository {
     email: string,
   ): Promise<Student | null>;
   countByClassId(classId: string): Promise<number>;
+  /** Conta alunos do curso (via snapshot `student.courseId`). */
+  countByCourseId(courseId: string): Promise<number>;
   delete(id: StudentId): Promise<void>;
   deleteByClassId(classId: string): Promise<void>;
+  /**
+   * Atualiza o snapshot `courseId` em todos os alunos de uma turma.
+   * Usado pelo UpdateClassUseCase em Fase 4 quando a turma muda de curso.
+   */
+  updateCourseForClass(classId: string, newCourseId: string | null): Promise<void>;
   existsByClassAndCode(classId: string, code: StudentCode): Promise<boolean>;
   existsByOwnerAndMatricula(ownerId: string, matricula: string): Promise<boolean>;
   existsByOwnerAndMatriculaExcluding(

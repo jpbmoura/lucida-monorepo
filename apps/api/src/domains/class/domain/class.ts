@@ -30,6 +30,12 @@ export interface ClassProps {
    * da org da chave. Backfill via `scripts/backfill-class-org/`.
    */
   organizationId: string | null;
+  /**
+   * Curso ao qual a turma pertence. Obrigatório (Fase 4+). O backfill
+   * (`scripts/backfill-courses/`) garantiu que toda turma legacy ganhou
+   * um curso "Geral" antes deste deploy.
+   */
+  courseId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +51,7 @@ export class Class {
     grade?: string | null;
     ownerId: string;
     organizationId?: string | null;
+    courseId: string;
     now?: Date;
   }): Class {
     const name = validateName(input.name);
@@ -60,6 +67,7 @@ export class Class {
       grade,
       ownerId: input.ownerId,
       organizationId: input.organizationId ?? null,
+      courseId: input.courseId,
       createdAt: now,
       updatedAt: now,
     });
@@ -97,6 +105,10 @@ export class Class {
     return this.props.organizationId;
   }
 
+  get courseId(): string {
+    return this.props.courseId;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -122,6 +134,15 @@ export class Class {
 
   updateGrade(newGrade: string | null, now: Date = new Date()): void {
     this.props.grade = validateGrade(newGrade);
+    this.props.updatedAt = now;
+  }
+
+  /**
+   * Move a turma para outro curso. A propagação do snapshot em
+   * student/exam/submission é responsabilidade do use case (transação).
+   */
+  moveToCourse(newCourseId: string, now: Date = new Date()): void {
+    this.props.courseId = newCourseId;
     this.props.updatedAt = now;
   }
 

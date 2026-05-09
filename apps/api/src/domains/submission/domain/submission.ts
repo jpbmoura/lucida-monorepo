@@ -48,6 +48,11 @@ export interface SubmissionProps {
   id: SubmissionId;
   examId: string;
   classId: string;
+  /**
+   * Snapshot de `exam.courseId`. Obrigatório (Fase 4+). Backfill em
+   * `scripts/backfill-courses/` populou os legacy.
+   */
+  courseId: string;
   ownerId: string; // dono da prova (professor) — usado pra listagem
   studentId: string;
   studentCode: string;
@@ -75,6 +80,7 @@ export class Submission {
     id: SubmissionId;
     examId: string;
     classId: string;
+    courseId: string;
     ownerId: string;
     studentId: string;
     studentCode: string;
@@ -87,6 +93,7 @@ export class Submission {
       id: input.id,
       examId: input.examId,
       classId: input.classId,
+      courseId: input.courseId,
       ownerId: input.ownerId,
       studentId: input.studentId,
       studentCode: input.studentCode,
@@ -113,6 +120,7 @@ export class Submission {
     id: SubmissionId;
     examId: string;
     classId: string;
+    courseId: string;
     ownerId: string;
     studentId: string;
     studentCode: string;
@@ -143,6 +151,7 @@ export class Submission {
       id: input.id,
       examId: input.examId,
       classId: input.classId,
+      courseId: input.courseId,
       ownerId: input.ownerId,
       studentId: input.studentId,
       studentCode: input.studentCode,
@@ -176,6 +185,9 @@ export class Submission {
   }
   get classId(): string {
     return this.props.classId;
+  }
+  get courseId(): string {
+    return this.props.courseId;
   }
   get ownerId(): string {
     return this.props.ownerId;

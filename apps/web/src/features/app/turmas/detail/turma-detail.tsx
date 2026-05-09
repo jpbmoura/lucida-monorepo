@@ -11,6 +11,7 @@ import { TurmaFormDialog, type TurmaFormValues } from "../turma-form-dialog";
 import { DeleteTurmaDialog } from "../delete-turma-dialog";
 import { updateTurmaAction, deleteTurmaAction } from "../actions";
 import { deriveTurmaInitials } from "../utils";
+import type { CursoDTO } from "@/features/app/cursos/types";
 import type { TurmaDTO, TurmaExamDTO, AlunoDTO } from "../types";
 import { TabsSwitcher, type TurmaTab } from "./tabs-switcher";
 import { ProvasTab } from "./provas-tab";
@@ -20,9 +21,15 @@ interface TurmaDetailProps {
   initialTurma: TurmaDTO;
   exams: TurmaExamDTO[];
   alunos: AlunoDTO[];
+  cursos: CursoDTO[];
 }
 
-export function TurmaDetail({ initialTurma, exams, alunos }: TurmaDetailProps) {
+export function TurmaDetail({
+  initialTurma,
+  exams,
+  alunos,
+  cursos,
+}: TurmaDetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab: TurmaTab = (searchParams.get("tab") as TurmaTab | null) ?? "provas";
@@ -31,6 +38,14 @@ export function TurmaDetail({ initialTurma, exams, alunos }: TurmaDetailProps) {
   const turma = initialTurma;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  // Curso pai pra link de voltar — usa courseName hidratado pelo backend
+  // se disponível, ou cai pro nome encontrado em `cursos` como fallback.
+  const courseHref = `/app/cursos/${turma.courseId}`;
+  const courseLabel =
+    turma.courseName ??
+    cursos.find((c) => c.id === turma.courseId)?.name ??
+    "Curso";
 
   async function handleEdit(values: TurmaFormValues) {
     const result = await updateTurmaAction(turma.id, values);
@@ -42,7 +57,7 @@ export function TurmaDetail({ initialTurma, exams, alunos }: TurmaDetailProps) {
     const result = await deleteTurmaAction(turma.id);
     if (result.ok) {
       startTransition(() => {
-        router.push("/app/turmas");
+        router.push(courseHref);
         router.refresh();
       });
     }
@@ -52,11 +67,11 @@ export function TurmaDetail({ initialTurma, exams, alunos }: TurmaDetailProps) {
   return (
     <>
       <Link
-        href="/app/turmas"
+        href={courseHref}
         className="inline-flex items-center gap-1.5 text-[13px] text-gray-500 transition-colors hover:text-ink"
       >
         <ArrowLeft className="size-3.5" />
-        Turmas
+        {courseLabel}
       </Link>
 
       <header className="mt-4 flex flex-col gap-6 border-b border-gray-100 pb-8 md:flex-row md:items-start md:justify-between">
@@ -143,7 +158,9 @@ export function TurmaDetail({ initialTurma, exams, alunos }: TurmaDetailProps) {
         onOpenChange={setDrawerOpen}
         mode="edit"
         turma={turma}
+        cursos={cursos}
         onSubmit={handleEdit}
+        onCursoCreated={() => startTransition(() => router.refresh())}
       />
 
       <DeleteTurmaDialog

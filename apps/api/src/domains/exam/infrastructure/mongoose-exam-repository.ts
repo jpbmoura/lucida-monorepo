@@ -21,6 +21,7 @@ export class MongooseExamRepository implements ExamRepository {
       {
         $set: {
           classId: exam.classId,
+          courseId: exam.courseId,
           ownerId: exam.ownerId,
           title: exam.title,
           description: exam.description,
@@ -76,6 +77,18 @@ export class MongooseExamRepository implements ExamRepository {
     return ExamModel.countDocuments({ classId, "questions.0": { $exists: true } }).exec();
   }
 
+  async countByCourseId(courseId: string): Promise<number> {
+    return ExamModel.countDocuments({ courseId }).exec();
+  }
+
+  async findByCourseId(courseId: string): Promise<Exam[]> {
+    const docs = await ExamModel.find({ courseId })
+      .sort({ createdAt: -1 })
+      .lean<ExamDoc[]>()
+      .exec();
+    return docs.map(toEntity);
+  }
+
   async delete(id: ExamId): Promise<void> {
     await ExamModel.deleteOne({ _id: id.toString() }).exec();
   }
@@ -83,12 +96,23 @@ export class MongooseExamRepository implements ExamRepository {
   async deleteByClassId(classId: string): Promise<void> {
     await ExamModel.deleteMany({ classId }).exec();
   }
+
+  async updateCourseForClass(
+    classId: string,
+    newCourseId: string | null,
+  ): Promise<void> {
+    await ExamModel.updateMany(
+      { classId },
+      { $set: { courseId: newCourseId } },
+    ).exec();
+  }
 }
 
 function toEntity(doc: ExamDoc): Exam {
   return Exam.restore({
     id: ExamId.of(doc._id),
     classId: doc.classId,
+    courseId: doc.courseId ?? "",
     ownerId: doc.ownerId,
     title: doc.title,
     description: doc.description ?? "",

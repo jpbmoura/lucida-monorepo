@@ -6,6 +6,8 @@ interface RawTurma {
   id: string;
   name: string;
   description: string;
+  courseId: string;
+  courseName?: string | null;
   createdAt: string;
   updatedAt: string;
   lastActivityAt: string | null;

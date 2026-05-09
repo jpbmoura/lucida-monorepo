@@ -44,3 +44,12 @@ export class ClassGradeInvalidError extends DomainError {
     super(reason);
   }
 }
+
+export class ClassCourseInvalidError extends DomainError {
+  readonly code = "CLASS_COURSE_INVALID";
+  readonly statusCode = 422;
+
+  constructor(reason = "Curso inválido ou não pertence ao professor.") {
+    super(reason);
+  }
+}

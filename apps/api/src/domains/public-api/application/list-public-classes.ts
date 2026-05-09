@@ -16,6 +16,7 @@ interface ClassDto {
   subject: string | null;
   grade: string | null;
   teacherId: string;
+  courseId: string;
   studentsCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -70,6 +71,7 @@ export class ListPublicClassesUseCase {
       subject: c.subject,
       grade: c.grade,
       teacherId: c.ownerId,
+      courseId: c.courseId,
       studentsCount: counts[i] ?? 0,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,

@@ -7,11 +7,14 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 const createTurmaSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().max(200).optional(),
+  courseId: z.string().min(1, "Selecione um curso."),
 });
 
 const updateTurmaSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   description: z.string().max(200).optional(),
+  /** Quando informado, move a turma pra outro curso (do mesmo professor). */
+  courseId: z.string().min(1).optional(),
 });
 
 const createAlunoSchema = z.object({
@@ -50,7 +53,7 @@ export async function createTurmaAction(input: unknown): Promise<ActionResult> {
   try {
     const body = createTurmaSchema.parse(input);
     await apiFetch("/v1/classes", { method: "POST", body });
-    revalidatePath("/app/turmas");
+    revalidatePath("/app/cursos");
     return { ok: true };
   } catch (err) {
     return toResult(err);
@@ -61,7 +64,7 @@ export async function updateTurmaAction(id: string, input: unknown): Promise<Act
   try {
     const body = updateTurmaSchema.parse(input);
     await apiFetch(`/v1/classes/${encodeURIComponent(id)}`, { method: "PUT", body });
-    revalidatePath("/app/turmas");
+    revalidatePath("/app/cursos");
     revalidatePath(`/app/turmas/${id}`);
     return { ok: true };
   } catch (err) {
@@ -72,7 +75,7 @@ export async function updateTurmaAction(id: string, input: unknown): Promise<Act
 export async function deleteTurmaAction(id: string): Promise<ActionResult> {
   try {
     await apiFetch(`/v1/classes/${encodeURIComponent(id)}`, { method: "DELETE" });
-    revalidatePath("/app/turmas");
+    revalidatePath("/app/cursos");
     return { ok: true };
   } catch (err) {
     return toResult(err);
@@ -92,7 +95,7 @@ export async function createAlunoAction(
       body,
     });
     revalidatePath(`/app/turmas/${classId}`);
-    revalidatePath("/app/turmas");
+    revalidatePath("/app/cursos");
     return { ok: true };
   } catch (err) {
     return toResult(err);
@@ -124,7 +127,7 @@ export async function deleteAlunoAction(
   try {
     await apiFetch(`/v1/students/${encodeURIComponent(studentId)}`, { method: "DELETE" });
     revalidatePath(`/app/turmas/${classId}`);
-    revalidatePath("/app/turmas");
+    revalidatePath("/app/cursos");
     return { ok: true };
   } catch (err) {
     return toResult(err);

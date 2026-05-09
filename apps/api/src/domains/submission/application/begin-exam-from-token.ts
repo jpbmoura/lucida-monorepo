@@ -99,6 +99,7 @@ export class BeginExamFromTokenUseCase {
       id: this.submissions.nextId(),
       examId: exam.id.toString(),
       classId: exam.classId,
+      courseId: exam.courseId,
       ownerId: exam.ownerId,
       studentId: student.id.toString(),
       studentCode: student.code.toString(),

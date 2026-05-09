@@ -19,6 +19,8 @@ export interface ExamUsageDoc {
 export interface ExamDoc {
   _id: string;
   classId: string;
+  /** Snapshot de `class.courseId`. Obrigatório (Fase 4+). */
+  courseId: string;
   ownerId: string;
   title: string;
   description: string;
@@ -58,6 +60,7 @@ const examSchema = new Schema<ExamDoc>(
   {
     _id: { type: String, required: true },
     classId: { type: String, required: true, index: true },
+    courseId: { type: String, required: true, index: true },
     ownerId: { type: String, required: true, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "", trim: true },
@@ -86,6 +89,7 @@ const examSchema = new Schema<ExamDoc>(
 );
 
 examSchema.index({ classId: 1, createdAt: -1 });
+examSchema.index({ courseId: 1, createdAt: -1 });
 examSchema.index({ shareId: 1 }, { unique: true });
 
 export const ExamModel: Model<ExamDoc> =

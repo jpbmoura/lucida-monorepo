@@ -25,6 +25,8 @@ export interface TeacherOverviewDTO {
   classes: Array<{
     classId: string;
     name: string;
+    courseId: string;
+    courseName: string;
     studentCount: number;
     examCount: number;
   }>;
@@ -33,6 +35,8 @@ export interface TeacherOverviewDTO {
     title: string;
     classId: string;
     className: string;
+    courseId: string;
+    courseName: string;
     createdAt: string;
     questionCount: number;
   }>;
@@ -44,6 +48,8 @@ export interface TeacherOverviewDTO {
     email: string | null;
     classId: string;
     className: string;
+    courseId: string;
+    courseName: string;
     createdAt: string;
   }>;
   ledger: Array<{

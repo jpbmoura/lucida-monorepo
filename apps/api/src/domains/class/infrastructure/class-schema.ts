@@ -11,6 +11,11 @@ export interface ClassDoc {
   ownerId: string;
   /** Org snapshot — null pra contas individuais. Backfill via script. */
   organizationId: string | null;
+  /**
+   * Curso da turma — obrigatório (Fase 4+). Backfill em
+   * `scripts/backfill-courses/` garantiu o populamento das turmas legacy.
+   */
+  courseId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +29,7 @@ const classSchema = new Schema<ClassDoc>(
     grade: { type: String, default: null, trim: true },
     ownerId: { type: String, required: true, index: true },
     organizationId: { type: String, default: null, index: true },
+    courseId: { type: String, required: true, index: true },
   },
   {
     collection: "classes",
@@ -37,6 +43,8 @@ classSchema.index({ ownerId: 1, createdAt: -1 });
 // Listagem paginada por org (rotas públicas) — ordenada por createdAt desc.
 // Inclui `_id` no índice pra permitir cursor com tiebreak estável.
 classSchema.index({ organizationId: 1, createdAt: -1, _id: -1 });
+// Listagem de turmas por curso — ordenada por createdAt desc.
+classSchema.index({ courseId: 1, createdAt: -1 });
 
 export const ClassModel: Model<ClassDoc> =
   (mongoose.models.Class as Model<ClassDoc> | undefined) ??

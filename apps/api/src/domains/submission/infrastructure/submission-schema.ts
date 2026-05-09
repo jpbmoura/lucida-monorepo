@@ -12,6 +12,8 @@ export interface SubmissionDoc {
   _id: string;
   examId: string;
   classId: string;
+  /** Snapshot de `exam.courseId`. Obrigatório (Fase 4+). */
+  courseId: string;
   ownerId: string;
   studentId: string;
   studentCode: string;
@@ -46,6 +48,7 @@ const submissionSchema = new Schema<SubmissionDoc>(
     _id: { type: String, required: true },
     examId: { type: String, required: true, index: true },
     classId: { type: String, required: true, index: true },
+    courseId: { type: String, required: true, index: true },
     ownerId: { type: String, required: true, index: true },
     studentId: { type: String, required: true, index: true },
     studentCode: { type: String, required: true },

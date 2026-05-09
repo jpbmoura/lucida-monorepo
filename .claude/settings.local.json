@@ -26,7 +26,11 @@
       "Bash(node scripts/export-user-exam-links.mjs demetriuslopes@gmail.com)",
       "Bash(pnpm --filter @lucida/api diagnose:legacy-ids)",
       "Bash(pnpm --filter @lucida/api diagnose:legacy-ids -- --email=projetopsiqs@gmail.com)",
-      "Bash(wmic process *)"
+      "Bash(wmic process *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\P\\\\Me\\\\lucida\\\\lucida-monorepo\\\\apps\\\\web\\\\src\\\\app\\\\app\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(pnpm --filter @lucida/api typecheck)",
+      "PowerShell(pnpm --filter @lucida/web typecheck)"
     ]
   }
 }

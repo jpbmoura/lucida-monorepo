@@ -18,6 +18,7 @@ export class MongooseStudentRepository implements StudentRepository {
           classId: student.classId,
           ownerId: student.ownerId,
           organizationId: student.organizationId,
+          courseId: student.courseId,
           code: student.code.toString(),
           name: student.name,
           matricula: student.matricula,
@@ -47,6 +48,20 @@ export class MongooseStudentRepository implements StudentRepository {
 
   async countByClassId(classId: string): Promise<number> {
     return StudentModel.countDocuments({ classId }).exec();
+  }
+
+  async countByCourseId(courseId: string): Promise<number> {
+    return StudentModel.countDocuments({ courseId }).exec();
+  }
+
+  async updateCourseForClass(
+    classId: string,
+    newCourseId: string | null,
+  ): Promise<void> {
+    await StudentModel.updateMany(
+      { classId },
+      { $set: { courseId: newCourseId } },
+    ).exec();
   }
 
   async delete(id: StudentId): Promise<void> {
@@ -143,6 +158,9 @@ function toEntity(doc: StudentDoc): Student {
     classId: doc.classId,
     ownerId: doc.ownerId,
     organizationId: doc.organizationId ?? null,
+    // Pós-backfill (Fase 3+) courseId é sempre string. Fallback "" só
+    // pra atravessar leitura — save subsequente vai estourar pelo `required`.
+    courseId: doc.courseId ?? "",
     code: StudentCode.of(doc.code),
     name: doc.name,
     matricula: doc.matricula,

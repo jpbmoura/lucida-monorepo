@@ -13,6 +13,7 @@ import {
   Settings,
   HelpCircle,
   ScanLine,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const ICONS = {
   settings: Settings,
   help: HelpCircle,
   scan: ScanLine,
+  folder: FolderOpen,
 } as const;
 
 export type SidebarIcon = keyof typeof ICONS;

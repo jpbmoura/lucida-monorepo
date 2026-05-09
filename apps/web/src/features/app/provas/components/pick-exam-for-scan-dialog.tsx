@@ -225,9 +225,9 @@ function TurmaStep({
           </p>
         </div>
         <Button asChild variant="primary" size="md" onClick={onClose}>
-          <Link href="/app/turmas">
+          <Link href="/app/cursos">
             <Plus className="size-4" strokeWidth={2.5} />
-            Criar primeira turma
+            Ir pra cursos
           </Link>
         </Button>
       </div>

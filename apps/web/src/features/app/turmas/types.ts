@@ -4,6 +4,9 @@ export interface TurmaDTO {
   id: string;
   name: string;
   description: string;
+  courseId: string;
+  /** Hidratado pelo `GetClassUseCase` no detalhe; null quando indisponível. */
+  courseName?: string | null;
   createdAt: string;
   updatedAt: string;
   lastActivityAt: string | null;

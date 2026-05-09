@@ -3,16 +3,24 @@ import { z } from "zod";
 export const createClassBody = z.object({
   name: z.string().min(2).max(120),
   description: z.string().max(200).optional(),
+  courseId: z.string().min(1),
 });
 
 export const updateClassBody = z
   .object({
     name: z.string().min(2).max(120).optional(),
     description: z.string().max(200).optional(),
+    courseId: z.string().min(1).optional(),
   })
-  .refine((v) => v.name !== undefined || v.description !== undefined, {
-    message: "Informe ao menos um campo para atualizar.",
-  });
+  .refine(
+    (v) =>
+      v.name !== undefined ||
+      v.description !== undefined ||
+      v.courseId !== undefined,
+    {
+      message: "Informe ao menos um campo para atualizar.",
+    },
+  );
 
 export const classIdParam = z.object({
   id: z.string().min(1),

@@ -10,11 +10,16 @@ import { deriveTurmaInitials } from "./utils";
 
 interface TurmaCardProps {
   turma: TurmaDTO;
+  /**
+   * Nome do curso pra mostrar como subtítulo. Quando ausente (curso
+   * removido ou ainda não carregado), só não renderiza a linha.
+   */
+  courseName?: string;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
+export function TurmaCard({ turma, courseName, onEdit, onDelete }: TurmaCardProps) {
   return (
     <ClickableCard
       href={`/app/turmas/${turma.id}`}
@@ -28,6 +33,11 @@ export function TurmaCard({ turma, onEdit, onDelete }: TurmaCardProps) {
           </span>
           <div className="flex flex-col leading-tight">
             <h3 className="text-[15px] font-medium tracking-tight text-ink">{turma.name}</h3>
+            {courseName && (
+              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                {courseName}
+              </p>
+            )}
             {turma.description && (
               <p className="mt-0.5 text-[12px] text-gray-500 line-clamp-1">{turma.description}</p>
             )}

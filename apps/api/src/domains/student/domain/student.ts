@@ -26,6 +26,11 @@ export interface StudentProps {
    * `scripts/backfill-student-org/`.
    */
   organizationId: string | null;
+  /**
+   * Snapshot do `class.courseId`. Obrigatório (Fase 4+). Backfill em
+   * `scripts/backfill-courses/` populou os legacy.
+   */
+  courseId: string;
   code: StudentCode;
   name: string;
   matricula: string;
@@ -42,6 +47,7 @@ export class Student {
     classId: string;
     ownerId: string;
     organizationId?: string | null;
+    courseId: string;
     code: StudentCode;
     name: string;
     matricula: string;
@@ -57,6 +63,7 @@ export class Student {
       classId: input.classId,
       ownerId: input.ownerId,
       organizationId: input.organizationId ?? null,
+      courseId: input.courseId,
       code: input.code,
       name,
       matricula,
@@ -81,6 +88,7 @@ export class Student {
     classId: string;
     ownerId: string;
     organizationId?: string | null;
+    courseId: string;
     name: string;
     email: string;
     now?: Date;
@@ -94,6 +102,7 @@ export class Student {
       classId: input.classId,
       ownerId: input.ownerId,
       organizationId: input.organizationId ?? null,
+      courseId: input.courseId,
       code: StudentCode.generate(),
       name: input.name,
       matricula: `auto-${randomUUID().slice(0, 12)}`,
@@ -113,6 +122,9 @@ export class Student {
   }
   get organizationId(): string | null {
     return this.props.organizationId;
+  }
+  get courseId(): string {
+    return this.props.courseId;
   }
   get code(): StudentCode {
     return this.props.code;

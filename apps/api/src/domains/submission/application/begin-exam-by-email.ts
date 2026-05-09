@@ -75,6 +75,7 @@ export class BeginExamByEmailUseCase {
       student = await this.createStudentForClass({
         classId: exam.classId,
         ownerId: exam.ownerId,
+        courseId: exam.courseId,
         email,
         name,
       });
@@ -119,6 +120,7 @@ export class BeginExamByEmailUseCase {
       id: this.submissions.nextId(),
       examId: exam.id.toString(),
       classId: exam.classId,
+      courseId: exam.courseId,
       ownerId: exam.ownerId,
       studentId: student.id.toString(),
       studentCode: student.code.toString(),
@@ -139,9 +141,13 @@ export class BeginExamByEmailUseCase {
   private async createStudentForClass(input: {
     classId: string;
     ownerId: string;
+    courseId: string;
     email: string;
     name: string;
   }): Promise<Student> {
+    // organizationId snapshot: lemos da turma (pode ser null pra contas
+    // individuais). courseId já vem garantido pelo exam que disparou esse
+    // fluxo — não precisa reler a turma só por isso.
     const cls = await this.classes.findById(ClassId.of(input.classId));
     const organizationId = cls?.organizationId ?? null;
 
@@ -151,6 +157,7 @@ export class BeginExamByEmailUseCase {
         classId: input.classId,
         ownerId: input.ownerId,
         organizationId,
+        courseId: input.courseId,
         email: input.email,
         name: input.name,
       });

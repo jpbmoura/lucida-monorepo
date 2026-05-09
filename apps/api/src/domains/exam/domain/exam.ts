@@ -28,6 +28,11 @@ export interface ExamUsage {
 export interface ExamProps {
   id: ExamId;
   classId: string;
+  /**
+   * Snapshot do `class.courseId`. Obrigatório (Fase 4+). Backfill em
+   * `scripts/backfill-courses/` populou os legacy.
+   */
+  courseId: string;
   ownerId: string;
   title: string;
   description: string;
@@ -47,6 +52,7 @@ export class Exam {
   static create(input: {
     id: ExamId;
     classId: string;
+    courseId: string;
     ownerId: string;
     title: string;
     description?: string;
@@ -68,6 +74,7 @@ export class Exam {
     return new Exam({
       id: input.id,
       classId: input.classId,
+      courseId: input.courseId,
       ownerId: input.ownerId,
       title,
       description,
@@ -91,6 +98,9 @@ export class Exam {
   }
   get classId(): string {
     return this.props.classId;
+  }
+  get courseId(): string {
+    return this.props.courseId;
   }
   get ownerId(): string {
     return this.props.ownerId;

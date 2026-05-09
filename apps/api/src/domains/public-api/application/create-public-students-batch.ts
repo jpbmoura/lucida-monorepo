@@ -139,6 +139,7 @@ export class CreatePublicStudentsBatchUseCase {
           classId: cls.id.toString(),
           ownerId: cls.ownerId,
           organizationId: input.organizationId,
+          courseId: cls.courseId,
           code,
           name: item.name,
           matricula,

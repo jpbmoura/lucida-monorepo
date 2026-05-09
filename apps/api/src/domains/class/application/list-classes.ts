@@ -10,6 +10,7 @@ export interface ListClassesItem {
   id: string;
   name: string;
   description: string;
+  courseId: string;
   createdAt: Date;
   updatedAt: Date;
   lastActivityAt: Date | null;
@@ -39,6 +40,7 @@ export class ListClassesUseCase {
           id: cls.id.toString(),
           name: cls.name,
           description: cls.description,
+          courseId: cls.courseId,
           createdAt: cls.createdAt,
           updatedAt: cls.updatedAt,
           lastActivityAt: cls.updatedAt,

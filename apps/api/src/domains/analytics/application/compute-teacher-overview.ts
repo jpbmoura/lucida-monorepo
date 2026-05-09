@@ -1,5 +1,6 @@
 import type { ClassRepository } from "@/domains/class/domain/class-repository.js";
 import type { ExamRepository } from "@/domains/exam/domain/exam-repository.js";
+import type { CourseRepository } from "@/domains/course/domain/course-repository.js";
 import type { LedgerRepository } from "@/domains/billing/domain/ledger-repository.js";
 import { SubmissionModel } from "@/domains/submission/infrastructure/submission-schema.js";
 import { StudentModel } from "@/domains/student/infrastructure/student-schema.js";
@@ -54,6 +55,8 @@ export interface TeacherOverviewResponse {
   classes: Array<{
     classId: string;
     name: string;
+    courseId: string;
+    courseName: string;
     studentCount: number;
     examCount: number;
   }>;
@@ -62,6 +65,8 @@ export interface TeacherOverviewResponse {
     title: string;
     classId: string;
     className: string;
+    courseId: string;
+    courseName: string;
     createdAt: string;
     questionCount: number;
   }>;
@@ -74,6 +79,8 @@ export interface TeacherOverviewResponse {
     email: string | null;
     classId: string;
     className: string;
+    courseId: string;
+    courseName: string;
     createdAt: string;
   }>;
   ledger: Array<{
@@ -100,6 +107,7 @@ export class ComputeTeacherOverviewUseCase {
     private readonly members: OrganizationMembersRepository,
     private readonly classes: ClassRepository,
     private readonly exams: ExamRepository,
+    private readonly courses: CourseRepository,
     private readonly ledger: LedgerRepository,
   ) {}
 
@@ -117,22 +125,29 @@ export class ComputeTeacherOverviewUseCase {
       throw new TeacherNotInOrganizationError();
     }
 
-    const [allClasses, allExams, submissionStats, ledgerEntries, studentDocs] =
-      await Promise.all([
-        this.classes.findByOwner(input.teacherId),
-        this.exams.findByOwnerId(input.teacherId),
-        aggregateSubmissionsForOwner(input.teacherId, periodStart),
-        this.ledger.findByOwner({
-          ownerId: input.organizationId,
-          scope: "org",
-          limit: 200,
-        }),
-        StudentModel.find({ ownerId: input.teacherId })
-          .sort({ createdAt: -1 })
-          .limit(studentsLimit)
-          .lean()
-          .exec(),
-      ]);
+    const [
+      allClasses,
+      allExams,
+      allCourses,
+      submissionStats,
+      ledgerEntries,
+      studentDocs,
+    ] = await Promise.all([
+      this.classes.findByOwner(input.teacherId),
+      this.exams.findByOwnerId(input.teacherId),
+      this.courses.findByOwner(input.teacherId),
+      aggregateSubmissionsForOwner(input.teacherId, periodStart),
+      this.ledger.findByOwner({
+        ownerId: input.organizationId,
+        scope: "org",
+        limit: 200,
+      }),
+      StudentModel.find({ ownerId: input.teacherId })
+        .sort({ createdAt: -1 })
+        .limit(studentsLimit)
+        .lean()
+        .exec(),
+    ]);
 
     // Filtra ledger institucional pelo professor (actorUserId).
     const teacherLedger = ledgerEntries.filter(
@@ -161,6 +176,19 @@ export class ComputeTeacherOverviewUseCase {
     }
 
     const classMap = new Map(allClasses.map((c) => [c.id.toString(), c]));
+    const courseMap = new Map(
+      allCourses.map((c) => [c.id.toString(), c.name]),
+    );
+
+    function resolveCourse(courseId: string): {
+      courseId: string;
+      courseName: string;
+    } {
+      return {
+        courseId,
+        courseName: courseMap.get(courseId) ?? "Curso removido",
+      };
+    }
 
     // Soma consumo desse professor no período (debits com ai_consumption).
     const creditsConsumed = teacherLedger
@@ -203,6 +231,7 @@ export class ComputeTeacherOverviewUseCase {
         .map((c) => ({
           classId: c.id.toString(),
           name: c.name,
+          ...resolveCourse(c.courseId),
           studentCount: classStudentCounts.get(c.id.toString()) ?? 0,
           examCount: classExamCounts.get(c.id.toString()) ?? 0,
         }))
@@ -212,6 +241,7 @@ export class ComputeTeacherOverviewUseCase {
         title: ex.title,
         classId: ex.classId,
         className: classMap.get(ex.classId)?.name ?? "Turma removida",
+        ...resolveCourse(ex.courseId),
         createdAt: ex.createdAt.toISOString(),
         questionCount: ex.questions.length,
       })),
@@ -223,6 +253,7 @@ export class ComputeTeacherOverviewUseCase {
         email: s.email,
         classId: s.classId,
         className: classMap.get(s.classId)?.name ?? "Turma removida",
+        ...resolveCourse(s.courseId),
         createdAt: s.createdAt.toISOString(),
       })),
       ledger: teacherLedger.slice(0, ledgerLimit).map((e) => ({

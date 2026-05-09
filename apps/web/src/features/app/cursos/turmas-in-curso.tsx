@@ -6,24 +6,35 @@ import { Plus, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { TurmaCard } from "./turma-card";
-import { TurmaFormDialog, type TurmaFormValues } from "./turma-form-dialog";
-import { DeleteTurmaDialog } from "./delete-turma-dialog";
+import { TurmaCard } from "@/features/app/turmas/turma-card";
+import {
+  TurmaFormDialog,
+  type TurmaFormValues,
+} from "@/features/app/turmas/turma-form-dialog";
+import { DeleteTurmaDialog } from "@/features/app/turmas/delete-turma-dialog";
 import {
   createTurmaAction,
   updateTurmaAction,
   deleteTurmaAction,
-} from "./actions";
-import type { TurmaDTO } from "./types";
+} from "@/features/app/turmas/actions";
+import type { TurmaDTO } from "@/features/app/turmas/types";
 
 type FilterKey = "withActive" | "noStudents" | "noExams";
 type SortKey = "recent" | "alpha" | "students" | "exams";
 
-interface TurmaListProps {
-  initialTurmas: TurmaDTO[];
+interface TurmasInCursoProps {
+  /** Curso onde estamos — fixa no form de criar/editar. */
+  courseId: string;
+  /** Turmas que pertencem ao curso (já enriquecidas). */
+  turmas: TurmaDTO[];
 }
 
-export function TurmaList({ initialTurmas }: TurmaListProps) {
+/**
+ * Listagem rica de turmas dentro do detalhe de um curso. Espelha o que
+ * `/app/turmas` tinha (cards + busca + filtros + sort + CRUD), mas sem
+ * agrupamento/filtro por curso — o curso é fixo, alimentado pelo pai.
+ */
+export function TurmasInCurso({ courseId, turmas }: TurmasInCursoProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -38,12 +49,11 @@ export function TurmaList({ initialTurmas }: TurmaListProps) {
   const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
   const [editTarget, setEditTarget] = useState<TurmaDTO | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
   const [deleteTarget, setDeleteTarget] = useState<TurmaDTO | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = initialTurmas.filter((t) => {
+    let list = turmas.filter((t) => {
       if (q && !t.name.toLowerCase().includes(q)) return false;
       if (filters.withActive && t.activeExamsCount === 0) return false;
       if (filters.noStudents && t.studentsCount > 0) return false;
@@ -66,7 +76,7 @@ export function TurmaList({ initialTurmas }: TurmaListProps) {
       }
     });
     return list;
-  }, [initialTurmas, search, filters, sort]);
+  }, [turmas, search, filters, sort]);
 
   const hasAnyFilter =
     search.trim().length > 0 ||
@@ -104,83 +114,81 @@ export function TurmaList({ initialTurmas }: TurmaListProps) {
 
   return (
     <>
-      <div className="flex flex-col gap-8 border-b border-gray-100 pb-8 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.15em] text-gray-400">
-            <span className="pulse-dot" />
-            Suas turmas
-          </div>
-          <h1 className="flex flex-wrap items-baseline gap-3 text-4xl font-medium leading-[1.05] tracking-tighter text-ink md:text-5xl">
-            Turmas
-            <span className="rounded-md bg-gray-100 px-2 py-1 text-sm font-medium tabular-nums text-gray-600">
-              {initialTurmas.length}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm">
+            <Users className="size-4 text-gray-400" />
+            <span className="font-medium text-ink">
+              {turmas.length} {turmas.length === 1 ? "turma" : "turmas"}
             </span>
-          </h1>
-          <p className="mt-3 max-w-md text-[15px] leading-relaxed text-gray-500">
-            Organize seus alunos, distribua provas e acompanhe o desempenho de cada turma.
-          </p>
+          </div>
+          <Button variant="primary" size="md" onClick={openCreate}>
+            <Plus className="size-4" strokeWidth={2.5} />
+            Nova turma
+          </Button>
         </div>
 
-        <Button variant="primary" size="lg" onClick={openCreate}>
-          <Plus className="size-4" strokeWidth={2.5} />
-          Nova turma
-        </Button>
-      </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-72">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar turmas..."
+                className="pl-10"
+              />
+            </div>
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-80">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar turmas..."
-              className="pl-10"
-            />
+            <div className="flex flex-wrap gap-2">
+              <FilterToggle
+                active={filters.withActive}
+                onToggle={() =>
+                  setFilters((f) => ({ ...f, withActive: !f.withActive }))
+                }
+              >
+                Com provas ativas
+              </FilterToggle>
+              <FilterToggle
+                active={filters.noStudents}
+                onToggle={() =>
+                  setFilters((f) => ({ ...f, noStudents: !f.noStudents }))
+                }
+              >
+                Sem alunos
+              </FilterToggle>
+              <FilterToggle
+                active={filters.noExams}
+                onToggle={() =>
+                  setFilters((f) => ({ ...f, noExams: !f.noExams }))
+                }
+              >
+                Sem provas
+              </FilterToggle>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <FilterToggle
-              active={filters.withActive}
-              onToggle={() => setFilters((f) => ({ ...f, withActive: !f.withActive }))}
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="turma-sort" className="text-gray-500">
+              Ordenar
+            </label>
+            <select
+              id="turma-sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-ink transition-colors hover:border-gray-300 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
             >
-              Com provas ativas
-            </FilterToggle>
-            <FilterToggle
-              active={filters.noStudents}
-              onToggle={() => setFilters((f) => ({ ...f, noStudents: !f.noStudents }))}
-            >
-              Sem alunos
-            </FilterToggle>
-            <FilterToggle
-              active={filters.noExams}
-              onToggle={() => setFilters((f) => ({ ...f, noExams: !f.noExams }))}
-            >
-              Sem provas
-            </FilterToggle>
+              <option value="recent">Recentes</option>
+              <option value="alpha">A — Z</option>
+              <option value="students">Mais alunos</option>
+              <option value="exams">Mais provas</option>
+            </select>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm">
-          <label htmlFor="turma-sort" className="text-gray-500">
-            Ordenar
-          </label>
-          <select
-            id="turma-sort"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-ink transition-colors hover:border-gray-300 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
-          >
-            <option value="recent">Recentes</option>
-            <option value="alpha">A — Z</option>
-            <option value="students">Mais alunos</option>
-            <option value="exams">Mais provas</option>
-          </select>
         </div>
       </div>
 
       {filtered.length > 0 ? (
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((turma) => (
             <TurmaCard
               key={turma.id}
@@ -206,6 +214,8 @@ export function TurmaList({ initialTurmas }: TurmaListProps) {
         onOpenChange={setDrawerOpen}
         mode={drawerMode}
         turma={editTarget}
+        cursos={[]}
+        lockedCourseId={courseId}
         onSubmit={handleSubmit}
       />
 
@@ -254,12 +264,12 @@ function EmptyNoData({ onCreate }: { onCreate: () => void }) {
       <div className="flex flex-col gap-1.5">
         <h2 className="text-lg font-medium text-ink">Nenhuma turma ainda</h2>
         <p className="max-w-xs text-sm text-gray-500">
-          Crie sua primeira turma pra começar a montar provas e acompanhar alunos.
+          Crie sua primeira turma neste curso pra começar a montar provas.
         </p>
       </div>
       <Button variant="primary" size="md" onClick={onCreate}>
         <Plus className="size-4" strokeWidth={2.5} />
-        Criar primeira turma
+        Criar turma
       </Button>
     </div>
   );
@@ -268,7 +278,9 @@ function EmptyNoData({ onCreate }: { onCreate: () => void }) {
 function EmptyFiltered({ onReset }: { onReset: () => void }) {
   return (
     <div className="mt-10 flex flex-col items-center gap-4 rounded-2xl border border-gray-100 bg-white px-6 py-14 text-center">
-      <p className="text-sm text-gray-500">Nenhuma turma combina com esses filtros.</p>
+      <p className="text-sm text-gray-500">
+        Nenhuma turma combina com esses filtros.
+      </p>
       <Button variant="ghost" size="sm" onClick={onReset}>
         Limpar filtros
       </Button>

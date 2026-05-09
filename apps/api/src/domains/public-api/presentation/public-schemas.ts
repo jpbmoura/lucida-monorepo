@@ -25,6 +25,12 @@ export const createClassBody = z.object({
   subject: z.string().max(80).optional(),
   grade: z.string().max(30).optional(),
   teacherId: z.string().min(1),
+  /**
+   * Curso opcional pra retrocompat. Se ausente, a turma vai pro curso
+   * "Geral" do `teacherId` (criado on-demand). Curso precisa pertencer
+   * ao mesmo `teacherId`.
+   */
+  courseId: z.string().min(1).optional(),
 });
 
 export const classIdParam = z.object({

@@ -45,6 +45,7 @@ export class CreateStudentUseCase {
       id: this.students.nextId(),
       classId: cls.id.toString(),
       ownerId: input.ownerId,
+      courseId: cls.courseId,
       code,
       name: input.name,
       matricula: input.matricula,

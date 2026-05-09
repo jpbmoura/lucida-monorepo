@@ -6,6 +6,7 @@ import {
   fetchAlunosByTurma,
   fetchExamsByTurma,
 } from "@/features/app/turmas/data";
+import { fetchCursos } from "@/features/app/cursos/data";
 import { TurmaDetail } from "@/features/app/turmas/detail/turma-detail";
 
 interface TurmaPageProps {
@@ -35,14 +36,20 @@ export default async function TurmaDetailPage({ params }: TurmaPageProps) {
     throw err;
   }
 
-  const [exams, alunos] = await Promise.all([
+  const [exams, alunos, cursos] = await Promise.all([
     fetchExamsByTurma(id),
     fetchAlunosByTurma(id),
+    fetchCursos(),
   ]);
 
   return (
     <div className="mx-auto w-full px-5 py-10 pb-20 md:px-10">
-      <TurmaDetail initialTurma={turma} exams={exams} alunos={alunos} />
+      <TurmaDetail
+        initialTurma={turma}
+        exams={exams}
+        alunos={alunos}
+        cursos={cursos}
+      />
     </div>
   );
 }

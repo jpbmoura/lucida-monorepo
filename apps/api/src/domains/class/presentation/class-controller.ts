@@ -37,21 +37,9 @@ export class ClassController {
         ownerId: req.auth!.userId,
         name: body.name,
         description: body.description,
+        courseId: body.courseId,
       });
       res.status(201).json({ data: created });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  get: RequestHandler = async (req, res, next) => {
-    try {
-      const { id } = classIdParam.parse(req.params);
-      const result = await this.deps.getClass.execute({
-        classId: id,
-        ownerId: req.auth!.userId,
-      });
-      res.json({ data: result });
     } catch (err) {
       next(err);
     }
@@ -66,8 +54,22 @@ export class ClassController {
         ownerId: req.auth!.userId,
         name: body.name,
         description: body.description,
+        courseId: body.courseId,
       });
       res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  get: RequestHandler = async (req, res, next) => {
+    try {
+      const { id } = classIdParam.parse(req.params);
+      const result = await this.deps.getClass.execute({
+        classId: id,
+        ownerId: req.auth!.userId,
+      });
+      res.json({ data: result });
     } catch (err) {
       next(err);
     }

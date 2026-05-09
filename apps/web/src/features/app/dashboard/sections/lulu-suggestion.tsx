@@ -72,7 +72,7 @@ export function LuluSuggestion({ atRiskStudents }: LuluSuggestionProps) {
       </div>
 
       <Link
-        href={hasAtRisk ? "/app/analises" : "/app/turmas"}
+        href={hasAtRisk ? "/app/analises" : "/app/cursos"}
         className="relative z-10 mt-6 inline-flex w-fit items-center gap-2 rounded-pill bg-brand-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white hover:text-ink"
       >
         {hasAtRisk ? (

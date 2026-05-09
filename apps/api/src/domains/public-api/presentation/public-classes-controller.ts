@@ -36,6 +36,7 @@ export class PublicClassesController {
         subject: body.subject ?? null,
         grade: body.grade ?? null,
         teacherId: body.teacherId,
+        courseId: body.courseId ?? null,
       });
       res.status(201).json({ data: result });
     } catch (err) {

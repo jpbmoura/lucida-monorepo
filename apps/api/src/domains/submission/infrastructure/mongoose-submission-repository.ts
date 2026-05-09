@@ -16,6 +16,7 @@ export class MongooseSubmissionRepository implements SubmissionRepository {
         $set: {
           examId: submission.examId,
           classId: submission.classId,
+          courseId: submission.courseId,
           ownerId: submission.ownerId,
           studentId: submission.studentId,
           studentCode: submission.studentCode,
@@ -96,6 +97,16 @@ export class MongooseSubmissionRepository implements SubmissionRepository {
       ]),
     );
   }
+
+  async updateCourseForClass(
+    classId: string,
+    newCourseId: string | null,
+  ): Promise<void> {
+    await SubmissionModel.updateMany(
+      { classId },
+      { $set: { courseId: newCourseId } },
+    ).exec();
+  }
 }
 
 function toEntity(doc: SubmissionDoc): Submission {
@@ -103,6 +114,7 @@ function toEntity(doc: SubmissionDoc): Submission {
     id: SubmissionId.of(doc._id),
     examId: doc.examId,
     classId: doc.classId,
+    courseId: doc.courseId ?? "",
     ownerId: doc.ownerId,
     studentId: doc.studentId,
     studentCode: doc.studentCode,

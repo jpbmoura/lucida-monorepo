@@ -5,7 +5,7 @@ import { SidebarUpgradeCard } from "./sidebar-upgrade-card";
 
 const GERAL: SidebarNavItem[] = [
   { label: "Dashboard", href: "/app", icon: "layout" },
-  { label: "Turmas", href: "/app/turmas", icon: "users" },
+  { label: "Cursos", href: "/app/cursos", icon: "folder" },
 ];
 
 const FERRAMENTAS: SidebarNavItem[] = [

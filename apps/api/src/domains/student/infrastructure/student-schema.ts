@@ -9,6 +9,8 @@ export interface StudentDoc {
    * do momento da criação. Backfill: `scripts/backfill-student-org/`.
    */
   organizationId: string | null;
+  /** Snapshot de `class.courseId`. Obrigatório (Fase 4+). */
+  courseId: string;
   code: string;
   name: string;
   matricula: string;
@@ -23,6 +25,7 @@ const studentSchema = new Schema<StudentDoc>(
     classId: { type: String, required: true, index: true },
     ownerId: { type: String, required: true, index: true },
     organizationId: { type: String, default: null, index: true },
+    courseId: { type: String, required: true, index: true },
     code: { type: String, required: true, match: /^[0-9]{7}$/ },
     name: { type: String, required: true, trim: true },
     matricula: { type: String, required: true, trim: true },
