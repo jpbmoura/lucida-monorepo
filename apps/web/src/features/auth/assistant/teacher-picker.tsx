@@ -51,6 +51,7 @@ export function TeacherPicker({ teachers, selfUser }: Props) {
           | null;
         throw new Error(body?.message ?? "Não foi possível selecionar.");
       }
+      router.refresh();
       router.replace("/app");
     } catch (err) {
       setError((err as Error).message);
@@ -71,6 +72,7 @@ export function TeacherPicker({ teachers, selfUser }: Props) {
           | null;
         throw new Error(body?.message ?? "Não foi possível entrar.");
       }
+      router.refresh();
       router.replace("/app");
     } catch (err) {
       setError((err as Error).message);

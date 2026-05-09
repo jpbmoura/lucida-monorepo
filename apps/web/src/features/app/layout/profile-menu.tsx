@@ -47,6 +47,7 @@ export function ProfileMenu({
       // /auxiliar/escolher. Faz o redirect manual também pra cobrir o
       // caso de o user já estar fora do /app.
       await fetch("/v1/iam/assistant/clear", { method: "POST" });
+      router.refresh();
       router.replace("/auxiliar/escolher");
     } finally {
       // Mantém o spinner até a navegação consolidar — replace dispara
