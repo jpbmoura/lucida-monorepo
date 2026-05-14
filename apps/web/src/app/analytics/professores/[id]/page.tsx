@@ -63,6 +63,8 @@ export default async function TeacherDetailPage({
           teacher={data.teacher}
           period={period}
           currentUserId={session.user.id}
+          classes={data.classes}
+          recentExams={data.recentExams}
         />
 
         <TeacherKpiGrid summary={data.summary} />

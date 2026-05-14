@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PeriodFilter } from "@/features/app/analises/components/period-filter";
 import { ImpersonateButton } from "@/features/analytics/impersonate/components/impersonate-button";
-import { ExportTeacherButton } from "./export-teacher-button";
+import { ExportTeacherDialog } from "./export-teacher-dialog";
 import type {
   TeacherOverviewDTO,
   TeacherOverviewPeriod,
@@ -13,12 +13,19 @@ interface TeacherHeaderProps {
   period: TeacherOverviewPeriod;
   /** ID do user logado — escondemos "Atuar como" quando é o próprio user. */
   currentUserId: string;
+  /** Turmas do professor (alimenta o filtro do dialog de export). */
+  classes: TeacherOverviewDTO["classes"];
+  /** Provas recentes (idem). Capadas pelo overview — caso o usuário precise
+   * recortar provas mais antigas, deixa o filtro vazio e usa data. */
+  recentExams: TeacherOverviewDTO["recentExams"];
 }
 
 export function TeacherHeader({
   teacher,
   period,
   currentUserId,
+  classes,
+  recentExams,
 }: TeacherHeaderProps) {
   const canImpersonate = teacher.id !== currentUserId;
   return (
@@ -55,9 +62,11 @@ export function TeacherHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <ExportTeacherButton
+          <ExportTeacherDialog
             teacherId={teacher.id}
             teacherName={teacher.name}
+            classes={classes}
+            exams={recentExams}
           />
           {canImpersonate && (
             <ImpersonateButton

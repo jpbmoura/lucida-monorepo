@@ -26,6 +26,7 @@ import {
   acceptInviteWithSignupBody,
   classIdParam,
   examIdParam,
+  exportTeacherQuery,
   orgOverviewQuery,
   overviewQuery,
   studentIdParam,
@@ -249,9 +250,10 @@ export class AnalyticsController {
   };
 
   /**
-   * Export completo do professor: ZIP com turmas, alunos, provas e
-   * submissões em CSV. Usado pelo botão "Exportar dados" no drill-down —
-   * sem parâmetros além do id (exporta tudo dele, não filtra por período).
+   * Export do professor: ZIP com turmas, alunos, provas e submissões em
+   * CSV. Aceita filtros opcionais (date range em `submittedAt`, classIds,
+   * examIds, status). Os filtros se aplicam em cascata: os 4 CSVs ficam
+   * recortados pelo conjunto de submissões que casaram.
    */
   teacherExport: RequestHandler = async (req, res, next) => {
     try {
@@ -259,9 +261,11 @@ export class AnalyticsController {
       if (!orgId) throw new MissingActiveOrganizationError();
 
       const { id } = teacherIdParam.parse(req.params);
+      const filters = exportTeacherQuery.parse(req.query);
       const { zip, filename } = await this.deps.exportTeacherData.execute({
         organizationId: orgId,
         teacherId: id,
+        filters,
       });
       res.setHeader("Content-Type", "application/zip");
       res.setHeader(
