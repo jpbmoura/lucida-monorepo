@@ -44,13 +44,15 @@ const dateParam = z
     return parsed;
   });
 
+// Export sempre exporta `status=submitted` — provas em andamento ficam
+// de fora por definição ("submissões que foram feitas"). Filtro de data
+// atua exclusivamente em `submittedAt`.
 export const exportTeacherQuery = z
   .object({
     from: dateParam,
     to: dateParam,
     classIds: idListParam,
     examIds: idListParam,
-    status: z.enum(["submitted", "in_progress", "all"]).default("all"),
   })
   .superRefine((data, ctx) => {
     if (data.from && data.to && data.from.getTime() > data.to.getTime()) {

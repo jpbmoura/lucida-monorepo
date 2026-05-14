@@ -250,10 +250,9 @@ export class AnalyticsController {
   };
 
   /**
-   * Export do professor: ZIP com turmas, alunos, provas e submissões em
-   * CSV. Aceita filtros opcionais (date range em `submittedAt`, classIds,
-   * examIds, status). Os filtros se aplicam em cascata: os 4 CSVs ficam
-   * recortados pelo conjunto de submissões que casaram.
+   * Export do professor: um único CSV com todas as submissões finalizadas
+   * que casam com os filtros (date range em `submittedAt`, classIds,
+   * examIds — todos opcionais). Provas em andamento ficam sempre de fora.
    */
   teacherExport: RequestHandler = async (req, res, next) => {
     try {
@@ -262,18 +261,18 @@ export class AnalyticsController {
 
       const { id } = teacherIdParam.parse(req.params);
       const filters = exportTeacherQuery.parse(req.query);
-      const { zip, filename } = await this.deps.exportTeacherData.execute({
+      const { csv, filename } = await this.deps.exportTeacherData.execute({
         organizationId: orgId,
         teacherId: id,
         filters,
       });
-      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${filename}"`,
       );
       res.setHeader("Cache-Control", "no-store");
-      res.end(Buffer.from(zip));
+      res.end(csv);
     } catch (err) {
       next(err);
     }

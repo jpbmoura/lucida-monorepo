@@ -590,6 +590,7 @@ export async function buildApp(): Promise<Express> {
       orgMembersRepository,
       classRepository,
       examRepository,
+      courseRepository,
     ),
     orgMembersRepository,
     orgInvitationsRepository,

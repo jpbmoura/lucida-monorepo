@@ -17,8 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-type StatusFilter = "all" | "submitted" | "in_progress";
-
 interface ClassOption {
   classId: string;
   name: string;
@@ -36,21 +34,22 @@ interface ExportTeacherDialogProps {
   teacherName: string;
   classes: ClassOption[];
   /**
-   * Pode estar capado em 50 e/ou filtrado pelo período do header — vem do
-   * mesmo overview. Pra "exportar todas as provas do professor", o usuário
-   * deixa o filtro vazio e usa o range de data.
+   * Lista de provas mostradas no filtro. Vem capada (50) e respeitando o
+   * período do header — pra "exportar todas as provas do professor" o
+   * usuário deixa o filtro vazio e usa apenas o range de data.
    */
   exams: ExamOption[];
 }
 
 /**
- * Modal de exportação. Filtros opcionais; submeter sem nenhum equivale ao
- * comportamento antigo (export integral). Monta querystring e dispara
- * fetch + download em blob — não dá pra server action porque retornar
- * `Uint8Array` pro browser via action de Next não é trivial.
+ * Modal de exportação. Baixa um único CSV com todas as submissões
+ * finalizadas do professor que casam com os filtros. Filtro de data atua
+ * em `submittedAt`; provas em andamento nunca entram.
  *
- * Next rewrite do `/v1/*` proxia pra api, então o request vai same-origin
- * e o cookie de sessão segue junto.
+ * Estratégia do download: `fetch` + blob + `<a download>`. Não dá pra
+ * server action porque streaming de bytes pro browser via action de Next
+ * não é trivial. Next rewrite do `/v1/*` proxia pra api → same-origin →
+ * cookie segue junto.
  */
 export function ExportTeacherDialog({
   teacherId,
@@ -67,7 +66,6 @@ export function ExportTeacherDialog({
   const [to, setTo] = useState("");
   const [classIds, setClassIds] = useState<Set<string>>(new Set());
   const [examIds, setExamIds] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState<StatusFilter>("all");
 
   const dateError = useMemo(() => {
     if (from && to && from > to) {
@@ -76,15 +74,32 @@ export function ExportTeacherDialog({
     return null;
   }, [from, to]);
 
-  function toggleSet(
-    setter: typeof setClassIds,
-    current: Set<string>,
-    id: string,
-  ) {
-    const next = new Set(current);
+  const allClassesSelected =
+    classes.length > 0 && classIds.size === classes.length;
+  const allExamsSelected = exams.length > 0 && examIds.size === exams.length;
+
+  function toggleClass(id: string) {
+    const next = new Set(classIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    setter(next);
+    setClassIds(next);
+  }
+
+  function toggleExam(id: string) {
+    const next = new Set(examIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExamIds(next);
+  }
+
+  function toggleAllClasses() {
+    if (allClassesSelected) setClassIds(new Set());
+    else setClassIds(new Set(classes.map((c) => c.classId)));
+  }
+
+  function toggleAllExams() {
+    if (allExamsSelected) setExamIds(new Set());
+    else setExamIds(new Set(exams.map((e) => e.examId)));
   }
 
   function resetForm() {
@@ -92,7 +107,6 @@ export function ExportTeacherDialog({
     setTo("");
     setClassIds(new Set());
     setExamIds(new Set());
-    setStatus("all");
     setError(null);
   }
 
@@ -102,12 +116,17 @@ export function ExportTeacherDialog({
     setError(null);
     setPending(true);
     try {
+      // Quando todas as turmas estão marcadas, omitimos o filtro — é
+      // semanticamente o mesmo que "sem filtro" e gera URL mais limpa.
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
-      if (classIds.size > 0) params.set("classIds", [...classIds].join(","));
-      if (examIds.size > 0) params.set("examIds", [...examIds].join(","));
-      if (status !== "all") params.set("status", status);
+      if (classIds.size > 0 && !allClassesSelected) {
+        params.set("classIds", [...classIds].join(","));
+      }
+      if (examIds.size > 0 && !allExamsSelected) {
+        params.set("examIds", [...examIds].join(","));
+      }
 
       const qs = params.toString();
       const url = `/v1/analytics/teachers/${encodeURIComponent(teacherId)}/export${qs ? `?${qs}` : ""}`;
@@ -128,7 +147,8 @@ export function ExportTeacherDialog({
       const blob = await res.blob();
       const disposition = res.headers.get("content-disposition") ?? "";
       const match = /filename="?([^";]+)"?/i.exec(disposition);
-      const filename = match?.[1] ?? `lucida-${slug(teacherName)}.zip`;
+      const filename =
+        match?.[1] ?? `lucida-submissoes-${slug(teacherName)}.csv`;
 
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -149,9 +169,8 @@ export function ExportTeacherDialog({
   const totalFilters =
     (from ? 1 : 0) +
     (to ? 1 : 0) +
-    (classIds.size > 0 ? 1 : 0) +
-    (examIds.size > 0 ? 1 : 0) +
-    (status !== "all" ? 1 : 0);
+    (classIds.size > 0 && !allClassesSelected ? 1 : 0) +
+    (examIds.size > 0 && !allExamsSelected ? 1 : 0);
 
   return (
     <Dialog
@@ -169,10 +188,11 @@ export function ExportTeacherDialog({
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Exportar dados de {teacherName}</DialogTitle>
+          <DialogTitle>Exportar submissões de {teacherName}</DialogTitle>
           <DialogDescription>
-            Gera um ZIP com turmas, alunos, provas e submissões em CSV. Os
-            filtros são opcionais — sem nenhum, exporta tudo do professor.
+            Baixa um CSV com todas as submissões finalizadas. Sem filtros,
+            exporta tudo. O período atua sobre a data em que o aluno
+            entregou a prova.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,15 +204,14 @@ export function ExportTeacherDialog({
           {/* ── Período ── */}
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium text-ink">
-              Período (data de submissão)
+              Período da submissão
             </legend>
-            <p className="text-xs text-gray-500">
-              Filtra pela data em que o aluno entregou a prova. Provas em
-              andamento ficam de fora quando um período é informado.
-            </p>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${formId}-from`} className="text-xs text-gray-600">
+                <Label
+                  htmlFor={`${formId}-from`}
+                  className="text-xs text-gray-600"
+                >
                   De
                 </Label>
                 <Input
@@ -204,7 +223,10 @@ export function ExportTeacherDialog({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`${formId}-to`} className="text-xs text-gray-600">
+                <Label
+                  htmlFor={`${formId}-to`}
+                  className="text-xs text-gray-600"
+                >
                   Até
                 </Label>
                 <Input
@@ -221,57 +243,30 @@ export function ExportTeacherDialog({
             )}
           </fieldset>
 
-          {/* ── Status ── */}
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-sm font-medium text-ink">Status</legend>
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  { value: "all", label: "Todas" },
-                  { value: "submitted", label: "Finalizadas" },
-                  { value: "in_progress", label: "Em andamento" },
-                ] as const
-              ).map((opt) => (
-                <label
-                  key={opt.value}
-                  className={cn(
-                    "cursor-pointer rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors",
-                    status === opt.value
-                      ? "border-analytics-primary bg-analytics-primary/10 text-analytics-primary"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name={`${formId}-status`}
-                    value={opt.value}
-                    checked={status === opt.value}
-                    onChange={() => setStatus(opt.value)}
-                    className="sr-only"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
           {/* ── Turmas ── */}
           <fieldset className="flex flex-col gap-2">
             <legend className="flex w-full items-center justify-between text-sm font-medium text-ink">
-              <span>Turmas</span>
-              {classIds.size > 0 && (
+              <span>
+                Turmas
+                <span className="ml-1.5 text-xs font-normal text-gray-400">
+                  ({classes.length})
+                </span>
+              </span>
+              {classes.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setClassIds(new Set())}
-                  className="text-xs font-normal text-gray-500 hover:text-ink"
+                  onClick={toggleAllClasses}
+                  className="text-xs font-normal text-analytics-primary hover:underline"
                 >
-                  Limpar ({classIds.size})
+                  {allClassesSelected
+                    ? "Limpar seleção"
+                    : "Selecionar todas"}
                 </button>
               )}
             </legend>
             {classes.length === 0 ? (
               <p className="rounded-xl border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-500">
-                Sem turmas cadastradas para este professor.
+                Sem turmas cadastradas.
               </p>
             ) : (
               <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-xl border border-gray-200 p-2">
@@ -279,26 +274,34 @@ export function ExportTeacherDialog({
                   <OptionRow
                     key={c.classId}
                     checked={classIds.has(c.classId)}
-                    onToggle={() => toggleSet(setClassIds, classIds, c.classId)}
+                    onToggle={() => toggleClass(c.classId)}
                     label={c.name}
                     sub={c.courseName}
                   />
                 ))}
               </div>
             )}
+            <p className="text-[11px] text-gray-400">
+              Sem turmas selecionadas = todas entram.
+            </p>
           </fieldset>
 
           {/* ── Provas ── */}
           <fieldset className="flex flex-col gap-2">
             <legend className="flex w-full items-center justify-between text-sm font-medium text-ink">
-              <span>Provas</span>
-              {examIds.size > 0 && (
+              <span>
+                Provas
+                <span className="ml-1.5 text-xs font-normal text-gray-400">
+                  ({exams.length})
+                </span>
+              </span>
+              {exams.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setExamIds(new Set())}
-                  className="text-xs font-normal text-gray-500 hover:text-ink"
+                  onClick={toggleAllExams}
+                  className="text-xs font-normal text-analytics-primary hover:underline"
                 >
-                  Limpar ({examIds.size})
+                  {allExamsSelected ? "Limpar seleção" : "Selecionar todas"}
                 </button>
               )}
             </legend>
@@ -313,13 +316,16 @@ export function ExportTeacherDialog({
                   <OptionRow
                     key={e.examId}
                     checked={examIds.has(e.examId)}
-                    onToggle={() => toggleSet(setExamIds, examIds, e.examId)}
+                    onToggle={() => toggleExam(e.examId)}
                     label={e.title}
                     sub={e.className}
                   />
                 ))}
               </div>
             )}
+            <p className="text-[11px] text-gray-400">
+              Sem provas selecionadas = todas entram.
+            </p>
           </fieldset>
 
           {error && (
@@ -348,7 +354,12 @@ export function ExportTeacherDialog({
           </div>
           <div className="flex items-center gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="ghost" size="sm" disabled={pending}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+              >
                 Cancelar
               </Button>
             </DialogClose>
@@ -399,7 +410,9 @@ function OptionRow({
       />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[13px] text-ink">{label}</span>
-        {sub && <span className="truncate text-[11px] text-gray-500">{sub}</span>}
+        {sub && (
+          <span className="truncate text-[11px] text-gray-500">{sub}</span>
+        )}
       </span>
     </label>
   );
