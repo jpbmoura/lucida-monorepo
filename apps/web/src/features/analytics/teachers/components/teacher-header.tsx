@@ -13,19 +13,12 @@ interface TeacherHeaderProps {
   period: TeacherOverviewPeriod;
   /** ID do user logado — escondemos "Atuar como" quando é o próprio user. */
   currentUserId: string;
-  /** Turmas do professor (alimenta o filtro do dialog de export). */
-  classes: TeacherOverviewDTO["classes"];
-  /** Provas recentes (idem). Capadas pelo overview — caso o usuário precise
-   * recortar provas mais antigas, deixa o filtro vazio e usa data. */
-  recentExams: TeacherOverviewDTO["recentExams"];
 }
 
 export function TeacherHeader({
   teacher,
   period,
   currentUserId,
-  classes,
-  recentExams,
 }: TeacherHeaderProps) {
   const canImpersonate = teacher.id !== currentUserId;
   return (
@@ -65,8 +58,6 @@ export function TeacherHeader({
           <ExportTeacherDialog
             teacherId={teacher.id}
             teacherName={teacher.name}
-            classes={classes}
-            exams={recentExams}
           />
           {canImpersonate && (
             <ImpersonateButton

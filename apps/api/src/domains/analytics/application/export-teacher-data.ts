@@ -15,10 +15,6 @@ export interface ExportTeacherFilters {
   from?: Date;
   /** `submittedAt <= to` (inclusivo, normalizado pro fim do dia UTC). */
   to?: Date;
-  /** Restringe às turmas selecionadas. `undefined`/vazio = todas. */
-  classIds?: string[];
-  /** Restringe às provas selecionadas. `undefined`/vazio = todas. */
-  examIds?: string[];
 }
 
 interface Input {
@@ -35,22 +31,21 @@ export interface ExportTeacherDataResult {
 }
 
 /**
- * Gera UM CSV com todas as submissões finalizadas do professor que casam
- * com os filtros. Cada linha = uma submissão; um aluno que respondeu N
- * provas aparece em N linhas.
+ * Gera UM CSV com todas as submissões finalizadas do professor no
+ * período. Cada linha = uma submissão; um aluno que respondeu N provas
+ * aparece em N linhas.
  *
  * Regras:
- *  - Só inclui submissões com `status: "submitted"`. Provas em andamento
- *    nunca entram — o filtro de data é sobre quando o aluno entregou.
- *  - Filtro de data sempre atua em `submittedAt` (não em createdAt da
- *    prova, da turma, do aluno).
- *  - `ownerId` é sempre travado em `teacherId` — defesa em profundidade
- *    pra que os filtros de classIds/examIds não consigam vazar dados
- *    fora do escopo do professor.
+ *  - Só `status: "submitted"`. Provas em andamento nunca entram.
+ *  - Filtro de data atua em `submittedAt`. Sem datas = exporta tudo.
+ *  - Cobre TODAS as turmas e provas do professor sem exceção — não há
+ *    recorte por turma/prova. `ownerId = teacherId` é o único critério
+ *    de escopo. Era tentador deixar o usuário selecionar turmas/provas
+ *    na UI, mas a lista vinha capada/filtrada pelo overview e o botão
+ *    "Selecionar tudo" não cobria tudo de verdade, ocultando submissões.
  *
- * Não usa cascata: as outras coleções (turmas, alunos, provas, cursos)
- * são lidas só pra enriquecer as colunas do CSV — não geram arquivos
- * separados.
+ * As coleções de turmas, alunos, provas e cursos são lidas só pra
+ * enriquecer colunas do CSV.
  */
 export class ExportTeacherDataUseCase {
   constructor(
@@ -167,8 +162,6 @@ export class ExportTeacherDataUseCase {
 interface NormalizedFilters {
   from: Date | null;
   to: Date | null;
-  classIds: string[] | null;
-  examIds: string[] | null;
 }
 
 function normalizeFilters(
@@ -177,9 +170,6 @@ function normalizeFilters(
   return {
     from: raw?.from ? startOfDayUTC(raw.from) : null,
     to: raw?.to ? endOfDayUTC(raw.to) : null,
-    classIds:
-      raw?.classIds && raw.classIds.length > 0 ? [...raw.classIds] : null,
-    examIds: raw?.examIds && raw.examIds.length > 0 ? [...raw.examIds] : null,
   };
 }
 
@@ -191,8 +181,6 @@ function buildSubmissionQuery(
     ownerId: teacherId,
     status: "submitted",
   };
-  if (filters.classIds) query.classId = { $in: filters.classIds };
-  if (filters.examIds) query.examId = { $in: filters.examIds };
   if (filters.from || filters.to) {
     const range: { $gte?: Date; $lte?: Date } = {};
     if (filters.from) range.$gte = filters.from;

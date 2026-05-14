@@ -15,36 +15,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-
-interface ClassOption {
-  classId: string;
-  name: string;
-  courseName: string;
-}
-
-interface ExamOption {
-  examId: string;
-  title: string;
-  className: string;
-}
 
 interface ExportTeacherDialogProps {
   teacherId: string;
   teacherName: string;
-  classes: ClassOption[];
-  /**
-   * Lista de provas mostradas no filtro. Vem capada (50) e respeitando o
-   * período do header — pra "exportar todas as provas do professor" o
-   * usuário deixa o filtro vazio e usa apenas o range de data.
-   */
-  exams: ExamOption[];
 }
 
 /**
- * Modal de exportação. Baixa um único CSV com todas as submissões
- * finalizadas do professor que casam com os filtros. Filtro de data atua
- * em `submittedAt`; provas em andamento nunca entram.
+ * Modal de exportação. Baixa um único CSV com TODAS as submissões
+ * finalizadas do professor (todas as turmas, todas as provas, todos os
+ * alunos). O único recorte é o período sobre `submittedAt`.
  *
  * Estratégia do download: `fetch` + blob + `<a download>`. Não dá pra
  * server action porque streaming de bytes pro browser via action de Next
@@ -54,8 +34,6 @@ interface ExportTeacherDialogProps {
 export function ExportTeacherDialog({
   teacherId,
   teacherName,
-  classes,
-  exams,
 }: ExportTeacherDialogProps) {
   const formId = useId();
   const [open, setOpen] = useState(false);
@@ -64,8 +42,6 @@ export function ExportTeacherDialog({
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [classIds, setClassIds] = useState<Set<string>>(new Set());
-  const [examIds, setExamIds] = useState<Set<string>>(new Set());
 
   const dateError = useMemo(() => {
     if (from && to && from > to) {
@@ -74,59 +50,15 @@ export function ExportTeacherDialog({
     return null;
   }, [from, to]);
 
-  const allClassesSelected =
-    classes.length > 0 && classIds.size === classes.length;
-  const allExamsSelected = exams.length > 0 && examIds.size === exams.length;
-
-  function toggleClass(id: string) {
-    const next = new Set(classIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setClassIds(next);
-  }
-
-  function toggleExam(id: string) {
-    const next = new Set(examIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setExamIds(next);
-  }
-
-  function toggleAllClasses() {
-    if (allClassesSelected) setClassIds(new Set());
-    else setClassIds(new Set(classes.map((c) => c.classId)));
-  }
-
-  function toggleAllExams() {
-    if (allExamsSelected) setExamIds(new Set());
-    else setExamIds(new Set(exams.map((e) => e.examId)));
-  }
-
-  function resetForm() {
-    setFrom("");
-    setTo("");
-    setClassIds(new Set());
-    setExamIds(new Set());
-    setError(null);
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (dateError) return;
     setError(null);
     setPending(true);
     try {
-      // Quando todas as turmas estão marcadas, omitimos o filtro — é
-      // semanticamente o mesmo que "sem filtro" e gera URL mais limpa.
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
-      if (classIds.size > 0 && !allClassesSelected) {
-        params.set("classIds", [...classIds].join(","));
-      }
-      if (examIds.size > 0 && !allExamsSelected) {
-        params.set("examIds", [...examIds].join(","));
-      }
 
       const qs = params.toString();
       const url = `/v1/analytics/teachers/${encodeURIComponent(teacherId)}/export${qs ? `?${qs}` : ""}`;
@@ -166,12 +98,6 @@ export function ExportTeacherDialog({
     }
   }
 
-  const totalFilters =
-    (from ? 1 : 0) +
-    (to ? 1 : 0) +
-    (classIds.size > 0 && !allClassesSelected ? 1 : 0) +
-    (examIds.size > 0 && !allExamsSelected ? 1 : 0);
-
   return (
     <Dialog
       open={open}
@@ -186,22 +112,20 @@ export function ExportTeacherDialog({
           Exportar dados
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Exportar submissões de {teacherName}</DialogTitle>
           <DialogDescription>
-            Baixa um CSV com todas as submissões finalizadas. Sem filtros,
-            exporta tudo. O período atua sobre a data em que o aluno
-            entregou a prova.
+            Baixa um CSV com todas as submissões finalizadas do professor
+            (todas as turmas e provas). Sem datas, exporta tudo.
           </DialogDescription>
         </DialogHeader>
 
         <form
           id={formId}
           onSubmit={handleSubmit}
-          className="flex flex-col gap-5"
+          className="flex flex-col gap-4"
         >
-          {/* ── Período ── */}
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium text-ink">
               Período da submissão
@@ -243,91 +167,6 @@ export function ExportTeacherDialog({
             )}
           </fieldset>
 
-          {/* ── Turmas ── */}
-          <fieldset className="flex flex-col gap-2">
-            <legend className="flex w-full items-center justify-between text-sm font-medium text-ink">
-              <span>
-                Turmas
-                <span className="ml-1.5 text-xs font-normal text-gray-400">
-                  ({classes.length})
-                </span>
-              </span>
-              {classes.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleAllClasses}
-                  className="text-xs font-normal text-analytics-primary hover:underline"
-                >
-                  {allClassesSelected
-                    ? "Limpar seleção"
-                    : "Selecionar todas"}
-                </button>
-              )}
-            </legend>
-            {classes.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-500">
-                Sem turmas cadastradas.
-              </p>
-            ) : (
-              <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-xl border border-gray-200 p-2">
-                {classes.map((c) => (
-                  <OptionRow
-                    key={c.classId}
-                    checked={classIds.has(c.classId)}
-                    onToggle={() => toggleClass(c.classId)}
-                    label={c.name}
-                    sub={c.courseName}
-                  />
-                ))}
-              </div>
-            )}
-            <p className="text-[11px] text-gray-400">
-              Sem turmas selecionadas = todas entram.
-            </p>
-          </fieldset>
-
-          {/* ── Provas ── */}
-          <fieldset className="flex flex-col gap-2">
-            <legend className="flex w-full items-center justify-between text-sm font-medium text-ink">
-              <span>
-                Provas
-                <span className="ml-1.5 text-xs font-normal text-gray-400">
-                  ({exams.length})
-                </span>
-              </span>
-              {exams.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleAllExams}
-                  className="text-xs font-normal text-analytics-primary hover:underline"
-                >
-                  {allExamsSelected ? "Limpar seleção" : "Selecionar todas"}
-                </button>
-              )}
-            </legend>
-            {exams.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-500">
-                Sem provas no período carregado. Use o filtro de data para
-                cobrir um intervalo maior.
-              </p>
-            ) : (
-              <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-xl border border-gray-200 p-2">
-                {exams.map((e) => (
-                  <OptionRow
-                    key={e.examId}
-                    checked={examIds.has(e.examId)}
-                    onToggle={() => toggleExam(e.examId)}
-                    label={e.title}
-                    sub={e.className}
-                  />
-                ))}
-              </div>
-            )}
-            <p className="text-[11px] text-gray-400">
-              Sem provas selecionadas = todas entram.
-            </p>
-          </fieldset>
-
           {error && (
             <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
               {error}
@@ -335,86 +174,34 @@ export function ExportTeacherDialog({
           )}
         </form>
 
-        <DialogFooter className="mt-1 items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={resetForm}
-              disabled={pending || totalFilters === 0}
-              className="text-xs font-medium text-gray-500 transition-colors hover:text-ink disabled:opacity-40"
-            >
-              Limpar tudo
-            </button>
-            {totalFilters > 0 && (
-              <span className="text-[11px] text-gray-400">
-                {totalFilters} filtro{totalFilters > 1 ? "s" : ""} aplicado
-                {totalFilters > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <DialogClose asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-              >
-                Cancelar
-              </Button>
-            </DialogClose>
+        <DialogFooter className="mt-1 items-center sm:justify-end">
+          <DialogClose asChild>
             <Button
-              type="submit"
-              form={formId}
+              type="button"
+              variant="ghost"
               size="sm"
-              disabled={pending || dateError !== null}
-              className="bg-analytics-primary text-white hover:bg-analytics-dark-01"
+              disabled={pending}
             >
-              {pending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
-              {pending ? "Preparando..." : "Baixar CSV"}
+              Cancelar
             </Button>
-          </div>
+          </DialogClose>
+          <Button
+            type="submit"
+            form={formId}
+            size="sm"
+            disabled={pending || dateError !== null}
+            className="bg-analytics-primary text-white hover:bg-analytics-dark-01"
+          >
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            {pending ? "Preparando..." : "Baixar CSV"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function OptionRow({
-  checked,
-  onToggle,
-  label,
-  sub,
-}: {
-  checked: boolean;
-  onToggle: () => void;
-  label: string;
-  sub: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
-        checked ? "bg-analytics-primary/5" : "hover:bg-gray-50",
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onToggle}
-        className="mt-0.5 size-4 shrink-0 cursor-pointer accent-analytics-primary"
-      />
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[13px] text-ink">{label}</span>
-        {sub && (
-          <span className="truncate text-[11px] text-gray-500">{sub}</span>
-        )}
-      </span>
-    </label>
   );
 }
 

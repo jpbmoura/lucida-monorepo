@@ -11,19 +11,6 @@ export const studentIdParam = z.object({ id: z.string().min(1) });
 export const examIdParam = z.object({ id: z.string().min(1) });
 export const teacherIdParam = z.object({ id: z.string().min(1) });
 
-// Aceita tanto repetição (`?classIds=a&classIds=b`) — Express com qs já
-// devolve array — quanto CSV (`?classIds=a,b`) por conveniência. Strings
-// vazias somem; resultado final é sempre `string[] | undefined`.
-const idListParam = z
-  .union([z.string(), z.array(z.string())])
-  .optional()
-  .transform((value) => {
-    if (value === undefined) return undefined;
-    const raw = Array.isArray(value) ? value : value.split(",");
-    const cleaned = raw.map((v) => v.trim()).filter((v) => v.length > 0);
-    return cleaned.length > 0 ? cleaned : undefined;
-  });
-
 // `yyyy-mm-dd` (input nativo) ou ISO datetime completo. Convertemos pra
 // Date; o use case decide como aplicar (from = início do dia, to = fim).
 const dateParam = z
@@ -44,15 +31,15 @@ const dateParam = z
     return parsed;
   });
 
-// Export sempre exporta `status=submitted` — provas em andamento ficam
-// de fora por definição ("submissões que foram feitas"). Filtro de data
-// atua exclusivamente em `submittedAt`.
+// Export sempre cobre `status=submitted` e TODAS as provas/turmas do
+// professor — o único recorte é o range de data sobre `submittedAt`.
+// Filtros por turma/prova foram removidos pra evitar a armadilha de
+// "Selecionar tudo" pegar só o que estava listado na UI (que vinha
+// capada pelo overview).
 export const exportTeacherQuery = z
   .object({
     from: dateParam,
     to: dateParam,
-    classIds: idListParam,
-    examIds: idListParam,
   })
   .superRefine((data, ctx) => {
     if (data.from && data.to && data.from.getTime() > data.to.getTime()) {
