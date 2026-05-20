@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* KaTeX — render de matemática (matriz/fração/expoente) nas questões.
+   Carregado global pra valer no review, prova do aluno, impressão e
+   resultado. Ver componente <RichText>. */
+@import "katex/dist/katex.min.css";
 
 @theme {
   /* ───────── Brand colors (Lucida Exam) ───────── */

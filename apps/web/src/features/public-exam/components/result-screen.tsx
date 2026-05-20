@@ -2,6 +2,7 @@
 
 import { CheckCircle2, XCircle, MinusCircle, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RichText } from "@/components/rich-text";
 import type { PublicExamDTO, SubmitExamResponse } from "../types";
 
 interface ResultScreenProps {
@@ -101,11 +102,11 @@ export function ResultScreen({
 
                 {q.context && (
                   <p className="rounded-xl border border-gray-100 bg-gray-50/60 px-3.5 py-2.5 text-sm leading-relaxed text-gray-600">
-                    {q.context}
+                    <RichText text={q.context} />
                   </p>
                 )}
                 <p className="text-sm font-medium leading-relaxed text-ink">
-                  {q.statement}
+                  <RichText text={q.statement} />
                 </p>
 
                 <ul className="flex flex-col gap-1.5">
@@ -136,7 +137,9 @@ export function ResultScreen({
                         >
                           {String.fromCharCode(65 + j)}
                         </span>
-                        <span className="flex-1">{opt}</span>
+                        <span className="flex-1">
+                          <RichText text={opt} />
+                        </span>
                         {isCorrectOpt && (
                           <span className="text-[10px] font-medium uppercase tracking-[0.05em] text-emerald-700">
                             correta
@@ -157,7 +160,7 @@ export function ResultScreen({
                     <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
                       Por quê
                     </div>
-                    {explanation}
+                    <RichText text={explanation} />
                   </div>
                 )}
               </li>

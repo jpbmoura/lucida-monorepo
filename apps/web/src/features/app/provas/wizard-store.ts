@@ -9,6 +9,7 @@ import type {
   ExamDifficulty,
   ExamStyle,
   GeneratedQuestion,
+  GenerationProgress,
   GenerationUsage,
   QuestionType,
   WizardConfig,
@@ -43,6 +44,9 @@ interface WizardState {
   questions: GeneratedQuestion[];
   usage: GenerationUsage | null;
   generationError: string | null;
+  // Progresso do top-up loop durante a geração (null fora do passo
+  // "generating" ou enquanto a 1ª rodada não fechou).
+  generationProgress: GenerationProgress | null;
 
   // actions
   setStep: (step: WizardStep) => void;
@@ -58,6 +62,7 @@ interface WizardState {
   addYoutubeUrl: (url: string) => void;
   removeYoutubeUrl: (index: number) => void;
   setConfig: (patch: Partial<WizardConfig>) => void;
+  setGenerationProgress: (p: GenerationProgress) => void;
   setGenerationResult: (questions: GeneratedQuestion[], usage: GenerationUsage) => void;
   /**
    * Acumula consumo no `usage` existente (regenerar uma questão soma seus
@@ -124,6 +129,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
   questions: [],
   usage: null,
   generationError: null,
+  generationProgress: null,
 
   setStep: (step) => set({ step }),
 
@@ -201,11 +207,14 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       config: { ...s.config, ...patch },
     })),
 
+  setGenerationProgress: (p) => set({ generationProgress: p }),
+
   setGenerationResult: (questions, usage) =>
     set({
       questions,
       usage,
       generationError: null,
+      generationProgress: null,
       step: "review",
     }),
 
@@ -223,6 +232,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
   setGenerationError: (error) =>
     set({
       generationError: error,
+      generationProgress: null,
       step: "config",
     }),
 
@@ -256,6 +266,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       questions: [],
       usage: null,
       generationError: null,
+      generationProgress: null,
     }),
 }));
 

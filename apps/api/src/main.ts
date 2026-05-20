@@ -64,6 +64,7 @@ import { DocxExtractor } from "@/domains/ai-ops/infrastructure/extractors/docx-e
 import { TextExtractor } from "@/domains/ai-ops/infrastructure/extractors/text-extractor.js";
 import { YoutubeTranscriptFetcher } from "@/domains/ai-ops/infrastructure/extractors/youtube-transcript-fetcher.js";
 import { OpenAiQuestionGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-question-generator.js";
+import { AnswerExplanationVerifier } from "@/domains/ai-ops/infrastructure/openai/answer-explanation-verifier.js";
 import { GenerateExamQuestionsUseCase } from "@/domains/ai-ops/application/generate-exam-questions.js";
 import { RegenerateQuestionUseCase } from "@/domains/ai-ops/application/regenerate-question.js";
 import { EstimateExamGenerationUseCase } from "@/domains/ai-ops/application/estimate-exam-generation.js";
@@ -453,12 +454,15 @@ export async function buildApp(): Promise<Express> {
   const extractors = [new PdfExtractor(), new DocxExtractor(), new TextExtractor()];
   const transcriptFetcher = new YoutubeTranscriptFetcher();
   const questionGenerator = new OpenAiQuestionGenerator();
+  // R2 telemetria — só atua com R2_VERIFY=1 (gate dentro do use case).
+  const answerExplanationVerifier = new AnswerExplanationVerifier();
   const aiController = new AiController({
     generateExamQuestions: new GenerateExamQuestionsUseCase(
       extractors,
       transcriptFetcher,
       questionGenerator,
       billingService,
+      answerExplanationVerifier,
     ),
     regenerateQuestion: new RegenerateQuestionUseCase(
       extractors,

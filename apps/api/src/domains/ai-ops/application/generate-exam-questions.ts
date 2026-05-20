@@ -1,6 +1,7 @@
 import type {
   FileExtractor,
   GenerationConfig,
+  GenerationProgress,
   GenerationResult,
   QuestionGenerator,
   SourceFile,
@@ -8,6 +9,7 @@ import type {
 import type { TranscriptFetcher } from "../infrastructure/extractors/youtube-transcript-fetcher.js";
 import type { BillingService } from "@/domains/billing/application/billing-service.js";
 import { estimateCreditsBeforeGeneration } from "../infrastructure/estimate-credits.js";
+import { AnswerExplanationVerifier } from "../infrastructure/openai/answer-explanation-verifier.js";
 import { collectSources } from "./collect-sources.js";
 
 interface Input {
@@ -27,6 +29,8 @@ interface Input {
   files: SourceFile[];
   pastedText: string;
   youtubeUrls: string[];
+  /** Progresso por rodada do top-up — repassado pro stream SSE. */
+  onProgress?: (p: GenerationProgress) => void;
 }
 
 export class GenerateExamQuestionsUseCase {
@@ -35,6 +39,8 @@ export class GenerateExamQuestionsUseCase {
     private readonly transcriptFetcher: TranscriptFetcher,
     private readonly generator: QuestionGenerator,
     private readonly billing: BillingService,
+    // R2 telemetria — opcional. Só roda se injetado E R2_VERIFY=1.
+    private readonly answerVerifier?: AnswerExplanationVerifier,
   ) {}
 
   async execute(input: Input): Promise<GenerationResult> {
@@ -67,6 +73,7 @@ export class GenerateExamQuestionsUseCase {
     const result = await this.generator.generate({
       config: input.config,
       sources,
+      onProgress: input.onProgress,
     });
 
     // Débito real pós-geração — usa os tokens de fato consumidos.
@@ -85,6 +92,46 @@ export class GenerateExamQuestionsUseCase {
         ...(isImpersonating && { impersonatedBy: input.actorRealUserId }),
       },
     });
+
+    // R2 (telemetria, opt-in via R2_VERIFY=1) — mede coerência
+    // explicação↔gabarito em produção. Best-effort: NUNCA quebra a geração
+    // nem debita o professor (instrumentação interna; a plataforma arca o
+    // custo da chamada). Síncrono de propósito: gated default-off, então
+    // zero impacto no caminho normal.
+    if (this.answerVerifier && AnswerExplanationVerifier.enabled()) {
+      try {
+        const v = await this.answerVerifier.verify(
+          input.config,
+          result.questions,
+        );
+        const incoherent = v.verdicts.filter(
+          (r) => !r.explanationMatchesMarked,
+        );
+        console.log(
+          "[ai-ops][r2-verify]",
+          JSON.stringify({
+            style: input.config.style,
+            total: result.questions.length,
+            incoherent: incoherent.length,
+            rate:
+              result.questions.length > 0
+                ? +(incoherent.length / result.questions.length).toFixed(3)
+                : 0,
+            model: v.model,
+            verifierTokens: v.inputTokens + v.outputTokens,
+            details: incoherent.map((r) => ({
+              index: r.index,
+              reason: r.reason,
+            })),
+          }),
+        );
+      } catch (err) {
+        console.warn(
+          "[ai-ops][r2-verify] verificação falhou (ignorado):",
+          (err as Error).message,
+        );
+      }
+    }
 
     return result;
   }

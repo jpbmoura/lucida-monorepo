@@ -1,9 +1,13 @@
 import { z } from "zod";
 
-const questionTypesSchema = z.object({
-  multipleChoice: z.boolean(),
-  trueFalse: z.boolean(),
-});
+const questionTypesSchema = z
+  .object({
+    multipleChoice: z.boolean(),
+    trueFalse: z.boolean(),
+  })
+  .refine((t) => t.multipleChoice || t.trueFalse, {
+    message: "Selecione ao menos um tipo de questão.",
+  });
 
 export const generateExamConfigSchema = z.object({
   questionCount: z.coerce.number().int().min(1).max(50),

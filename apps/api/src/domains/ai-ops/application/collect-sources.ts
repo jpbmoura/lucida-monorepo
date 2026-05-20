@@ -1,7 +1,13 @@
 import {
   EmptySourceMaterialError,
+  InsufficientSourceMaterialError,
   UnsupportedFileTypeError,
 } from "../domain/errors.js";
+
+// Abaixo disso a IA só alucina — material curto demais pra uma prova
+// fiel. ~150 chars ≈ uma frase e meia; menos que isso não dá pra cobrir
+// nem uma questão sem inventar. PDF escaneado sem OCR cai aqui.
+const MIN_MEANINGFUL_CHARS = 150;
 import type {
   ExtractionResult,
   FileExtractor,
@@ -59,6 +65,23 @@ export async function collectSources(
 
   if (sources.length === 0) {
     throw new EmptySourceMaterialError();
+  }
+
+  // R8 — extraiu algo, mas pouco demais. Caso clássico: PDF escaneado
+  // (imagem, sem camada de texto) → vem só ruído/whitespace. Sem isso o
+  // pipeline gera questões alucinadas sem avisar. Mensagem acionável,
+  // específica se houve arquivo.
+  const meaningfulChars = sources.reduce(
+    (sum, s) => sum + s.text.trim().length,
+    0,
+  );
+  if (meaningfulChars < MIN_MEANINGFUL_CHARS) {
+    const hadFiles = input.files.length > 0;
+    throw new InsufficientSourceMaterialError(
+      hadFiles
+        ? "Quase nenhum texto foi extraído do material. Se o arquivo for um PDF escaneado (imagem), ele não tem texto selecionável — envie um PDF com texto, um DOCX, ou cole o conteúdo direto."
+        : "O material enviado é curto demais para gerar uma prova fiel. Adicione mais conteúdo (pelo menos um parágrafo).",
+    );
   }
 
   return sources;

@@ -87,6 +87,7 @@ export class AiController {
         })),
         pastedText: config.pastedText ?? "",
         youtubeUrls: config.youtubeUrls ?? [],
+        onProgress: (p) => stream.send("progress", p),
       });
       stream.send("result", { data: result });
     } catch (err) {

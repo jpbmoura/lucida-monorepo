@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Clock, Send, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { RichText } from "@/components/rich-text";
 import type {
   ExamSession,
   IntegrityFlags,
@@ -259,11 +260,11 @@ export function ExamTaking({
               <div className="flex-1 space-y-3">
                 {q.context && (
                   <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-600">
-                    {q.context}
+                    <RichText text={q.context} />
                   </p>
                 )}
                 <p className="text-[15px] font-medium leading-relaxed text-ink">
-                  {q.statement}
+                  <RichText text={q.statement} />
                 </p>
               </div>
             </div>
@@ -299,7 +300,7 @@ export function ExamTaking({
                         <span className="mr-2 font-medium text-gray-400">
                           {String.fromCharCode(65 + j)})
                         </span>
-                        {opt}
+                        <RichText text={opt} />
                       </span>
                     </button>
                   </li>

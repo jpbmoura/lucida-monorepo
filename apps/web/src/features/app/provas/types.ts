@@ -25,6 +25,13 @@ export interface GenerationResult {
   usage: GenerationUsage;
 }
 
+export interface GenerationProgress {
+  round: number;
+  totalRounds: number;
+  delivered: number;
+  requested: number;
+}
+
 export interface WizardConfig {
   title: string;
   description: string;

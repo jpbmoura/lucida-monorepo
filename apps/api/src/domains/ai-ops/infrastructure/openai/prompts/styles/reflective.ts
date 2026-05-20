@@ -7,6 +7,9 @@ export const reflectiveStyle: StyleSpec = {
     "materiais não-canônicos (livros, artigos, documentários, textos culturais) onde a ideia central importa mais que fatos isolados",
   optionCount: 4,
   contextPolicy: "required",
+  // Mais alta do conjunto: interpretação/implicação se beneficia de
+  // diversidade; material aqui não costuma ser quantitativo.
+  temperature: 0.5,
 
   guide: `ESTILO: Reflexiva. Questões desenhadas pra provocar reflexão sobre o
 conteúdo, não pra checar memorização. O objetivo é fazer o aluno perceber

@@ -6,6 +6,9 @@ export const contextualStyle: StyleSpec = {
   target: "vestibular ENEM e simulados de ensino médio",
   optionCount: 5,
   contextPolicy: "required",
+  // Média: ENEM precisa de cenário variado, mas o cálculo embutido ainda
+  // exige precisão. Meio-termo.
+  temperature: 0.4,
 
   guide: `ESTILO: Contextual (inspirado no ENEM). Cada questão começa com um
 parágrafo de contexto ("context") que situa o aluno numa cena real,

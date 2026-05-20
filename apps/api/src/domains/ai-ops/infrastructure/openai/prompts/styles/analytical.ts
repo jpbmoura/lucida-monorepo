@@ -11,6 +11,9 @@ export const analyticalStyle: StyleSpec = {
   target: "ensino superior, prova de curso, avaliação de especialização",
   optionCount: 5,
   contextPolicy: "required",
+  // Mais baixa: raciocínio multi-passo / cálculo — onde o gabarito mais
+  // erra (baseline R1). Correção pesa muito mais que variedade aqui.
+  temperature: 0.15,
 
   guide: `ESTILO: Analítico (inspirado no ENADE). Cada questão exige raciocínio em
 múltiplos passos. O aluno precisa ler um cenário profissional ou conceitual,

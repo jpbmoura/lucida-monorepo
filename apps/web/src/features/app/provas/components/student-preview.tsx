@@ -2,6 +2,7 @@
 
 import { Clock, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RichText } from "@/components/rich-text";
 import type { GeneratedQuestion } from "../types";
 
 interface StudentPreviewProps {
@@ -58,11 +59,13 @@ export function StudentPreview({
                     <div className="flex-1 space-y-3">
                       {q.context && (
                         <p className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-600">
-                          {q.context}
+                          <RichText text={q.context} />
                         </p>
                       )}
                       <p className="text-sm font-medium leading-relaxed text-ink">
-                        {q.statement || (
+                        {q.statement ? (
+                          <RichText text={q.statement} />
+                        ) : (
                           <span className="text-gray-400">(sem enunciado)</span>
                         )}
                       </p>
@@ -82,7 +85,7 @@ export function StudentPreview({
                           <span className="mr-2 font-medium text-gray-400">
                             {String.fromCharCode(65 + j)})
                           </span>
-                          {opt}
+                          <RichText text={opt} />
                         </span>
                       </li>
                     ))}

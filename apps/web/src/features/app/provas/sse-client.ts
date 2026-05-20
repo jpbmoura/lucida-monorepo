@@ -1,5 +1,7 @@
 "use client";
 
+import type { GenerationProgress } from "./types";
+
 interface SseErrorShape {
   status: number;
   code: string;
@@ -25,9 +27,10 @@ export class SseHttpError extends Error {
  * fetch + leitura manual do stream.
  *
  * Eventos esperados do servidor:
- *  - `event: ping`   — heartbeat, mantém conexão viva (ignorado aqui)
- *  - `event: result` — `{ data: <T> }` final, resolve a Promise
- *  - `event: error`  — `{ status, code, message }`, rejeita com `SseHttpError`
+ *  - `event: ping`     — heartbeat, mantém conexão viva (ignorado aqui)
+ *  - `event: progress` — `<GenerationProgress>` por rodada do top-up loop
+ *  - `event: result`   — `{ data: <T> }` final, resolve a Promise
+ *  - `event: error`    — `{ status, code, message }`, rejeita com `SseHttpError`
  *
  * Se a request **não** virar SSE (ex.: validação de payload retornou 4xx
  * com JSON normal), tratamos como erro HTTP convencional pra o caller
@@ -36,6 +39,7 @@ export class SseHttpError extends Error {
 export async function postSseExpectingResult<T>(
   url: string,
   init: RequestInit,
+  opts?: { onProgress?: (p: GenerationProgress) => void },
 ): Promise<T> {
   const response = await fetch(url, init);
 
@@ -77,6 +81,8 @@ export async function postSseExpectingResult<T>(
       if (parsed) {
         if (parsed.event === "ping") {
           // ignora
+        } else if (parsed.event === "progress") {
+          opts?.onProgress?.(parsed.data as GenerationProgress);
         } else if (parsed.event === "error") {
           await reader.cancel();
           throw new SseHttpError(parsed.data as SseErrorShape);

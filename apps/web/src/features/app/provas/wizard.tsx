@@ -28,6 +28,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
   const config = useWizardStore((s) => s.config);
   const setStep = useWizardStore((s) => s.setStep);
   const setGenerationResult = useWizardStore((s) => s.setGenerationResult);
+  const setGenerationProgress = useWizardStore((s) => s.setGenerationProgress);
   const setGenerationError = useWizardStore((s) => s.setGenerationError);
   const addUsage = useWizardStore((s) => s.addUsage);
   const reset = useWizardStore((s) => s.reset);
@@ -103,6 +104,7 @@ export function Wizard({ classId, turmaName }: WizardProps) {
       const data = await postSseExpectingResult<GenerationResult>(
         "/v1/ai/generate-exam",
         { method: "POST", body: formData },
+        { onProgress: setGenerationProgress },
       );
       setGenerationResult(data.questions, data.usage);
       notifyBalanceChanged();

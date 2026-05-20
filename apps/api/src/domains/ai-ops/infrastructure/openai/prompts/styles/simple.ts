@@ -6,18 +6,20 @@ export const simpleStyle: StyleSpec = {
   target: "sala de aula regular, checagem rápida de conceito",
   optionCount: 4,
   contextPolicy: "none",
+  // Baixa: questão direta, prioriza precisão sobre criatividade.
+  temperature: 0.2,
 
   guide: `ESTILO: Simples e objetivo. Cada questão é uma pergunta direta sobre um
 conceito apresentado no material.
 
 - Enunciado em 1-2 frases, claro e sem floreio.
-- Sem parágrafo de contexto — "context" deve ser null.
+- Sem parágrafo de contexto — "context" deve ser string vazia "".
 - Vocabulário adequado ao nível do material.
 - Evite perguntas retóricas ou ambiguidades.
 
 Exemplos de enunciado BOM:
   "Qual é a principal função da fotossíntese nas plantas?"
-  "Em uma função linear f(x) = 2x + 3, qual é o valor de f(5)?"
+  "Em uma função linear $f(x) = 2x + 3$, qual é o valor de $f(5)$?"
 
 Exemplos de enunciado RUIM (não faça):
   "O que podemos afirmar sobre..." (genérico demais)

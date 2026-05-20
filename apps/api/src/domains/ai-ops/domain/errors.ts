@@ -24,6 +24,17 @@ export class EmptySourceMaterialError extends DomainError {
   }
 }
 
+// R8 — material extraído existe mas é pequeno/ruído demais pra gerar prova
+// decente (caso típico: PDF escaneado sem camada de texto). Distinto do
+// EmptySourceMaterialError (zero conteúdo) pra dar uma mensagem acionável.
+export class InsufficientSourceMaterialError extends DomainError {
+  readonly code = "AI_INSUFFICIENT_SOURCE";
+  readonly statusCode = 422;
+  constructor(reason: string) {
+    super(reason);
+  }
+}
+
 export class AiGenerationFailedError extends DomainError {
   readonly code = "AI_GENERATION_FAILED";
   readonly statusCode = 502;

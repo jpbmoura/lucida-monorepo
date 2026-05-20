@@ -2,6 +2,7 @@
 
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RichText } from "@/components/rich-text";
 import type { ExamDetailDTO } from "../data";
 
 export type ExamExportVersion = "student" | "answer_key" | "both";
@@ -75,11 +76,12 @@ function StudentVersion({ exam }: { exam: ExamDetailDTO }) {
           <li key={i} className="break-inside-avoid">
             {q.context && (
               <p className="mb-2 text-sm italic leading-relaxed text-gray-700">
-                {q.context}
+                <RichText text={q.context} />
               </p>
             )}
             <p className="mb-2 text-sm leading-relaxed text-ink">
-              <span className="font-semibold">{i + 1}.</span> {q.statement}
+              <span className="font-semibold">{i + 1}.</span>{" "}
+              <RichText text={q.statement} />
             </p>
             <ul className="ml-6 flex flex-col gap-1.5 text-sm text-ink">
               {q.options.map((opt, j) => (
@@ -87,7 +89,7 @@ function StudentVersion({ exam }: { exam: ExamDetailDTO }) {
                   <span className="mr-1 font-semibold">
                     {String.fromCharCode(65 + j)})
                   </span>
-                  {opt}
+                  <RichText text={opt} />
                 </li>
               ))}
             </ul>
@@ -117,12 +119,12 @@ function AnswerKey({ exam }: { exam: ExamDetailDTO }) {
               <p className="text-sm leading-relaxed text-ink">
                 <span className="font-semibold">{i + 1}.</span>{" "}
                 <span className="font-semibold">
-                  Resposta: {letter}) {correctOption}
+                  Resposta: {letter}) <RichText text={correctOption} />
                 </span>
               </p>
               {q.explanation && (
                 <p className="ml-5 mt-1 text-xs italic leading-relaxed text-gray-700">
-                  {q.explanation}
+                  <RichText text={q.explanation} />
                 </p>
               )}
             </li>

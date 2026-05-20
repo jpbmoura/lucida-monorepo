@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { useWizardStore } from "../wizard-store";
 
 const STAGES = [
   "Lendo o material...",
@@ -14,6 +15,13 @@ const STAGES = [
 
 export function StepGenerating() {
   const [stageIndex, setStageIndex] = useState(0);
+  const progress = useWizardStore((s) => s.generationProgress);
+
+  // Top-up loop ativo: 1ª rodada já fechou mas ainda falta questão. Aí
+  // trocamos a animação genérica por progresso real (material curto pode
+  // levar minutos e várias rodadas).
+  const showProgress =
+    progress !== null && progress.delivered < progress.requested;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -37,12 +45,39 @@ export function StepGenerating() {
           <span className="font-serif font-normal italic text-brand-primary">preparando sua prova</span>
         </h2>
         <p className="text-[15px] text-gray-500">
-          Isso costuma levar entre 20 e 60 segundos dependendo do material.
+          {showProgress
+            ? "O material é curto pra essa quantidade — estou completando em algumas rodadas. Pode levar alguns minutos."
+            : "Isso costuma levar entre 20 e 60 segundos dependendo do material."}
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 w-full max-w-sm">
-        {STAGES.map((stage, i) => {
+      {showProgress && progress ? (
+        <div className="flex w-full max-w-sm flex-col gap-2">
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="font-medium text-ink">
+              {progress.delivered} de {progress.requested} questões
+            </span>
+            <span className="text-gray-500">
+              rodada {progress.round}/{progress.totalRounds}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full rounded-full bg-brand-primary transition-all duration-500"
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.round(
+                    (progress.delivered / progress.requested) * 100,
+                  ),
+                )}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 w-full max-w-sm">
+          {STAGES.map((stage, i) => {
           const state = i < stageIndex ? "done" : i === stageIndex ? "active" : "pending";
           return (
             <div
@@ -73,8 +108,9 @@ export function StepGenerating() {
               </span>
             </div>
           );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }

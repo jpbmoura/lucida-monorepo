@@ -46,12 +46,27 @@ export interface ExtractionResult {
   sourceLabel: string; // "arquivo.pdf", "texto colado", etc.
 }
 
+// Progresso emitido a cada rodada do top-up loop. Geração multi-round de
+// material raso pode levar minutos; o front usa isso pra não ficar um
+// spinner mudo.
+export interface GenerationProgress {
+  /** Rodada concluída (1-based). */
+  round: number;
+  /** Teto de rodadas (1 inicial + top-ups). */
+  totalRounds: number;
+  /** Questões já acumuladas. */
+  delivered: number;
+  /** Quantas foram pedidas. */
+  requested: number;
+}
+
 // Interface — implementada por OpenAi (infra). Use case depende desta.
 export interface QuestionGenerator {
   generate(input: {
     config: GenerationConfig;
     sources: ExtractionResult[];
     avoidStatements?: string[]; // usado pelo regenerate: evita questões já existentes
+    onProgress?: (p: GenerationProgress) => void;
   }): Promise<GenerationResult>;
 }
 
