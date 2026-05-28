@@ -137,7 +137,10 @@ export function DropZone({ files, onAdd, onRemove, disabled }: DropZoneProps) {
                 </div>
                 <div className="mt-0.5 text-[11px] text-gray-500">
                   {formatSize(file.size)}
-                  {file.status === "extracting" && " · extraindo texto..."}
+                  {file.status === "extracting" &&
+                    (file.extractProgress && file.extractProgress.total > 0
+                      ? ` · extraindo página ${file.extractProgress.done}/${file.extractProgress.total}`
+                      : " · extraindo texto...")}
                   {file.status === "done" &&
                     file.text != null &&
                     ` · ${file.text.length.toLocaleString("pt-BR")} caracteres`}

@@ -27,6 +27,8 @@ export interface MaterialFile {
   text?: string;
   warning?: string;
   error?: string;
+  /** Progresso de extração de PDF (página atual / total). */
+  extractProgress?: { done: number; total: number };
 }
 
 interface WizardState {
@@ -152,7 +154,13 @@ export const useWizardStore = create<WizardState>((set, get) => ({
     // necessária porque cada um faz seu próprio set().
     accepted.forEach((file, i) => {
       const id = newEntries[i]!.id;
-      void extractTextFromFile(file)
+      void extractTextFromFile(file, (done, total) => {
+        set((s) => ({
+          materialFiles: s.materialFiles.map((mf) =>
+            mf.id === id ? { ...mf, extractProgress: { done, total } } : mf,
+          ),
+        }));
+      })
         .then((result) => {
           set((s) => ({
             materialFiles: s.materialFiles.map((mf) =>
@@ -162,6 +170,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
                     status: "done",
                     text: result.text,
                     warning: result.warning,
+                    extractProgress: undefined,
                   }
                 : mf,
             ),

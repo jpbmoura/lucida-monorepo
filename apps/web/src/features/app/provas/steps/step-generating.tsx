@@ -17,9 +17,9 @@ export function StepGenerating() {
   const [stageIndex, setStageIndex] = useState(0);
   const progress = useWizardStore((s) => s.generationProgress);
 
-  // Top-up loop ativo: 1ª rodada já fechou mas ainda falta questão. Aí
+  // Loop em lotes ativo: 1º lote já fechou mas ainda falta questão. Aí
   // trocamos a animação genérica por progresso real (material curto pode
-  // levar minutos e várias rodadas).
+  // levar minutos e vários lotes).
   const showProgress =
     progress !== null && progress.delivered < progress.requested;
 
@@ -30,8 +30,28 @@ export function StepGenerating() {
     return () => clearInterval(interval);
   }, []);
 
+  // Geração não pode ser interrompida no meio (perderia o trabalho e os
+  // créditos). Enquanto este componente está montado (passo "generating"),
+  // avisamos antes de fechar/recarregar a aba.
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  // Overlay de tela cheia (fixed inset-0, z alto) cobre todo o app —
+  // inclusive a sidebar — então durante a geração não dá pra clicar em
+  // nenhum outro botão nem sair da tela por engano.
   return (
-    <div className="flex flex-col items-center gap-8 py-20 text-center">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gerando prova"
+      className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-8 overflow-y-auto bg-white px-6 py-20 text-center"
+    >
       <div className="relative">
         <div className="absolute inset-0 animate-ping rounded-full bg-brand-primary/20" />
         <div className="relative grid size-24 place-items-center rounded-full bg-brand-primary/10 text-brand-primary">

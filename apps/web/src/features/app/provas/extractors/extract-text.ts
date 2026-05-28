@@ -12,10 +12,15 @@ export class ExtractError extends Error {
   }
 }
 
-export async function extractTextFromFile(file: File): Promise<ExtractResult> {
+export async function extractTextFromFile(
+  file: File,
+  // Progresso por página (só PDF chama). Deixa a UI mostrar "página X/Y" em
+  // PDF longo, que antes parecia travado.
+  onProgress?: (done: number, total: number) => void,
+): Promise<ExtractResult> {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   if (ext === "pdf" || file.type === "application/pdf") {
-    return extractPdf(file);
+    return extractPdf(file, onProgress);
   }
   if (
     ext === "docx" ||
@@ -74,7 +79,10 @@ async function ensurePdfWorker(
   pdfWorkerReady = true;
 }
 
-async function extractPdf(file: File): Promise<ExtractResult> {
+async function extractPdf(
+  file: File,
+  onProgress?: (done: number, total: number) => void,
+): Promise<ExtractResult> {
   const pdfjs = await import("pdfjs-dist");
   await ensurePdfWorker(pdfjs);
 
@@ -93,20 +101,28 @@ async function extractPdf(file: File): Promise<ExtractResult> {
   }
 
   try {
+    onProgress?.(0, doc.numPages);
     const pages: string[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const content = await page.getTextContent();
-      // PDFs com layout (colunas, espaçamento absoluto) vêm como itens soltos.
-      // Concatenar com espaço cobre 90% dos casos; o resto a IA tolera.
-      const pageText = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .filter(Boolean)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (pageText) pages.push(pageText);
-      page.cleanup();
+      // Página problemática (fonte exótica, conteúdo corrompido) não derruba
+      // o arquivo inteiro — pula e segue. PDF longo "buga" menos assim.
+      try {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        // PDFs com layout (colunas, espaçamento absoluto) vêm como itens soltos.
+        // Concatenar com espaço cobre 90% dos casos; o resto a IA tolera.
+        const pageText = content.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (pageText) pages.push(pageText);
+        page.cleanup();
+      } catch {
+        // ignora a página e continua
+      }
+      onProgress?.(i, doc.numPages);
     }
     const text = pages.join("\n\n").trim();
     if (!text) {

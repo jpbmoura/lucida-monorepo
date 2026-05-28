@@ -240,42 +240,8 @@ function Header({
   onExport,
 }: HeaderProps) {
   return (
-    <header className="mb-8 flex flex-col gap-6 border-b border-gray-100 pb-8 md:flex-row md:items-start md:justify-between">
-      <div className="min-w-0 flex-1">
-        <h1 className="text-3xl font-medium leading-tight tracking-tighter text-ink md:text-4xl">
-          {exam.title}
-        </h1>
-        {exam.description && (
-          <p className="mt-2 max-w-3xl text-[15px] text-gray-500">{exam.description}</p>
-        )}
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          <Stat
-            icon={<FileText className="size-3.5" />}
-            label={`${exam.questions.length} ${exam.questions.length === 1 ? "questão" : "questões"}`}
-          />
-          <Dot />
-          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 font-medium text-gray-600">
-            {STYLE_LABEL[exam.style]}
-          </span>
-          {exam.duration > 0 && (
-            <>
-              <Dot />
-              <Stat icon={<Clock className="size-3.5" />} label={`${exam.duration} min`} />
-            </>
-          )}
-          {exam.usage && (
-            <>
-              <Dot />
-              <span className="inline-flex items-center gap-1 rounded-md bg-brand-primary/10 px-2 py-0.5 font-medium text-brand-primary">
-                <Sparkles className="size-3" />
-                {exam.usage.credits} créditos
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <header className="mb-8 flex flex-col gap-6 border-b border-gray-100 pb-8">
+      <div className="flex flex-wrap items-center gap-2 md:justify-end">
         {mode === "view" ? (
           <>
             <CopyLinkButton shareId={exam.shareId} />
@@ -330,6 +296,40 @@ function Header({
             </Button>
           </>
         )}
+      </div>
+
+      <div className="min-w-0">
+        <h1 className="text-3xl font-medium leading-tight tracking-tighter text-ink md:text-4xl">
+          {exam.title}
+        </h1>
+        {exam.description && (
+          <p className="mt-2 max-w-3xl text-[15px] text-gray-500">{exam.description}</p>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <Stat
+            icon={<FileText className="size-3.5" />}
+            label={`${exam.questions.length} ${exam.questions.length === 1 ? "questão" : "questões"}`}
+          />
+          <Dot />
+          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 font-medium text-gray-600">
+            {STYLE_LABEL[exam.style]}
+          </span>
+          {exam.duration > 0 && (
+            <>
+              <Dot />
+              <Stat icon={<Clock className="size-3.5" />} label={`${exam.duration} min`} />
+            </>
+          )}
+          {exam.usage && (
+            <>
+              <Dot />
+              <span className="inline-flex items-center gap-1 rounded-md bg-brand-primary/10 px-2 py-0.5 font-medium text-brand-primary">
+                <Sparkles className="size-3" />
+                {exam.usage.credits} créditos
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
