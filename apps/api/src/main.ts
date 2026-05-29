@@ -56,6 +56,7 @@ import { GetExamUseCase } from "@/domains/exam/application/get-exam.js";
 import { UpdateExamUseCase } from "@/domains/exam/application/update-exam.js";
 import { DeleteExamUseCase } from "@/domains/exam/application/delete-exam.js";
 import { ExportExamDocxUseCase } from "@/domains/exam/application/export-exam-docx.js";
+import { CopyExamToClassUseCase } from "@/domains/exam/application/copy-exam-to-class.js";
 import { ExamController } from "@/domains/exam/presentation/exam-controller.js";
 import { makeExamRouter } from "@/domains/exam/presentation/exam-routes.js";
 
@@ -448,6 +449,7 @@ export async function buildApp(): Promise<Express> {
       examRepository,
       new DocxExamBuilderImpl(),
     ),
+    copyExamToClass: new CopyExamToClassUseCase(examRepository, classRepository),
   });
 
   // --- ai-ops domain ---

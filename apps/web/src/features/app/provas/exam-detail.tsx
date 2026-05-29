@@ -16,6 +16,7 @@ import {
   Plus,
   Link2,
   Check,
+  Copy,
   FileDown,
   ScanLine,
   BarChart3,
@@ -29,8 +30,9 @@ import { StudentPreview } from "./components/student-preview";
 import { ExamMetadataDialog } from "./components/exam-metadata-dialog";
 import { DeleteExamDialog } from "./components/delete-exam-dialog";
 import { ExportExamDialog } from "./components/export-exam-dialog";
+import { CopyExamToClassDialog } from "./components/copy-exam-to-class-dialog";
 import { SubmissionsSection } from "./components/submissions-section";
-import { updateExamAction, deleteExamAction } from "./actions";
+import { updateExamAction, deleteExamAction, copyExamToClassAction } from "./actions";
 
 const STYLE_LABEL: Record<ExamDetailDTO["style"], string> = {
   simple: "Simples",
@@ -53,6 +55,7 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
   const [metaOpen, setMetaOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const [draft, setDraft] = useState<GeneratedQuestion[]>(() =>
     exam.questions.map(cloneQuestion),
@@ -125,6 +128,19 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
     return { ok: result.ok, error: result.error?.message };
   }
 
+  async function handleCopyToClass(targetClassId: string) {
+    const result = await copyExamToClassAction(exam.id, targetClassId);
+    if (!result.ok || !result.data) {
+      return { ok: false, error: result.error?.message };
+    }
+    const newExamId = result.data.id;
+    startTransition(() => {
+      router.push(`/app/provas/${newExamId}`);
+      router.refresh();
+    });
+    return { ok: true };
+  }
+
   return (
     <>
       <div className="mx-auto w-full max-w-[1600px] px-5 py-8 md:px-10">
@@ -141,6 +157,7 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
           onSave={saveQuestions}
           onDelete={() => setDeleteOpen(true)}
           onExport={() => setExportOpen(true)}
+          onCopyToClass={() => setCopyOpen(true)}
         />
 
         {saveError && (
@@ -189,6 +206,14 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
         onOpenChange={setExportOpen}
         examId={exam.id}
       />
+
+      <CopyExamToClassDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        examTitle={exam.title}
+        currentClassId={exam.classId}
+        onConfirm={handleCopyToClass}
+      />
     </>
   );
 }
@@ -225,6 +250,7 @@ interface HeaderProps {
   onSave: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onCopyToClass: () => void;
 }
 
 function Header({
@@ -238,6 +264,7 @@ function Header({
   onSave,
   onDelete,
   onExport,
+  onCopyToClass,
 }: HeaderProps) {
   return (
     <header className="mb-8 flex flex-col gap-6 border-b border-gray-100 pb-8">
@@ -260,6 +287,10 @@ function Header({
             <Button variant="outline" size="md" onClick={onExport}>
               <FileDown className="size-4" />
               Exportar
+            </Button>
+            <Button variant="outline" size="md" onClick={onCopyToClass}>
+              <Copy className="size-4" />
+              Copiar para turma
             </Button>
             <Button variant="outline" size="md" onClick={onEditMetadata}>
               <Pencil className="size-4" />

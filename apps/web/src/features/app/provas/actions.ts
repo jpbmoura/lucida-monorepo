@@ -106,6 +106,25 @@ export async function deleteExamAction(
   }
 }
 
+const copyExamSchema = z.object({ targetClassId: z.string().min(1) });
+
+export async function copyExamToClassAction(
+  sourceExamId: string,
+  targetClassId: string,
+): Promise<ActionResult<{ id: string; shareId: string }>> {
+  try {
+    const body = copyExamSchema.parse({ targetClassId });
+    const response = await apiFetch<{ data: { id: string; shareId: string } }>(
+      `/v1/exams/${encodeURIComponent(sourceExamId)}/copy`,
+      { method: "POST", body },
+    );
+    revalidatePath(`/app/turmas/${targetClassId}`);
+    return { ok: true, data: response.data };
+  } catch (err) {
+    return { ok: false, error: toError(err) };
+  }
+}
+
 // ───── Scanner (OMR) ─────────────────────────────────────────
 
 const scanSheetSchema = z.object({

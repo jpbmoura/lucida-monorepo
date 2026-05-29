@@ -16,8 +16,8 @@ const FERRAMENTAS: SidebarNavItem[] = [
   // e daí vai pra /app/provas/:id/scanner.
   { label: "Scanner", action: "scanner", icon: "scan" },
   { label: "Análises", href: "/app/analises", icon: "chart" },
-  { label: "Nova Aula", href: "", icon: "book", disabled: true },
-  { label: "Novo Slide", href: "", icon: "presentation", disabled: true },
+  { label: "Nova Aula", icon: "book", disabled: true },
+  { label: "Novo Slide", icon: "presentation", disabled: true },
 ];
 
 const CONTA: SidebarNavItem[] = [

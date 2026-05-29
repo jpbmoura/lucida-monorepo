@@ -70,7 +70,9 @@ export function SidebarNav({ items }: SidebarNavProps) {
           item.children?.some((c) => matchRoute(pathname, c.href)) ?? false;
 
         return (
-          <div key={item.href ?? `action:${item.action}`}>
+          // label como fallback: itens desabilitados (placeholders "em breve")
+          // não têm href nem action, então href/action sozinhos colidiriam.
+          <div key={item.href || item.action || item.label}>
             <NavRow item={item} active={isActive} Icon={ICONS[item.icon]} />
             {item.children && (isActive || isSectionActive) && (
               <ul className="ml-[30px] mt-0.5 mb-1 flex flex-col gap-0.5 border-l border-gray-200 pl-3">

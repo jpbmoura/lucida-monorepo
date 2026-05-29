@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import {
   createExamBody,
   updateExamBody,
+  copyExamBody,
   classIdParam,
   examIdParam,
   exportExamQuery,
@@ -12,6 +13,7 @@ import type { GetExamUseCase } from "../application/get-exam.js";
 import type { UpdateExamUseCase } from "../application/update-exam.js";
 import type { DeleteExamUseCase } from "../application/delete-exam.js";
 import type { ExportExamDocxUseCase } from "../application/export-exam-docx.js";
+import type { CopyExamToClassUseCase } from "../application/copy-exam-to-class.js";
 
 interface Deps {
   createExam: CreateExamUseCase;
@@ -20,6 +22,7 @@ interface Deps {
   updateExam: UpdateExamUseCase;
   deleteExam: DeleteExamUseCase;
   exportExamDocx: ExportExamDocxUseCase;
+  copyExamToClass: CopyExamToClassUseCase;
 }
 
 export class ExamController {
@@ -66,6 +69,21 @@ export class ExamController {
         ownerId: req.auth!.userId,
       });
       res.json({ data: exam });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  copyToClass: RequestHandler = async (req, res, next) => {
+    try {
+      const { id } = examIdParam.parse(req.params);
+      const { targetClassId } = copyExamBody.parse(req.body);
+      const created = await this.deps.copyExamToClass.execute({
+        sourceExamId: id,
+        targetClassId,
+        ownerId: req.auth!.userId,
+      });
+      res.status(201).json({ data: created });
     } catch (err) {
       next(err);
     }

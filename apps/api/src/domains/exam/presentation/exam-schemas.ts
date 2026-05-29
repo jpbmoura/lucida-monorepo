@@ -45,6 +45,8 @@ export const updateExamBody = z
     { message: "Informe ao menos um campo para atualizar." },
   );
 
+export const copyExamBody = z.object({ targetClassId: z.string().min(1) });
+
 export const classIdParam = z.object({ classId: z.string().min(1) });
 export const examIdParam = z.object({ id: z.string().min(1) });
 

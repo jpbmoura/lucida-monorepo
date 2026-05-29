@@ -26,23 +26,75 @@ interface AlunosTabProps {
   alunos: AlunoDTO[];
 }
 
+type SortKey = "name_asc" | "name_desc" | "recent" | "oldest";
+type EmailFilter = "all" | "with" | "without";
+type PeriodFilter = "all" | "7d" | "30d" | "90d";
+
+const PERIOD_DAYS: Record<Exclude<PeriodFilter, "all">, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
+function hasEmail(aluno: AlunoDTO): boolean {
+  return !!aluno.email && aluno.email.trim().length > 0;
+}
+
 export function AlunosTab({ turmaId, alunos }: AlunosTabProps) {
   const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name_asc");
+  const [emailFilter, setEmailFilter] = useState<EmailFilter>("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<AlunoDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AlunoDTO | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return alunos;
-    return alunos.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.matricula.toLowerCase().includes(q) ||
-        a.code.includes(q) ||
-        (a.email?.toLowerCase().includes(q) ?? false),
-    );
-  }, [alunos, search]);
+    const cutoff =
+      periodFilter === "all"
+        ? null
+        : Date.now() - PERIOD_DAYS[periodFilter] * 86_400_000;
+
+    const list = alunos.filter((a) => {
+      if (
+        q &&
+        !(
+          a.name.toLowerCase().includes(q) ||
+          a.matricula.toLowerCase().includes(q) ||
+          a.code.includes(q) ||
+          (a.email?.toLowerCase().includes(q) ?? false)
+        )
+      ) {
+        return false;
+      }
+      if (emailFilter === "with" && !hasEmail(a)) return false;
+      if (emailFilter === "without" && hasEmail(a)) return false;
+      if (cutoff !== null && new Date(a.createdAt).getTime() < cutoff) {
+        return false;
+      }
+      return true;
+    });
+
+    return list.sort((a, b) => {
+      switch (sortKey) {
+        case "name_asc":
+          return a.name.localeCompare(b.name, "pt-BR");
+        case "name_desc":
+          return b.name.localeCompare(a.name, "pt-BR");
+        case "recent":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        case "oldest":
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        default:
+          return 0;
+      }
+    });
+  }, [alunos, search, sortKey, emailFilter, periodFilter]);
 
   function openCreate() {
     setEditTarget(null);
@@ -119,9 +171,58 @@ export function AlunosTab({ turmaId, alunos }: AlunosTabProps) {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterToggle
+            active={emailFilter === "with"}
+            onToggle={() =>
+              setEmailFilter((f) => (f === "with" ? "all" : "with"))
+            }
+          >
+            Com e-mail
+          </FilterToggle>
+          <FilterToggle
+            active={emailFilter === "without"}
+            onToggle={() =>
+              setEmailFilter((f) => (f === "without" ? "all" : "without"))
+            }
+          >
+            Sem e-mail
+          </FilterToggle>
+          <select
+            aria-label="Filtrar por período de cadastro"
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-ink transition-colors hover:border-gray-300 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
+          >
+            <option value="all">Qualquer data</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="90d">Últimos 90 dias</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="aluno-sort" className="text-gray-500">
+            Ordenar
+          </label>
+          <select
+            id="aluno-sort"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-ink transition-colors hover:border-gray-300 focus-visible:border-brand-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/15"
+          >
+            <option value="name_asc">Nome (A – Z)</option>
+            <option value="name_desc">Nome (Z – A)</option>
+            <option value="recent">Mais recentes</option>
+            <option value="oldest">Mais antigos</option>
+          </select>
+        </div>
+      </div>
+
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white px-6 py-10 text-center text-sm text-gray-500">
-          Nenhum aluno combina com “{search}”.
+          Nenhum aluno combina com a busca ou os filtros.
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white">
@@ -194,6 +295,32 @@ export function AlunosTab({ turmaId, alunos }: AlunosTabProps) {
         aluno={deleteTarget}
       />
     </div>
+  );
+}
+
+function FilterToggle({
+  active,
+  onToggle,
+  children,
+}: {
+  active: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(
+        "rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "border-brand-primary/20 bg-brand-primary/10 text-brand-primary"
+          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
