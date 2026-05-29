@@ -91,6 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           }
           hideBalance={orgPays}
           isAssistant={(assistant?.availableTeachers ?? 0) > 0}
+          hasActiveSubscription={hasActiveSubscription}
         />
         {/* LowBalanceAlert é sobre saldo pessoal — some quando a instituição
             paga pela ação (pool/pay_per_use). O saldo pessoal fica congelado

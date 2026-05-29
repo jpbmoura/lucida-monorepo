@@ -20,8 +20,16 @@ import {
   FileDown,
   ScanLine,
   BarChart3,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import type { ExamDetailDTO, ExamSubmissionsResult } from "./data";
 import type { GeneratedQuestion } from "./types";
@@ -270,46 +278,14 @@ function Header({
     <header className="mb-8 flex flex-col gap-6 border-b border-gray-100 pb-8">
       <div className="flex flex-wrap items-center gap-2 md:justify-end">
         {mode === "view" ? (
-          <>
-            <CopyLinkButton shareId={exam.shareId} />
-            <Button variant="outline" size="md" asChild>
-              <Link href={`/app/analises/provas/${exam.id}`}>
-                <BarChart3 className="size-4" />
-                Análises
-              </Link>
-            </Button>
-            <Button variant="outline" size="md" asChild>
-              <Link href={`/app/provas/${exam.id}/scanner`}>
-                <ScanLine className="size-4" />
-                Scanner
-              </Link>
-            </Button>
-            <Button variant="outline" size="md" onClick={onExport}>
-              <FileDown className="size-4" />
-              Exportar
-            </Button>
-            <Button variant="outline" size="md" onClick={onCopyToClass}>
-              <Copy className="size-4" />
-              Copiar para turma
-            </Button>
-            <Button variant="outline" size="md" onClick={onEditMetadata}>
-              <Pencil className="size-4" />
-              Editar infos
-            </Button>
-            <Button variant="primary" size="md" onClick={onEnterEdit}>
-              <PencilLine className="size-4" />
-              Editar questões
-            </Button>
-            <Button
-              type="button"
-              onClick={onDelete}
-              className="bg-red-50 text-red-700 hover:bg-red-100"
-              size="md"
-            >
-              <Trash2 className="size-4" />
-              Excluir
-            </Button>
-          </>
+          <ViewActions
+            exam={exam}
+            onEditMetadata={onEditMetadata}
+            onEnterEdit={onEnterEdit}
+            onDelete={onDelete}
+            onExport={onExport}
+            onCopyToClass={onCopyToClass}
+          />
         ) : (
           <>
             <Button variant="ghost" size="md" onClick={onDiscardEdit} disabled={saving}>
@@ -377,6 +353,167 @@ function Stat({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 function Dot() {
   return <span className="size-0.5 rounded-full bg-gray-300" />;
+}
+
+interface ViewActionsProps {
+  exam: ExamDetailDTO;
+  onEditMetadata: () => void;
+  onEnterEdit: () => void;
+  onDelete: () => void;
+  onExport: () => void;
+  onCopyToClass: () => void;
+}
+
+/**
+ * Ações da prova em modo view. Em desktop todas aparecem em linha (wrap →
+ * justify-end). Em mobile só ficam visíveis as primárias (copiar link + editar
+ * questões); as secundárias vão pra um drawer "Mais ações" pra não estourar a
+ * largura da tela.
+ */
+function ViewActions({
+  exam,
+  onEditMetadata,
+  onEnterEdit,
+  onDelete,
+  onExport,
+  onCopyToClass,
+}: ViewActionsProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const secondary: SecondaryAction[] = [
+    {
+      key: "analises",
+      label: "Análises",
+      icon: BarChart3,
+      href: `/app/analises/provas/${exam.id}`,
+    },
+    {
+      key: "scanner",
+      label: "Scanner",
+      icon: ScanLine,
+      href: `/app/provas/${exam.id}/scanner`,
+    },
+    { key: "export", label: "Exportar", icon: FileDown, onClick: onExport },
+    {
+      key: "copy",
+      label: "Copiar para turma",
+      icon: Copy,
+      onClick: onCopyToClass,
+    },
+    {
+      key: "edit-infos",
+      label: "Editar infos",
+      icon: Pencil,
+      onClick: onEditMetadata,
+    },
+    {
+      key: "delete",
+      label: "Excluir",
+      icon: Trash2,
+      onClick: onDelete,
+      danger: true,
+    },
+  ];
+
+  return (
+    <>
+      <CopyLinkButton shareId={exam.shareId} />
+
+      {/* Secundárias inline — só desktop. */}
+      {secondary.map((a) => (
+        <Button
+          key={a.key}
+          variant="outline"
+          size="md"
+          asChild={Boolean(a.href)}
+          onClick={a.onClick}
+          className={cn(
+            "hidden md:inline-flex",
+            a.danger && "bg-red-50 text-red-700 hover:bg-red-100",
+          )}
+        >
+          {a.href ? (
+            <Link href={a.href}>
+              <a.icon className="size-4" />
+              {a.label}
+            </Link>
+          ) : (
+            <>
+              <a.icon className="size-4" />
+              {a.label}
+            </>
+          )}
+        </Button>
+      ))}
+
+      <Button variant="primary" size="md" onClick={onEnterEdit}>
+        <PencilLine className="size-4" />
+        Editar questões
+      </Button>
+
+      {/* Overflow mobile. */}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="md" className="md:hidden">
+            <MoreHorizontal className="size-4" />
+            Mais
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="right" className="safe-top w-[280px] gap-0 p-0">
+          <SheetHeader className="border-b border-gray-100 px-5 py-4">
+            <SheetTitle>Mais ações</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col p-2">
+            {secondary.map((a) => {
+              const inner = (
+                <>
+                  <a.icon className="size-[18px] shrink-0" />
+                  <span className="flex-1 truncate">{a.label}</span>
+                </>
+              );
+              const rowClass = cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                a.danger
+                  ? "text-red-700 hover:bg-red-50"
+                  : "text-gray-700 hover:bg-gray-50",
+              );
+              return a.href ? (
+                <Link
+                  key={a.key}
+                  href={a.href}
+                  className={rowClass}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <button
+                  key={a.key}
+                  type="button"
+                  className={rowClass}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    a.onClick?.();
+                  }}
+                >
+                  {inner}
+                </button>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+interface SecondaryAction {
+  key: string;
+  label: string;
+  icon: typeof BarChart3;
+  href?: string;
+  onClick?: () => void;
+  danger?: boolean;
 }
 
 function ViewMode({ exam }: { exam: ExamDetailDTO }) {

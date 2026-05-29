@@ -110,18 +110,23 @@ export function TurmaDetail({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="md">
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:shrink-0">
+          <Button asChild variant="outline" size="md" className="flex-1 md:flex-none">
             <Link href={`/app/analises/turmas/${turma.id}`}>
               <BarChart3 className="size-4" />
               Análises
             </Link>
           </Button>
-          <Button variant="outline" size="md" onClick={() => setDrawerOpen(true)}>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => setDrawerOpen(true)}
+            className="flex-1 md:flex-none"
+          >
             <Pencil className="size-4" />
             Editar
           </Button>
-          <Button asChild variant="primary" size="md">
+          <Button asChild variant="primary" size="md" className="flex-1 md:flex-none">
             <Link href={`/app/turmas/${turma.id}/provas/nova`}>
               <Plus className="size-4" strokeWidth={2.5} />
               Nova prova

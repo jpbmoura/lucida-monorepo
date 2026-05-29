@@ -2,31 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { SidebarNav, type SidebarNavItem } from "./sidebar-nav";
 import { SidebarUpgradeCard } from "./sidebar-upgrade-card";
-
-const GERAL: SidebarNavItem[] = [
-  { label: "Dashboard", href: "/app", icon: "layout" },
-  { label: "Cursos", href: "/app/cursos", icon: "folder" },
-];
-
-const FERRAMENTAS: SidebarNavItem[] = [
-  // "Nova prova" não navega — abre dialog pra escolher a turma e daí vai
-  // pro wizard. Ver NewExamSidebarRow + NewExamDialog.
-  { label: "Nova prova", action: "new-exam", icon: "file" },
-  // "Scanner" também não navega — abre dialog pra escolher turma → prova
-  // e daí vai pra /app/provas/:id/scanner.
-  { label: "Scanner", action: "scanner", icon: "scan" },
-  { label: "Análises", href: "/app/analises", icon: "chart" },
-  { label: "Nova Aula", icon: "book", disabled: true },
-  { label: "Novo Slide", icon: "presentation", disabled: true },
-];
-
-const CONTA: SidebarNavItem[] = [
-  {
-    label: "Ajuda e suporte",
-    href: "/app/ajuda",
-    icon: "help",
-  },
-];
+import { GERAL, FERRAMENTAS, CONTA } from "./nav-items";
 
 export function Sidebar({
   hasActiveSubscription,

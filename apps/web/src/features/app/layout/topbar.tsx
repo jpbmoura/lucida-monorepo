@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { ProfileMenu } from "./profile-menu";
 import { InstitutionalEyebrow } from "./institutional-eyebrow";
+import { AppMobileNav } from "./mobile-nav";
+import { Logo } from "@/components/brand/logo";
 import { BalanceWidget } from "@/features/app/billing/components/balance-widget";
 import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
 
@@ -29,6 +32,8 @@ interface TopbarProps {
    * professores que ele atende.
    */
   isAssistant: boolean;
+  /** Passado ao drawer mobile pra decidir se mostra o card de upgrade. */
+  hasActiveSubscription: boolean;
 }
 
 export function Topbar({
@@ -40,12 +45,25 @@ export function Topbar({
   isOrgAdmin,
   hideBalance,
   isAssistant,
+  hasActiveSubscription,
 }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between gap-4 border-b border-gray-100 bg-white/85 px-5 backdrop-blur md:px-10">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="safe-top sticky top-0 z-20 flex min-h-18 items-center justify-between gap-4 border-b border-gray-100 bg-white/85 px-5 backdrop-blur md:px-10">
+      <div className="flex min-w-0 items-center gap-2">
+        {/* Mobile: hamburger abre o drawer; o logo substitui o da sidebar
+            (escondida em < lg). Ambos somem em lg+. */}
+        <AppMobileNav hasActiveSubscription={hasActiveSubscription} />
+        <Link
+          href="/app"
+          aria-label="Ir para o dashboard"
+          className="shrink-0 lg:hidden"
+        >
+          <Logo priority className="h-6" />
+        </Link>
         {orgName && (
-          <InstitutionalEyebrow orgName={orgName} isAdmin={isOrgAdmin} />
+          <div className="hidden min-w-0 sm:flex">
+            <InstitutionalEyebrow orgName={orgName} isAdmin={isOrgAdmin} />
+          </div>
         )}
       </div>
 

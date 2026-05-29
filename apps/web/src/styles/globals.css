@@ -93,6 +93,18 @@
   }
 }
 
+/* ───────── Safe areas (PWA standalone / notch no iOS) ─────────
+ * Com viewport-fit=cover (ver app/layout.tsx) o conteúdo desenha atrás das
+ * barras do sistema. Estas classes adicionam o respiro do env(safe-area-*)
+ * em barras fixas: .safe-top no topbar, .safe-bottom em barras de ação
+ * fixas no rodapé. O max() garante que não encolham abaixo do padding base. */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Surface utilities from the brand manual */
 .surface-dark {
   background-color: var(--color-brand-super-dark);
