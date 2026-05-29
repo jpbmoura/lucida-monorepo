@@ -24,7 +24,7 @@ const envSchema = z.object({
   SUPPORT_EMAIL: z.string().email().default("contato@lucidaexam.com"),
 
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  OPENAI_MODEL: z.string().min(1).default("gpt-4.1-mini"),
 
   // URL do serviço Python lucida-omr (OMRChecker). Sem isso a feature
   // de scanner fica indisponível — o endpoint devolve 502 via OmrServiceError.

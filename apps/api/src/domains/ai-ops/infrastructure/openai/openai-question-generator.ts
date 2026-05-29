@@ -19,10 +19,6 @@ import {
 } from "./prompts/index.js";
 import { estimateCredits } from "../estimate-credits.js";
 import { normalizeMathDelimiters } from "./normalize-math.js";
-import {
-  FILL_MODE_STALE_LIMIT,
-  QUESTION_BATCH_SIZE,
-} from "./generation-tuning.js";
 
 // Schema "limpa" usada como contrato pro structured output da OpenAI.
 // Sem .min/.max, sem transform/refine, **sem nullable** — strict mode do
@@ -144,10 +140,16 @@ const MATERIAL_TRUNCATION_NOTICE =
   "\n\n[...material truncado por exceder o limite de tamanho; gere as questões a partir do trecho acima.]";
 
 // R4 — teto de output. Orçamento generoso por questão + buffer, com cap
-// duro pra um questionCount alto não virar uma resposta ilimitada.
+// duro pra um questionCount alto não virar uma resposta ilimitada. 32k cobre
+// uma chamada única de N alto (gpt-4.1-mini suporta 32k de saída) sem truncar
+// o JSON.
 function maxOutputTokens(questionCount: number): number {
-  return Math.min(16_384, questionCount * 400 + 1_000);
+  return Math.min(32_000, questionCount * 400 + 1_000);
 }
+
+// 1 chamada inicial + até este nº de top-ups pedindo só o gap, quando a IA
+// devolve menos que N. Sem fill mode — só completa o que faltou.
+const MAX_TOPUP_ROUNDS = 2;
 
 function capMaterial(material: string): string {
   if (material.length <= MAX_MATERIAL_CHARS) return material;
@@ -162,12 +164,12 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
 
   constructor() {
     // R14 — resiliência. O SDK já faz backoff exponencial em 429/5xx/rede;
-    // tornamos explícito e um pouco mais agressivo (geração é cara de
-    // refazer) + timeout por chamada pra não pendurar o SSE.
+    // tornamos explícito + timeout por chamada generoso: uma geração única de
+    // N alto pode levar ~2 min, e o heartbeat SSE já mantém o proxy vivo.
     this.client = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
       maxRetries: 4,
-      timeout: 90_000,
+      timeout: 180_000,
     });
   }
 
@@ -195,52 +197,40 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
     let cachedInputTokens = 0;
 
     // Nonce único da geração inteira — mantém o bloco de material idêntico
-    // entre lotes pra o prompt caching da OpenAI reaproveitar o prefixo.
+    // entre chamadas pra o prompt caching da OpenAI reaproveitar o prefixo
+    // nos eventuais top-ups.
     const nonce = randomBytes(8).toString("hex");
 
-    // Garantia dura de N: geramos em lotes pequenos até fechar a quantidade
-    // pedida, em vez de pedir tudo numa chamada (estoura timeout/teto de
-    // tokens) ou aceitar shortfall. Backstop pra não rodar pra sempre num
-    // caso patológico de material quase vazio (já barrado por
-    // MIN_MEANINGFUL_CHARS no collect-sources).
-    const plannedBatches = Math.max(
-      1,
-      Math.ceil(expectedCount / QUESTION_BATCH_SIZE),
-    );
-    const maxCalls = plannedBatches + 12;
+    // 1 chamada pedindo N inteiro (material uma vez — caminho comum, igual ao
+    // legado). Se a IA devolver menos, até MAX_TOPUP_ROUNDS chamadas extras
+    // pedindo SÓ o que faltou, passando o já gerado como "evite". Sem fill
+    // mode: se mesmo assim faltar, entrega o que veio (aceita shortfall).
     let calls = 0;
-    let staleStreak = 0;
-    let fillMode = false;
-
-    while (collected.length < expectedCount && calls < maxCalls) {
-      calls++;
+    for (let round = 0; round <= MAX_TOPUP_ROUNDS; round++) {
       const remaining = expectedCount - collected.length;
-      const requestCount = Math.min(QUESTION_BATCH_SIZE, remaining);
+      if (remaining <= 0) break;
+      calls++;
 
       let roundResult: Awaited<ReturnType<typeof this.runRound>>;
       try {
         roundResult = await this.runRound({
           config: input.config,
           material,
-          requestCount,
+          requestCount: remaining,
           avoidStatements: avoid,
-          fillMode,
           nonce,
         });
       } catch (err) {
         // Falha já depois dos retries do SDK. Se a 1ª chamada falhou sem nada
-        // coletado, é erro real → propaga pro usuário. Senão, não jogamos a
-        // geração fora: pula o lote e segue tentando fechar N.
+        // coletado, é erro real → propaga. Senão, entrega o que já tem.
         if (collected.length === 0) throw err;
-        console.warn("[ai-ops] lote falhou; seguindo pra fechar N", {
+        console.warn("[ai-ops] top-up falhou; entregando parcial", {
           call: calls,
           collected: collected.length,
           requested: expectedCount,
           message: (err as Error).message,
         });
-        staleStreak++;
-        if (staleStreak >= FILL_MODE_STALE_LIMIT) fillMode = true;
-        continue;
+        break;
       }
 
       inputTokens += roundResult.inputTokens;
@@ -251,7 +241,7 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
       for (const q of roundResult.questions) {
         if (collected.length >= expectedCount) break;
         // Dedupe por enunciado normalizado — evita gastar slot com repetição
-        // exata quando o modelo ignora parcialmente o avoid.
+        // exata quando o modelo ignora parcialmente o "evite".
         const key = normalizeKey(q.statement);
         if (seenStatements.has(key)) continue;
         seenStatements.add(key);
@@ -261,21 +251,14 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
       }
 
       input.onProgress?.({
-        round: calls,
-        totalRounds: Math.max(plannedBatches, calls),
+        round: round + 1,
+        totalRounds: MAX_TOPUP_ROUNDS + 1,
         delivered: collected.length,
         requested: expectedCount,
       });
 
-      // Lote sem nada novo → material rendendo pouco. Depois de alguns lotes
-      // secos, liga o fill mode (relaxa a não-redundância) pra ainda assim
-      // fechar N. Uma vez ligado, fica ligado — o material já se mostrou raso.
-      if (added === 0) {
-        staleStreak++;
-        if (staleStreak >= FILL_MODE_STALE_LIMIT) fillMode = true;
-      } else {
-        staleStreak = 0;
-      }
+      // Round não trouxe nada novo → material esgotado; não adianta insistir.
+      if (added === 0) break;
     }
 
     if (collected.length === 0) {
@@ -285,10 +268,9 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
     }
 
     if (collected.length < expectedCount) {
-      // Só chega aqui no caso patológico do backstop (material quase vazio).
-      // Entregamos o máximo em vez de 502, mas logamos alto — a garantia dura
-      // deveria ter fechado N.
-      console.warn("[ai-ops] shortfall após backstop de lotes", {
+      // Material raso demais pra N mesmo após os top-ups. Entregamos o máximo
+      // em vez de 502 — o professor revisa e completa.
+      console.warn("[ai-ops] shortfall após top-up", {
         requested: expectedCount,
         delivered: collected.length,
         calls,
@@ -352,14 +334,13 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
     };
   }
 
-  // Um lote = uma chamada OpenAI + parse + validação de shape por questão
-  // (R6). Não decide contagem final — quem orquestra é o loop em generate().
+  // Uma chamada OpenAI + parse + validação de shape por questão (R6). Não
+  // decide contagem final — quem orquestra é o loop em generate().
   private async runRound(input: {
     config: GenerationConfig;
     material: string;
     requestCount: number;
     avoidStatements: string[];
-    fillMode: boolean;
     nonce: string;
   }): Promise<{
     questions: GeneratedQuestion[];
@@ -374,7 +355,6 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
       material: input.material,
       avoidStatements:
         input.avoidStatements.length > 0 ? input.avoidStatements : undefined,
-      fillMode: input.fillMode,
       nonce: input.nonce,
     });
 
@@ -394,11 +374,8 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
           "exam_questions",
         ),
         // Temperatura por estilo (R1): baixa em simple/analytical pra
-        // priorizar correção; mais alta em contextual/reflective. No fill
-        // mode sobe um pouco pra forçar variação e destravar a contagem.
-        temperature: input.fillMode
-          ? Math.min(spec.temperature + 0.2, 1)
-          : spec.temperature,
+        // priorizar correção; mais alta em contextual/reflective.
+        temperature: spec.temperature,
         max_tokens: maxOutputTokens(input.requestCount),
       });
 

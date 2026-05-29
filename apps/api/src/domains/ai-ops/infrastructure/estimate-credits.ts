@@ -8,7 +8,6 @@
 
 import type { GenerationConfig } from "../domain/generation-types.js";
 import { buildSystemPrompt, buildUserPrompt } from "./openai/prompts/index.js";
-import { QUESTION_BATCH_SIZE } from "./openai/generation-tuning.js";
 
 const TOKENS_PER_CREDIT = 5.5;
 const MIN_CREDITS = 1;
@@ -16,8 +15,8 @@ const MIN_CREDITS = 1;
 const CHARS_PER_TOKEN = 3.6;
 /**
  * Token de input cacheado custa ~50% do normal na OpenAI (prompt caching).
- * A geração em lotes reenvia o mesmo prefixo (system + material) em cada
- * lote; do 2º em diante ele vem cacheado. Cobramos o cacheado nesse fator.
+ * Quando um top-up reenvia o mesmo prefixo (system + material), ele vem
+ * cacheado; cobramos o cacheado nesse fator no débito real.
  */
 const CACHED_INPUT_DISCOUNT = 0.5;
 /**
@@ -51,11 +50,8 @@ export function estimateCredits(input: {
  * golden rules, estilo, output contract) é grande e fixo — ignorá-lo deixa
  * a estimativa subdimensionada quando o material é pequeno.
  *
- * A geração roda em lotes (QUESTION_BATCH_SIZE por chamada) e reenvia o
- * prefixo (system + material) em cada lote. Modelamos isso: 1ª chamada com
- * input cheio + as demais com o material cacheado (cobrado com desconto).
- * Sem isso a estimativa subdimensiona e o pré-check de saldo libera uma
- * geração que estoura no meio.
+ * Modela o caminho comum: 1 chamada (material uma vez). Eventuais top-ups só
+ * acontecem quando a IA devolve menos que N — o débito real cobre esse extra.
  */
 export function estimateCreditsBeforeGeneration(input: {
   config: GenerationConfig;
@@ -64,38 +60,19 @@ export function estimateCreditsBeforeGeneration(input: {
   /** Para regenerate: enunciados das questões existentes pra "evitar". */
   avoidStatements?: string[];
 }): number {
-  const batchCount = Math.max(
-    1,
-    Math.ceil(input.config.questionCount / QUESTION_BATCH_SIZE),
-  );
-
   const systemPrompt = buildSystemPrompt(input.config.style);
   const userPrompt = buildUserPrompt({
-    config: {
-      ...input.config,
-      questionCount: Math.min(QUESTION_BATCH_SIZE, input.config.questionCount),
-    },
+    config: input.config,
     material: input.material,
     avoidStatements: input.avoidStatements,
   });
 
-  const perCallInputTokens = Math.ceil(
+  const inputTokens = Math.ceil(
     (systemPrompt.length + userPrompt.length) / CHARS_PER_TOKEN,
   );
-  // Conservador: tratamos só o material como cacheável nos lotes 2+ (o
-  // system também é, mas subestimar o desconto deixa a reserva por cima).
-  const materialTokens = Math.ceil(input.material.length / CHARS_PER_TOKEN);
-
-  const totalInputTokens = perCallInputTokens * batchCount;
-  const cachedInputTokens = materialTokens * (batchCount - 1);
-
   const outputTokens =
     input.config.questionCount *
     OUTPUT_TOKENS_PER_QUESTION[input.config.style];
 
-  return estimateCredits({
-    inputTokens: totalInputTokens,
-    outputTokens,
-    cachedInputTokens,
-  });
+  return estimateCredits({ inputTokens, outputTokens });
 }
