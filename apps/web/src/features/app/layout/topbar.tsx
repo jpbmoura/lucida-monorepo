@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { ProfileMenu } from "./profile-menu";
 import { InstitutionalEyebrow } from "./institutional-eyebrow";
 import { AppMobileNav } from "./mobile-nav";
-import { Logo } from "@/components/brand/logo";
 import { BalanceWidget } from "@/features/app/billing/components/balance-widget";
 import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
 
@@ -50,16 +48,9 @@ export function Topbar({
   return (
     <header className="safe-top sticky top-0 z-20 flex min-h-18 items-center justify-between gap-4 border-b border-gray-100 bg-white/85 px-5 backdrop-blur md:px-10">
       <div className="flex min-w-0 items-center gap-2">
-        {/* Mobile: hamburger abre o drawer; o logo substitui o da sidebar
-            (escondida em < lg). Ambos somem em lg+. */}
+        {/* Mobile: só o hamburger abre o drawer. O logo vive na sidebar/drawer
+            (escondidos em < lg). O trigger some em lg+. */}
         <AppMobileNav hasActiveSubscription={hasActiveSubscription} />
-        <Link
-          href="/app"
-          aria-label="Ir para o dashboard"
-          className="shrink-0 lg:hidden"
-        >
-          <Logo priority className="h-6" />
-        </Link>
         {orgName && (
           <div className="hidden min-w-0 sm:flex">
             <InstitutionalEyebrow orgName={orgName} isAdmin={isOrgAdmin} />
