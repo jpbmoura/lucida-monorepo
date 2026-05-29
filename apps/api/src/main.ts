@@ -472,10 +472,7 @@ export async function buildApp(): Promise<Express> {
       questionGenerator,
       billingService,
     ),
-    estimateExamGeneration: new EstimateExamGenerationUseCase(
-      extractors,
-      transcriptFetcher,
-    ),
+    estimateExamGeneration: new EstimateExamGenerationUseCase(),
   });
 
   // --- webhook dispatcher (precisa existir antes do submission/scan

@@ -3,15 +3,12 @@ import type { BillingScope } from "../domain/billing-scope.js";
 import { InsufficientCreditsError } from "../domain/billing-errors.js";
 
 /**
- * Margem de segurança aplicada sobre a estimativa antes da geração. O modelo
- * pode devolver mais tokens que o esperado — queremos que o user tenha saldo
- * que cubra mesmo se a geração "estourar". 1.2 = 20% de folga.
- *
- * Se o débito real ultrapassar a margem, ele ainda acontece (não vamos
- * cobrar nada a mais que o real). A margem só serve pra decidir se deixa
- * começar a ação.
+ * Margem sobre a estimativa antes da ação. No modelo de preço tabelado a
+ * cobrança é EXATA (vem de `priceExam`/`priceRegenerate`), então não há
+ * estouro a cobrir: o gate exige exatamente o preço. Manter margem > 1
+ * bloquearia quem tem o valor exato.
  */
-const SAFETY_MARGIN = 1.2;
+const SAFETY_MARGIN = 1.0;
 
 interface Input {
   ownerId: string;

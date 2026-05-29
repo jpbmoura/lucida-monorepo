@@ -148,9 +148,10 @@ function BalanceHero({
           <span className="text-lg text-white/50">créditos</span>
         </div>
         <p className="mt-3 max-w-md text-[13px] text-white/60">
-          Uma prova de 10 questões consome em média ~700 créditos. Regerar
-          uma questão custa ~70. Quanto maior e mais complexo o material,
-          mais créditos.
+          O custo de cada prova é fixo, definido pelo estilo e pelo número de
+          questões — você vê o valor exato antes de gerar. Uma prova contextual
+          de 10 questões custa 700 créditos; uma simples, 500. Regerar uma
+          questão custa de 25 a 45.
         </p>
       </div>
 

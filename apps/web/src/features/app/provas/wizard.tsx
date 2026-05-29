@@ -43,27 +43,20 @@ export function Wizard({ classId, turmaName }: WizardProps) {
     };
   }, [reset]);
 
-  // Dispara estimativa real (server-side) ao abrir o confirm. Extração de
-  // PDF/DOCX já rodou no browser, então mandamos só o texto combinado e o
-  // api estima em cima dele — débito final fica dentro da margem de variação
-  // dos tokens da IA. Falha silenciosa: o dialog mostra "estimativa
-  // indisponível" e segue.
+  // Busca o custo exato ao abrir o confirm. Preço tabelado depende só de
+  // style + questionCount, então a cotação é instantânea — sem enviar
+  // material. Falha silenciosa: o dialog mostra "custo indisponível" e segue.
   function openConfirm() {
     setEstimate(null);
     setEstimateLoading(true);
     setConfirmOpen(true);
 
-    const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
     const formData = new FormData();
     formData.append(
       "config",
       JSON.stringify({
-        questionCount: config.questionCount,
-        difficulty: config.difficulty,
         style: config.style,
-        questionTypes: config.questionTypes,
-        pastedText: combinedText,
-        youtubeUrls,
+        questionCount: config.questionCount,
       }),
     );
 

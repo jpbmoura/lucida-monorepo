@@ -17,12 +17,12 @@ interface GenerateConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /**
-   * Estimativa em créditos vinda do backend (POST /v1/ai/estimate). `null`
-   * cobre dois casos: ainda carregando OU a chamada de estimativa falhou.
-   * Use `estimateLoading` pra distinguir.
+   * Custo exato em créditos vindo do backend (POST /v1/ai/estimate). É o
+   * mesmo valor que será debitado. `null` cobre dois casos: ainda carregando
+   * OU a chamada falhou. Use `estimateLoading` pra distinguir.
    */
   estimate: number | null;
-  /** True enquanto o fetch de estimativa está em voo. */
+  /** True enquanto o fetch de custo está em voo. */
   estimateLoading: boolean;
   onConfirm: () => void | Promise<void>;
 }
@@ -91,15 +91,15 @@ export function GenerateConfirmDialog({
         <DialogHeader>
           <DialogTitle>Confirmar geração</DialogTitle>
           <DialogDescription>
-            Estimativa pré-cálculo. O custo final pode variar um pouco
-            conforme o tamanho do material e a profundidade das respostas.
+            Este é o custo exato da geração — será debitado apenas se a prova
+            for gerada com sucesso.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50/60 px-5 py-4">
           <div>
             <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-500">
-              Custo estimado
+              Custo
             </div>
             <div className="mt-1 flex items-baseline gap-1">
               <CostValue
@@ -154,10 +154,10 @@ export function GenerateConfirmDialog({
           <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-[13px] text-gray-700">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-gray-500" />
             <div>
-              <div className="font-medium">Estimativa indisponível</div>
+              <div className="font-medium">Custo indisponível</div>
               <div className="mt-0.5 text-gray-600">
-                Não conseguimos pré-calcular o custo. Você ainda pode gerar
-                — o débito real usa os créditos de fato consumidos.
+                Não conseguimos calcular o custo agora. Você ainda pode gerar
+                — o valor é definido pela configuração da prova.
               </div>
             </div>
           </div>
@@ -231,7 +231,7 @@ function CostValue({
   return (
     <>
       <span className="text-2xl font-medium tabular-nums text-ink">
-        ~{estimate}
+        {estimate.toLocaleString("pt-BR")}
       </span>
       <span className="text-xs text-gray-500">créditos</span>
     </>

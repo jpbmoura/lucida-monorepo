@@ -32,9 +32,9 @@ export function makeAiRouter({
     upload.array("files"),
     controller.regenerateQuestion,
   );
-  // Pré-extrai material e devolve estimativa exata (mesma fórmula do
-  // pre-check do generate). Frontend usa pra mostrar custo confiável no
-  // confirm dialog. Sem chamada à OpenAI, sem débito.
+  // Devolve o custo exato (preço tabelado por style + questionCount). Mesmo
+  // valor que o generate vai debitar. Sem extração de material, sem OpenAI,
+  // sem débito. multer só parseia o campo `config` do form-data.
   router.post(
     "/v1/ai/estimate",
     requireAuth,

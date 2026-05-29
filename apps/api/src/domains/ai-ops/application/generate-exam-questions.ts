@@ -8,7 +8,7 @@ import type {
 } from "../domain/generation-types.js";
 import type { TranscriptFetcher } from "../infrastructure/extractors/youtube-transcript-fetcher.js";
 import type { BillingService } from "@/domains/billing/application/billing-service.js";
-import { estimateCreditsBeforeGeneration } from "../infrastructure/estimate-credits.js";
+import { priceExam } from "../domain/exam-pricing.js";
 import { AnswerExplanationVerifier } from "../infrastructure/openai/answer-explanation-verifier.js";
 import { collectSources } from "./collect-sources.js";
 
@@ -53,21 +53,14 @@ export class GenerateExamQuestionsUseCase {
       { extractors: this.extractors, transcriptFetcher: this.transcriptFetcher },
     );
 
-    // Pré-check com margem de segurança (SAFETY_MARGIN lá dentro). Bloqueia
-    // com 402 se o saldo não cobre um possível estouro do output da IA.
-    // O material precisa do mesmo formato que o generator usa (### label\n
-    // text\n\n…) pra a estimativa de tokens bater com o que vai pra IA.
-    const material = sources
-      .map((s) => `### ${s.sourceLabel}\n${s.text}`)
-      .join("\n\n");
-    const estimate = estimateCreditsBeforeGeneration({
-      config: input.config,
-      material,
-    });
+    // Preço tabelado exato (estilo + nº de questões). É o mesmo número que o
+    // confirm dialog mostrou via /v1/ai/estimate. Bloqueia com 402 se o saldo
+    // não cobre — sem margem, porque a cobrança é exata.
+    const price = priceExam(input.config);
     await this.billing.ensureSufficientBalance({
       userId: input.ownerId,
       activeOrganizationId: input.activeOrganizationId,
-      estimate,
+      estimate: price,
     });
 
     const result = await this.generator.generate({
@@ -76,13 +69,15 @@ export class GenerateExamQuestionsUseCase {
       onProgress: input.onProgress,
     });
 
-    // Débito real pós-geração — usa os tokens de fato consumidos.
+    // Débito do preço tabelado — exatamente o valor informado na cotação.
+    // `tokensUsed` guarda o custo real (telemetria), mas não influencia o
+    // valor cobrado.
     const isImpersonating =
       !!input.actorRealUserId && input.actorRealUserId !== input.ownerId;
     await this.billing.debit({
       userId: input.ownerId,
       activeOrganizationId: input.activeOrganizationId,
-      amount: result.usage.credits,
+      amount: price,
       reason: "ai_consumption",
       relatedAction: "generate_exam",
       tokensUsed: result.usage.inputTokens + result.usage.outputTokens,
@@ -92,6 +87,9 @@ export class GenerateExamQuestionsUseCase {
         ...(isImpersonating && { impersonatedBy: input.actorRealUserId }),
       },
     });
+
+    // O front exibe `usage.credits` pós-geração — força bater com o cobrado.
+    result.usage.credits = price;
 
     // R2 (telemetria, opt-in via R2_VERIFY=1) — mede coerência
     // explicação↔gabarito em produção. Best-effort: NUNCA quebra a geração

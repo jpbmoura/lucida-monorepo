@@ -141,21 +141,13 @@ export class AiController {
       }
       const config = estimateExamConfigSchema.parse(parsed);
 
-      const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+      // Preço tabelado depende só de style + questionCount — não extrai
+      // material nem chama OpenAI.
       const result = await this.deps.estimateExamGeneration.execute({
         config: {
-          questionCount: config.questionCount,
-          difficulty: config.difficulty,
           style: config.style,
-          questionTypes: config.questionTypes,
+          questionCount: config.questionCount,
         },
-        files: files.map((f) => ({
-          filename: f.originalname,
-          mimetype: f.mimetype,
-          buffer: f.buffer,
-        })),
-        pastedText: config.pastedText ?? "",
-        youtubeUrls: config.youtubeUrls ?? [],
       });
 
       res.json({ data: result });

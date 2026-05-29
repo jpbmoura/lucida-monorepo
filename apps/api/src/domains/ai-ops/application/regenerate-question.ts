@@ -8,7 +8,7 @@ import type {
 } from "../domain/generation-types.js";
 import type { TranscriptFetcher } from "../infrastructure/extractors/youtube-transcript-fetcher.js";
 import type { BillingService } from "@/domains/billing/application/billing-service.js";
-import { estimateCreditsBeforeGeneration } from "../infrastructure/estimate-credits.js";
+import { priceRegenerate } from "../domain/exam-pricing.js";
 import { collectSources } from "./collect-sources.js";
 import { AiGenerationFailedError } from "../domain/errors.js";
 
@@ -53,20 +53,13 @@ export class RegenerateQuestionUseCase {
       { extractors: this.extractors, transcriptFetcher: this.transcriptFetcher },
     );
 
-    // Pré-check com margem. Regenerar 1 questão é barato mas ainda custa.
-    // Usa o mesmo formato de material do generator pra estimativa bater.
-    const material = sources
-      .map((s) => `### ${s.sourceLabel}\n${s.text}`)
-      .join("\n\n");
-    const estimate = estimateCreditsBeforeGeneration({
-      config: { ...input.config, questionCount: 1 },
-      material,
-      avoidStatements: input.avoidStatements,
-    });
+    // Preço tabelado exato de 1 questão (sem a base — prompt reaproveitado).
+    // Sem margem: a cobrança é exata.
+    const price = priceRegenerate(input.config);
     await this.billing.ensureSufficientBalance({
       userId: input.ownerId,
       activeOrganizationId: input.activeOrganizationId,
-      estimate,
+      estimate: price,
     });
 
     const result = await this.generator.generate({
@@ -80,12 +73,13 @@ export class RegenerateQuestionUseCase {
       throw new AiGenerationFailedError("A IA não devolveu nenhuma questão.");
     }
 
+    // Débito do preço tabelado. `tokensUsed` é só telemetria do custo real.
     const isImpersonating =
       !!input.actorRealUserId && input.actorRealUserId !== input.ownerId;
     await this.billing.debit({
       userId: input.ownerId,
       activeOrganizationId: input.activeOrganizationId,
-      amount: result.usage.credits,
+      amount: price,
       reason: "ai_consumption",
       relatedAction: "regenerate_question",
       tokensUsed: result.usage.inputTokens + result.usage.outputTokens,
@@ -94,6 +88,8 @@ export class RegenerateQuestionUseCase {
       }),
     });
 
+    // Front acumula `usage.credits` no badge — força bater com o cobrado.
+    result.usage.credits = price;
     return { question, usage: result.usage };
   }
 }
