@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NewExamSidebarRow } from "./new-exam-sidebar-row";
+import { NewLessonPlanSidebarRow } from "./new-lesson-plan-sidebar-row";
 import { ScannerSidebarRow } from "./scanner-sidebar-row";
 
 // Icons são resolvidos no client — não dá pra passar componentes React como
@@ -39,7 +40,7 @@ const ICONS = {
 export type SidebarIcon = keyof typeof ICONS;
 
 /** IDs de ações que disparam comportamentos no client (dialogs, etc). */
-export type SidebarAction = "new-exam" | "scanner";
+export type SidebarAction = "new-exam" | "new-lesson-plan" | "scanner";
 
 export interface SidebarNavItem {
   label: string;
@@ -111,6 +112,15 @@ function NavRow({
   if (item.action === "new-exam") {
     return (
       <NewExamSidebarRow label={item.label} Icon={Icon} disabled={item.disabled} />
+    );
+  }
+  if (item.action === "new-lesson-plan") {
+    return (
+      <NewLessonPlanSidebarRow
+        label={item.label}
+        Icon={Icon}
+        disabled={item.disabled}
+      />
     );
   }
   if (item.action === "scanner") {

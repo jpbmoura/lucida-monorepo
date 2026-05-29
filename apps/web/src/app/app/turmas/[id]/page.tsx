@@ -6,6 +6,7 @@ import {
   fetchAlunosByTurma,
   fetchExamsByTurma,
 } from "@/features/app/turmas/data";
+import { fetchLessonPlansByClass } from "@/features/app/aulas/data";
 import { fetchCursos } from "@/features/app/cursos/data";
 import { TurmaDetail } from "@/features/app/turmas/detail/turma-detail";
 
@@ -36,8 +37,9 @@ export default async function TurmaDetailPage({ params }: TurmaPageProps) {
     throw err;
   }
 
-  const [exams, alunos, cursos] = await Promise.all([
+  const [exams, lessonPlans, alunos, cursos] = await Promise.all([
     fetchExamsByTurma(id),
+    fetchLessonPlansByClass(id),
     fetchAlunosByTurma(id),
     fetchCursos(),
   ]);
@@ -47,6 +49,7 @@ export default async function TurmaDetailPage({ params }: TurmaPageProps) {
       <TurmaDetail
         initialTurma={turma}
         exams={exams}
+        lessonPlans={lessonPlans}
         alunos={alunos}
         cursos={cursos}
       />

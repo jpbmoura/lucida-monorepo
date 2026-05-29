@@ -18,10 +18,19 @@ import { notifyBalanceChanged } from "@/features/app/billing/components/balance-
 interface WizardProps {
   classId: string;
   turmaName: string;
+  /**
+   * Handoff vindo de um plano de aula (módulo "Aulas"). Quando presente, o
+   * wizard começa já com o material/título semeados, na etapa de config, e
+   * ao salvar a prova grava a back-reference no plano.
+   */
+  seed?: { title?: string; pastedText?: string };
+  fromLessonPlanId?: string;
 }
 
-export function Wizard({ classId, turmaName }: WizardProps) {
+export function Wizard({ classId, turmaName, seed, fromLessonPlanId }: WizardProps) {
   const step = useWizardStore((s) => s.step);
+  const setConfig = useWizardStore((s) => s.setConfig);
+  const setPastedText = useWizardStore((s) => s.setPastedText);
   const materialFiles = useWizardStore((s) => s.materialFiles);
   const pastedText = useWizardStore((s) => s.pastedText);
   const youtubeUrls = useWizardStore((s) => s.youtubeUrls);
@@ -42,6 +51,16 @@ export function Wizard({ classId, turmaName }: WizardProps) {
       reset();
     };
   }, [reset]);
+
+  // Semeia o store a partir do plano de aula (handoff) e pula pra config.
+  // Roda uma vez na montagem.
+  useEffect(() => {
+    if (!seed) return;
+    if (seed.title) setConfig({ title: seed.title });
+    if (seed.pastedText) setPastedText(seed.pastedText);
+    setStep("config");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Busca o custo exato ao abrir o confirm. Preço tabelado depende só de
   // style + questionCount, então a cotação é instantânea — sem enviar
@@ -179,7 +198,11 @@ export function Wizard({ classId, turmaName }: WizardProps) {
       {step === "config" && <StepConfig onGenerate={openConfirm} />}
       {step === "generating" && <StepGenerating />}
       {step === "review" && (
-        <StepReview classId={classId} onRegenerate={handleRegenerate} />
+        <StepReview
+          classId={classId}
+          onRegenerate={handleRegenerate}
+          fromLessonPlanId={fromLessonPlanId}
+        />
       )}
 
       <GenerateConfirmDialog

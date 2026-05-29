@@ -26,11 +26,22 @@ interface Deps {
   transcriptFetcher: TranscriptFetcher;
 }
 
+interface Options {
+  /**
+   * Como o artefato gerado é chamado na mensagem de material insuficiente.
+   * Default "uma prova fiel" (geração de provas); a geração de planos passa
+   * "um plano de aula fiel".
+   */
+  artifactLabel?: string;
+}
+
 // Coleta e normaliza todas as fontes (PDF/DOCX/TXT + texto colado + YouTube)
-// num array único de ExtractionResult. Compartilhado por Generate e Regenerate.
+// num array único de ExtractionResult. Compartilhado por Generate e Regenerate
+// (provas e planos de aula).
 export async function collectSources(
   input: Input,
   deps: Deps,
+  opts: Options = {},
 ): Promise<ExtractionResult[]> {
   const sources: ExtractionResult[] = [];
 
@@ -77,10 +88,11 @@ export async function collectSources(
   );
   if (meaningfulChars < MIN_MEANINGFUL_CHARS) {
     const hadFiles = input.files.length > 0;
+    const artifactLabel = opts.artifactLabel ?? "uma prova fiel";
     throw new InsufficientSourceMaterialError(
       hadFiles
         ? "Quase nenhum texto foi extraído do material. Se o arquivo for um PDF escaneado (imagem), ele não tem texto selecionável — envie um PDF com texto, um DOCX, ou cole o conteúdo direto."
-        : "O material enviado é curto demais para gerar uma prova fiel. Adicione mais conteúdo (pelo menos um parágrafo).",
+        : `O material enviado é curto demais para gerar ${artifactLabel}. Adicione mais conteúdo (pelo menos um parágrafo).`,
     );
   }
 

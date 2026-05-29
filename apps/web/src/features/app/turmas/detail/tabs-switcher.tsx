@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export type TurmaTab = "provas" | "alunos";
+export type TurmaTab = "provas" | "aulas" | "alunos";
 
 interface TabsSwitcherProps {
   turmaId: string;
-  counts: { provas: number; alunos: number };
+  counts: { provas: number; aulas: number; alunos: number };
 }
 
 const TABS: Array<{ key: TurmaTab; label: string }> = [
   { key: "provas", label: "Provas" },
+  { key: "aulas", label: "Aulas" },
   { key: "alunos", label: "Alunos" },
 ];
 

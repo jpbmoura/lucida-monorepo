@@ -8,14 +8,21 @@ import { QuestionEditor } from "../components/question-editor";
 import { StudentPreview } from "../components/student-preview";
 import { useWizardStore } from "../wizard-store";
 import { createExamAction } from "../actions";
+import { linkExamToLessonPlanAction } from "@/features/app/aulas/actions";
 import type { GeneratedQuestion } from "../types";
 
 interface StepReviewProps {
   classId: string;
   onRegenerate: (avoidStatements: string[]) => Promise<GeneratedQuestion | null>;
+  /** Handoff: id do plano de aula que originou esta prova (back-reference). */
+  fromLessonPlanId?: string;
 }
 
-export function StepReview({ classId, onRegenerate }: StepReviewProps) {
+export function StepReview({
+  classId,
+  onRegenerate,
+  fromLessonPlanId,
+}: StepReviewProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -84,6 +91,11 @@ export function StepReview({ classId, onRegenerate }: StepReviewProps) {
       if (!result.ok) {
         setSaveError(result.error?.message ?? "Não foi possível salvar a prova.");
         return;
+      }
+      // Handoff: grava a back-reference no plano de aula que originou a prova.
+      // Best-effort — não bloqueia a navegação se falhar.
+      if (fromLessonPlanId && result.data?.id) {
+        void linkExamToLessonPlanAction(fromLessonPlanId, result.data.id);
       }
       reset();
       startTransition(() => {

@@ -69,8 +69,26 @@ import { AnswerExplanationVerifier } from "@/domains/ai-ops/infrastructure/opena
 import { GenerateExamQuestionsUseCase } from "@/domains/ai-ops/application/generate-exam-questions.js";
 import { RegenerateQuestionUseCase } from "@/domains/ai-ops/application/regenerate-question.js";
 import { EstimateExamGenerationUseCase } from "@/domains/ai-ops/application/estimate-exam-generation.js";
+import { OpenAiLessonPlanGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-lesson-plan-generator.js";
+import { GenerateLessonPlanUseCase } from "@/domains/ai-ops/application/generate-lesson-plan.js";
+import { RegenerateLessonBlockUseCase } from "@/domains/ai-ops/application/regenerate-lesson-block.js";
+import { EstimateLessonPlanUseCase } from "@/domains/ai-ops/application/estimate-lesson-plan.js";
 import { AiController } from "@/domains/ai-ops/presentation/ai-controller.js";
+import { LessonPlanAiController } from "@/domains/ai-ops/presentation/lesson-plan-ai-controller.js";
 import { makeAiRouter } from "@/domains/ai-ops/presentation/ai-routes.js";
+
+import { MongooseLessonPlanRepository } from "@/domains/lesson-plan/infrastructure/mongoose-lesson-plan-repository.js";
+import { DocxLessonPlanBuilderImpl } from "@/domains/lesson-plan/infrastructure/docx-lesson-plan-builder.js";
+import { CreateLessonPlanUseCase } from "@/domains/lesson-plan/application/create-lesson-plan.js";
+import { ListLessonPlansByClassUseCase } from "@/domains/lesson-plan/application/list-lesson-plans-by-class.js";
+import { GetLessonPlanUseCase } from "@/domains/lesson-plan/application/get-lesson-plan.js";
+import { UpdateLessonPlanUseCase } from "@/domains/lesson-plan/application/update-lesson-plan.js";
+import { DeleteLessonPlanUseCase } from "@/domains/lesson-plan/application/delete-lesson-plan.js";
+import { DuplicateLessonPlanUseCase } from "@/domains/lesson-plan/application/duplicate-lesson-plan.js";
+import { ArchiveLessonPlanUseCase } from "@/domains/lesson-plan/application/archive-lesson-plan.js";
+import { ExportLessonPlanDocxUseCase } from "@/domains/lesson-plan/application/export-lesson-plan-docx.js";
+import { LessonPlanController } from "@/domains/lesson-plan/presentation/lesson-plan-controller.js";
+import { makeLessonPlanRouter } from "@/domains/lesson-plan/presentation/lesson-plan-routes.js";
 
 import { MongooseSubmissionRepository } from "@/domains/submission/infrastructure/mongoose-submission-repository.js";
 import { GetPublicExamUseCase } from "@/domains/submission/application/get-public-exam.js";
@@ -473,6 +491,46 @@ export async function buildApp(): Promise<Express> {
       billingService,
     ),
     estimateExamGeneration: new EstimateExamGenerationUseCase(),
+  });
+
+  // --- lesson-plan generation (módulo "Aulas") ---
+  const lessonPlanGenerator = new OpenAiLessonPlanGenerator();
+  const lessonPlanAiController = new LessonPlanAiController({
+    generateLessonPlan: new GenerateLessonPlanUseCase(
+      extractors,
+      transcriptFetcher,
+      lessonPlanGenerator,
+      billingService,
+    ),
+    regenerateLessonBlock: new RegenerateLessonBlockUseCase(
+      extractors,
+      transcriptFetcher,
+      lessonPlanGenerator,
+      billingService,
+    ),
+    estimateLessonPlan: new EstimateLessonPlanUseCase(),
+  });
+
+  // --- lesson-plan persistence (módulo "Aulas") ---
+  const lessonPlanRepository = new MongooseLessonPlanRepository();
+  const lessonPlanController = new LessonPlanController({
+    createLessonPlan: new CreateLessonPlanUseCase(
+      lessonPlanRepository,
+      classRepository,
+    ),
+    listLessonPlansByClass: new ListLessonPlansByClassUseCase(
+      lessonPlanRepository,
+      classRepository,
+    ),
+    getLessonPlan: new GetLessonPlanUseCase(lessonPlanRepository),
+    updateLessonPlan: new UpdateLessonPlanUseCase(lessonPlanRepository),
+    deleteLessonPlan: new DeleteLessonPlanUseCase(lessonPlanRepository),
+    duplicateLessonPlan: new DuplicateLessonPlanUseCase(lessonPlanRepository),
+    archiveLessonPlan: new ArchiveLessonPlanUseCase(lessonPlanRepository),
+    exportLessonPlanDocx: new ExportLessonPlanDocxUseCase(
+      lessonPlanRepository,
+      new DocxLessonPlanBuilderImpl(),
+    ),
   });
 
   // --- webhook dispatcher (precisa existir antes do submission/scan
@@ -1030,7 +1088,12 @@ export async function buildApp(): Promise<Express> {
     makeClassRouter({ requireAuth, controller: classController }),
     makeStudentRouter({ requireAuth, controller: studentController }),
     makeExamRouter({ requireAuth, controller: examController }),
-    makeAiRouter({ requireAuth, controller: aiController }),
+    makeAiRouter({
+      requireAuth,
+      controller: aiController,
+      lessonPlanController: lessonPlanAiController,
+    }),
+    makeLessonPlanRouter({ requireAuth, controller: lessonPlanController }),
     makePublicSubmissionRouter({ controller: submissionController }),
     makeAuthedSubmissionRouter({ requireAuth, controller: submissionController }),
     makeScanRouter({ requireAuth, controller: scanController }),

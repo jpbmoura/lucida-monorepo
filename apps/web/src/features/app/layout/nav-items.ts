@@ -17,7 +17,9 @@ export const FERRAMENTAS: SidebarNavItem[] = [
   // e daí vai pra /app/provas/:id/scanner.
   { label: "Scanner", action: "scanner", icon: "scan" },
   { label: "Análises", href: "/app/analises", icon: "chart" },
-  { label: "Nova Aula", icon: "book", disabled: true },
+  // "Nova aula" não navega — abre dialog pra escolher a turma e daí vai pro
+  // wizard de plano de aula. Ver NewLessonPlanSidebarRow + NewLessonPlanDialog.
+  { label: "Nova aula", action: "new-lesson-plan", icon: "book" },
   { label: "Novo Slide", icon: "presentation", disabled: true },
 ];
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, BarChart3, Pencil, Plus, Users, FileText, Clock } from "lucide-react";
+import { ArrowLeft, BarChart3, NotebookPen, Pencil, Plus, Users, FileText, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/relative-time";
@@ -13,13 +13,16 @@ import { updateTurmaAction, deleteTurmaAction } from "../actions";
 import { deriveTurmaInitials } from "../utils";
 import type { CursoDTO } from "@/features/app/cursos/types";
 import type { TurmaDTO, TurmaExamDTO, AlunoDTO } from "../types";
+import type { LessonPlanListItem } from "@/features/app/aulas/types";
 import { TabsSwitcher, type TurmaTab } from "./tabs-switcher";
 import { ProvasTab } from "./provas-tab";
+import { AulasTab } from "./aulas-tab";
 import { AlunosTab } from "./alunos-tab";
 
 interface TurmaDetailProps {
   initialTurma: TurmaDTO;
   exams: TurmaExamDTO[];
+  lessonPlans: LessonPlanListItem[];
   alunos: AlunoDTO[];
   cursos: CursoDTO[];
 }
@@ -27,6 +30,7 @@ interface TurmaDetailProps {
 export function TurmaDetail({
   initialTurma,
   exams,
+  lessonPlans,
   alunos,
   cursos,
 }: TurmaDetailProps) {
@@ -126,6 +130,12 @@ export function TurmaDetail({
             <Pencil className="size-4" />
             Editar
           </Button>
+          <Button asChild variant="outline" size="md" className="flex-1 md:flex-none">
+            <Link href={`/app/turmas/${turma.id}/aulas/nova`}>
+              <NotebookPen className="size-4" />
+              Novo plano
+            </Link>
+          </Button>
           <Button asChild variant="primary" size="md" className="flex-1 md:flex-none">
             <Link href={`/app/turmas/${turma.id}/provas/nova`}>
               <Plus className="size-4" strokeWidth={2.5} />
@@ -138,16 +148,24 @@ export function TurmaDetail({
       <div className="mt-8">
         <TabsSwitcher
           turmaId={turma.id}
-          counts={{ provas: exams.length, alunos: alunos.length }}
+          counts={{
+            provas: exams.length,
+            aulas: lessonPlans.length,
+            alunos: alunos.length,
+          }}
         />
       </div>
 
-      <div className={cn("mt-6", tab === "provas" && "hidden")} hidden={tab !== "alunos"}>
-        <AlunosTab turmaId={turma.id} alunos={alunos} />
+      <div className={cn("mt-6", tab !== "provas" && "hidden")} hidden={tab !== "provas"}>
+        <ProvasTab classId={turma.id} exams={exams} />
       </div>
 
-      <div className={cn("mt-6", tab !== "provas" && "hidden")} hidden={tab === "alunos"}>
-        <ProvasTab classId={turma.id} exams={exams} />
+      <div className={cn("mt-6", tab !== "aulas" && "hidden")} hidden={tab !== "aulas"}>
+        <AulasTab classId={turma.id} plans={lessonPlans} />
+      </div>
+
+      <div className={cn("mt-6", tab !== "alunos" && "hidden")} hidden={tab !== "alunos"}>
+        <AlunosTab turmaId={turma.id} alunos={alunos} />
       </div>
 
       <button
