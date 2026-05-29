@@ -3,6 +3,9 @@ export type ExamDifficulty = "fácil" | "médio" | "difícil" | "misto";
 export type QuestionType = "multipleChoice" | "trueFalse";
 export type QuestionDifficulty = "fácil" | "médio" | "difícil";
 export type SecurityLevel = "off" | "strict";
+// Idioma de saída do conteúdo gerado pela IA. Não é persistido — só vai no
+// payload da geração pro prompt.
+export type OutputLanguage = "pt-BR" | "en" | "es";
 
 export interface GeneratedQuestion {
   type: QuestionType;
@@ -39,6 +42,7 @@ export interface WizardConfig {
   difficulty: ExamDifficulty;
   style: ExamStyle;
   questionTypes: { multipleChoice: boolean; trueFalse: boolean };
+  language: OutputLanguage;
   duration: number;
   securityLevel: SecurityLevel;
 }

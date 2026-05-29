@@ -79,6 +79,7 @@ export class AiController {
           difficulty: config.difficulty,
           style: config.style,
           questionTypes: config.questionTypes,
+          language: config.language,
         },
         files: files.map((f) => ({
           filename: f.originalname,
@@ -187,6 +188,7 @@ export class AiController {
           difficulty: config.difficulty,
           style: config.style,
           questionTypes: config.questionTypes,
+          language: config.language,
         },
         files: files.map((f) => ({
           filename: f.originalname,

@@ -8,7 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { StylePicker } from "../components/style-picker";
 import { useWizardStore, canGenerate } from "../wizard-store";
-import type { ExamDifficulty, SecurityLevel } from "../types";
+import type { ExamDifficulty, OutputLanguage, SecurityLevel } from "../types";
+
+const LANGUAGE_OPTIONS: { value: OutputLanguage; label: string }[] = [
+  { value: "pt-BR", label: "Português (Brasil)" },
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+];
 
 interface StepConfigProps {
   onGenerate: () => void;
@@ -67,6 +73,26 @@ export function StepConfig({ onGenerate }: StepConfigProps) {
             placeholder="Breve descrição da prova, pontos que estão sendo avaliados..."
             className="min-h-[90px]"
           />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="exam-language">Idioma da prova</Label>
+          <select
+            id="exam-language"
+            value={config.language}
+            onChange={(e) =>
+              setConfig({ language: e.target.value as OutputLanguage })
+            }
+            className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-ink transition-colors focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
+          >
+            {LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gray-500">
+            O conteúdo gerado (enunciados, opções e explicações) sai neste idioma.
+          </p>
         </div>
       </section>
 

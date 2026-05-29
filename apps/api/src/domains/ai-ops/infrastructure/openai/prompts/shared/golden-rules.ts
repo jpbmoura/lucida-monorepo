@@ -1,4 +1,8 @@
-export const GOLDEN_RULES = `REGRA DE OURO — nunca copie a resposta do material:
+import type { OutputLanguage } from "../../../../domain/generation-types.js";
+import { languageRule } from "./language.js";
+
+export function buildGoldenRules(language: OutputLanguage): string {
+  return `REGRA DE OURO — nunca copie a resposta do material:
 A resposta correta NUNCA pode ser uma cópia textual (ou quase textual) do
 material fornecido. Se o material traz a frase pronta que responderia a
 pergunta, você deve REFORMULAR o enunciado ou o contexto pra exigir APLICAÇÃO
@@ -16,15 +20,13 @@ PROIBIÇÕES ABSOLUTAS:
 - Usar "Todas as alternativas anteriores" ou "Nenhuma das anteriores" como
   opção correta.
 - Pegadinhas gramaticais, trocadilhos irrelevantes ou alternativas com erro
-  de português proposital.
+  proposital de idioma.
 - Emojis em qualquer campo.
 - Siglas, códigos BNCC ou qualquer marca interna no conteúdo gerado.
 
-LÍNGUA: Português do Brasil. Adapte exemplos, nomes próprios e cenários pra
-realidade brasileira quando fizer sentido (ex: prefira "Maria" a "Mary", "o
-SUS" a "o NHS", reais a dólares). Evite anglicismos se o equivalente em
-pt-BR for claro.
+${languageRule(language)}
 
 VARIEDADE: Se gerar mais de uma questão, distribua os conceitos cobertos ao
 longo do material — não concentre todas em um único trecho. Se o material
 tem seções, tente cobrir seções diferentes.`;
+}

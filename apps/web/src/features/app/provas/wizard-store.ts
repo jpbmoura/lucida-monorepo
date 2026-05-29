@@ -88,10 +88,19 @@ function defaultConfig(): WizardConfig {
     difficulty: "médio",
     style: "simple",
     questionTypes: { multipleChoice: true, trueFalse: false },
+    language: "pt-BR",
     duration: 0,
     securityLevel: "off",
   };
 }
+
+// Rótulos V/F por idioma — espelha o backend (trueFalseLabels). Questão manual
+// começa no idioma da prova pra bater com as geradas pela IA.
+const TRUE_FALSE_LABELS: Record<WizardConfig["language"], [string, string]> = {
+  "pt-BR": ["Verdadeiro", "Falso"],
+  en: ["True", "False"],
+  es: ["Verdadero", "Falso"],
+};
 
 function defaultQuestion(config: WizardConfig): GeneratedQuestion {
   const type: "multipleChoice" | "trueFalse" = config.questionTypes.multipleChoice
@@ -110,7 +119,7 @@ function defaultQuestion(config: WizardConfig): GeneratedQuestion {
     context: needsContext ? "" : null,
     options:
       type === "trueFalse"
-        ? ["Verdadeiro", "Falso"]
+        ? [...TRUE_FALSE_LABELS[config.language]]
         : Array.from({ length: mcOptionCount }, () => ""),
     correctAnswer: 0,
     explanation: "",

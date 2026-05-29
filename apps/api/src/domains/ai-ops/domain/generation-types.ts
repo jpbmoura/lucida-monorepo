@@ -4,6 +4,11 @@ export type ExamStyle = "simple" | "contextual" | "analytical" | "reflective";
 export type QuestionType = "multipleChoice" | "trueFalse";
 export type QuestionDifficulty = "fácil" | "médio" | "difícil" | "misto";
 
+// Idioma do conteúdo gerado (statement/context/options/explanation). Efêmero:
+// flui da request pro prompt e não é persistido. `difficulty`/`type` seguem
+// nos valores canônicos do schema, independente disto.
+export type OutputLanguage = "pt-BR" | "en" | "es";
+
 export interface GenerationConfig {
   questionCount: number;
   difficulty: QuestionDifficulty;
@@ -12,6 +17,7 @@ export interface GenerationConfig {
     trueFalse: boolean;
   };
   style: ExamStyle;
+  language: OutputLanguage;
 }
 
 export interface SourceFile {

@@ -2,15 +2,17 @@ import { randomBytes } from "node:crypto";
 import type {
   ExamStyle,
   GenerationConfig,
+  OutputLanguage,
 } from "../../../domain/generation-types.js";
 import type { StyleSpec } from "./types.js";
 import { PERSONA } from "./shared/persona.js";
-import { GOLDEN_RULES } from "./shared/golden-rules.js";
+import { buildGoldenRules } from "./shared/golden-rules.js";
 import { INJECTION_DEFENSE } from "./shared/injection-defense.js";
 import { MATH_NOTATION } from "./shared/math-notation.js";
 import { BLOOM_CALIBRATION } from "./shared/bloom-calibration.js";
 import { DISTRACTOR_DISCIPLINE_BASE } from "./shared/distractor-discipline.js";
 import { buildOutputContract } from "./shared/output-contract.js";
+import { languageName } from "./shared/language.js";
 import { simpleStyle } from "./styles/simple.js";
 import { contextualStyle } from "./styles/contextual.js";
 import { analyticalStyle } from "./styles/analytical.js";
@@ -27,11 +29,14 @@ export function getStyleSpec(style: ExamStyle): StyleSpec {
   return STYLES[style];
 }
 
-export function buildSystemPrompt(style: ExamStyle): string {
+export function buildSystemPrompt(
+  style: ExamStyle,
+  language: OutputLanguage,
+): string {
   const spec = STYLES[style];
   return [
     PERSONA,
-    GOLDEN_RULES,
+    buildGoldenRules(language),
     INJECTION_DEFENSE,
     MATH_NOTATION,
     BLOOM_CALIBRATION,
@@ -39,7 +44,7 @@ export function buildSystemPrompt(style: ExamStyle): string {
     DISTRACTOR_DISCIPLINE_BASE,
     spec.distractorPattern,
     spec.explanationPattern,
-    buildOutputContract(spec),
+    buildOutputContract(spec, language),
   ].join("\n\n");
 }
 
@@ -60,6 +65,14 @@ export function buildUserPrompt(input: {
   const spec = STYLES[config.style];
   const typesLabel = typesToLabel(config.questionTypes, spec.optionCount);
   const difficultyDir = difficultyDirective(config);
+
+  // Reforço de idioma no fim do user prompt (cinto+suspensório com o
+  // golden-rules/output-contract). Só quando não é pt-BR — pra geração em
+  // português o prefixo segue byte-idêntico ao histórico (mantém o cache).
+  const languageReminder =
+    config.language === "pt-BR"
+      ? ""
+      : `\n\nIMPORTANTE: todo o conteúdo das questões (enunciado, contexto, opções e explicação) deve estar em ${languageName(config.language)}.`;
 
   const avoidBlock =
     avoidStatements && avoidStatements.length > 0
@@ -96,7 +109,7 @@ ${difficultyDir}${avoidBlock}
 
 Distribua os tipos quando mais de um for permitido. Varie o enunciado e os
 conceitos cobertos entre as questões. Nenhuma questão deve ser redundante
-com outra.`;
+com outra.${languageReminder}`;
 }
 
 function typesToLabel(

@@ -17,7 +17,8 @@ export interface EvalFixture {
   /** Por que esse fixture existe / o que ele estressa. */
   intent: string;
   material: string;
-  config: GenerationConfig;
+  // Sem `language`: o runner injeta "pt-BR" (todas as fixtures são pt-BR).
+  config: Omit<GenerationConfig, "language">;
 }
 
 const MC = { multipleChoice: true, trueFalse: false } as const;

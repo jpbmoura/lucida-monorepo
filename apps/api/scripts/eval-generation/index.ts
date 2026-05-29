@@ -30,7 +30,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { env } from "../../src/env.js";
 import { OpenAiQuestionGenerator } from "../../src/domains/ai-ops/infrastructure/openai/openai-question-generator.js";
-import type { GeneratedQuestion } from "../../src/domains/ai-ops/domain/generation-types.js";
+import type {
+  GeneratedQuestion,
+  GenerationConfig,
+} from "../../src/domains/ai-ops/domain/generation-types.js";
 import { FIXTURES } from "./fixtures.js";
 import { runStructuralChecks, type CheckResult } from "./checks.js";
 import { Judge, JUDGE_MODEL, type Verdict } from "./judge.js";
@@ -96,6 +99,8 @@ async function main() {
   const reports: FixtureReport[] = [];
 
   for (const f of fixtures) {
+    // Fixtures são todas pt-BR (material e checagens em português).
+    const config: GenerationConfig = { ...f.config, language: "pt-BR" };
     const runs: SampleRun[] = [];
     for (let s = 1; s <= samples; s++) {
       const tag = samples > 1 ? `${f.id} [${s}/${samples}]` : f.id;
@@ -104,7 +109,7 @@ async function main() {
       let usage: SampleRun["usage"];
       try {
         const result = await generator.generate({
-          config: f.config,
+          config,
           sources: [{ text: f.material, sourceLabel: "golden" }],
         });
         questions = result.questions;
@@ -121,9 +126,9 @@ async function main() {
         continue;
       }
 
-      const checks = runStructuralChecks(f.config, questions);
+      const checks = runStructuralChecks(config, questions);
       const verdicts = judge
-        ? await judge.judge(f.material, f.config, questions)
+        ? await judge.judge(f.material, config, questions)
         : undefined;
       const structFail = checks.filter((c) => !c.passed).length;
       runs.push({

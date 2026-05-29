@@ -1,7 +1,13 @@
+import type { OutputLanguage } from "../../../../domain/generation-types.js";
 import type { StyleSpec } from "../types.js";
+import { outputLanguageLine, trueFalseLabels } from "./language.js";
 
-export function buildOutputContract(spec: StyleSpec): string {
+export function buildOutputContract(
+  spec: StyleSpec,
+  language: OutputLanguage,
+): string {
   const mcCount = spec.optionCount;
+  const [trueLabel, falseLabel] = trueFalseLabels(language);
   const contextField =
     spec.contextPolicy === "required"
       ? `"context" é OBRIGATÓRIO (veja a seção ESTILO deste prompt).`
@@ -25,8 +31,8 @@ export function buildOutputContract(spec: StyleSpec): string {
 Regras do formato:
 - "correctAnswer" é o ÍNDICE (0-based) da opção correta em "options".
 - Para "multipleChoice", gere EXATAMENTE ${mcCount} opções. Uma única correta.
-- Para "trueFalse", "options" deve ser EXATAMENTE ["Verdadeiro", "Falso"].
+- Para "trueFalse", "options" deve ser EXATAMENTE ["${trueLabel}", "${falseLabel}"].
 - ${contextField}
 - Nada de comentários, markdown ou texto fora do JSON.
-- Todas as strings em português do Brasil.`;
+- ${outputLanguageLine(language)}`;
 }

@@ -17,6 +17,7 @@ import {
   buildUserPrompt,
   getStyleSpec,
 } from "./prompts/index.js";
+import { trueFalseLabels } from "./prompts/shared/language.js";
 import { estimateCredits } from "../estimate-credits.js";
 import { normalizeMathDelimiters } from "./normalize-math.js";
 
@@ -349,7 +350,13 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
     cachedInputTokens: number;
   }> {
     const spec = getStyleSpec(input.config.style);
-    const systemPrompt = buildSystemPrompt(input.config.style);
+    const systemPrompt = buildSystemPrompt(
+      input.config.style,
+      input.config.language,
+    );
+    const [trueLabel, falseLabel] = trueFalseLabels(input.config.language);
+    const expectedTrueKey = normalizeKey(trueLabel);
+    const expectedFalseKey = normalizeKey(falseLabel);
     const userPrompt = buildUserPrompt({
       config: { ...input.config, questionCount: input.requestCount },
       material: input.material,
@@ -404,16 +411,17 @@ export class OpenAiQuestionGenerator implements QuestionGenerator {
         if (q.type === "trueFalse") {
           if (
             q.options.length !== 2 ||
-            normalizeKey(q.options[0] ?? "") !== "verdadeiro" ||
-            normalizeKey(q.options[1] ?? "") !== "falso"
+            normalizeKey(q.options[0] ?? "") !== expectedTrueKey ||
+            normalizeKey(q.options[1] ?? "") !== expectedFalseKey
           ) {
             throw new AiGenerationFailedError(
               "Questão verdadeiro/falso veio com opções fora do formato esperado.",
             );
           }
-          // Canoniza grafia/acentuação — downstream (OMR/correção) espera
+          // Canoniza grafia/acentuação no idioma da prova — downstream
+          // (OMR/correção exibe verbatim; correção é por índice) espera
           // exatamente estes literais.
-          q.options = ["Verdadeiro", "Falso"];
+          q.options = [trueLabel, falseLabel];
         } else if (q.options.length !== expectedOptionCount) {
           throw new AiGenerationFailedError(
             `Questão de múltipla escolha veio com ${q.options.length} opções (esperado ${expectedOptionCount}).`,
