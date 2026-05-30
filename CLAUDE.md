@@ -44,9 +44,13 @@ Domínios já migrados:
 |---|---|
 | `iam` | Auth via **BetterAuth** (Google OAuth + email/senha + organization plugin). |
 | `class` / `student` / `exam` / `submission` | Núcleo pedagógico — turmas, alunos, provas, respostas. |
+| `course` | Catálogo de cursos do professor — agrupam turmas/provas; CRUD por dono ou organização. |
+| `lesson-plan` | Planos de aula — criação/edição, snapshots de turma/curso/disciplina, skills BNCC, exportação DOCX, duplicação/arquivo, integração com geração de provas. |
 | `ai-ops` | Geração e regeneração de questões via OpenAI; extractors PDF/DOCX/text/YouTube. |
 | `scan` | OMR (folha de respostas) — proxy para serviço Python externo. |
 | `billing` | Créditos, ledger, débito atômico, assinaturas Stripe + top-ups + webhook. |
+| `invoicing` | Emissão de NFS-e via NFE.io — disparada por transações de billing; webhook de provider (`NFEIO_*`). |
+| `finance` | Dashboard financeiro staff-only — despesas operacionais, categorização, histórico por competência. |
 | `analytics` | Visões de organização — overview, professor, turma, aluno, exam, members. |
 | `api-access` | API keys HMAC + endpoints de webhook configuráveis (público REST). |
 | `public-api` | REST externo (parceiros) — turmas, alunos, exam links, results. |
@@ -57,6 +61,7 @@ Domínios já migrados:
 | `organization-preferences` | Preferências por organização. |
 | `roadmap` | Suggest + voting público; CRUD pra staff. |
 | `support` | Form de contato (`/app/ajuda`) → email via Resend. |
+| `tickets` | Suporte por email — inbound via Resend Inbound (`TICKETS_INBOUND_SECRET`), threading, fila staff no Kintal (distinto do form simples de `support`). |
 
 Stack: `express` 5, `mongoose` 8, `better-auth`, `zod`, `stripe`, `openai`, `resend`,
 `multer`, `pdf-parse`, `mammoth`, `docx`, `youtube-transcript`, `cors`. Dev: `tsx`, `tsc-alias`, `vitest`.
@@ -73,7 +78,8 @@ Defaults:
 - **Server Actions** para mutations, **TanStack Query** para dados client-side.
 - **react-hook-form + Zod** para forms.
 - **Zustand** para estado global de UI; **Recharts** para gráficos; **dnd-kit** para drag-and-drop;
-  **motion** (Framer) para animação; **Shiki** para syntax highlighting nos docs.
+  **motion** (Framer) para animação; **Shiki** para syntax highlighting nos docs; **KaTeX** para
+  fórmulas matemáticas; **pdfjs-dist** para render/extração de PDF no client.
 
 Tokens da marca (azul `#007AFF`, Poppins + Instrument Serif) em
 [`apps/web/src/styles/globals.css`](apps/web/src/styles/globals.css) via `@theme` do Tailwind v4.
@@ -84,9 +90,10 @@ Topologia de rotas — usa route groups e folders top-level pra separar layouts:
 |---|---|
 | `(marketing)` | Landing pública (`/`, `/precos`, `/contact`, `/privacidade`, `/termos`). |
 | `(auth)` | `/sign-in`, `/sign-up`, `/organizacoes/*` (login institucional). |
-| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]`, `/app/turmas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/ajuda`, `/app/analises`. |
+| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]`, `/app/turmas`, `/app/cursos`, `/app/aulas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/ajuda`, `/app/analises`. |
 | `analytics/` | Dashboard de organização (admin de instituição) — `professores`, `desenvolvedores`, `notificacoes`, `configuracoes`, `ajuda`. |
 | `kintal/` | Backoffice interno (staff-only) — `(app)` + `entrar`. |
+| `auxiliar/` | Seletor de conta pra atendentes/assistentes (`auxiliar/escolher`) — atuar em nome de um professor supervisionado. |
 | `roadmap/` | Roadmap público com voting. |
 | `exam/[shareId]` | Página pública pra aluno responder a prova. |
 | `print/exams/[id]` | Versão imprimível da prova. |
@@ -152,7 +159,9 @@ Vivem em [`apps/api/scripts/`](apps/api/scripts/) e rodam via `pnpm --filter @lu
 | `seed:test-org` | Cria organização de teste com dados sintéticos. |
 | `seed:roadmap` | Popula itens iniciais do roadmap. |
 | `backfill:student-org` / `backfill:class-org` | Preenche `organizationId` retroativo. |
+| `backfill:courses` | Preenche dados de curso retroativos em turmas/provas. |
 | `billing:add-org-credits` | Concede créditos manuais para uma org. |
+| `eval:generation` | Roda avaliação (eval) da geração de questões do `ai-ops`. |
 
 Há também utilitários soltos em `.mjs` na mesma pasta (`promote-staff.mjs`,
 `reset-password.mjs`, `inspect-accounts.mjs`, `export-user-exam-links.mjs`) — rodar
