@@ -26,6 +26,11 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL: z.string().min(1).default("gpt-4.1-mini"),
 
+  // Pexels — busca de imagens de stock pros slides (módulo Apresentações).
+  // Opcional: sem a key, o ImageProvider devolve [] e os slides caem pra
+  // tipografia/tema (degradação graciosa). Default 200 req/h, 20k/mês.
+  PEXELS_API_KEY: z.string().optional(),
+
   // URL do serviço Python lucida-omr (OMRChecker). Sem isso a feature
   // de scanner fica indisponível — o endpoint devolve 502 via OmrServiceError.
   OMR_SERVICE_URL: z.string().url().optional(),

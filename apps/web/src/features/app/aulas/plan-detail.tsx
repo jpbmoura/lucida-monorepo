@@ -172,7 +172,14 @@ export function PlanDetail({ plan }: PlanDetailProps) {
         <p className="mt-1 text-[13px] text-gray-600">
           Transforme este plano em avaliação ou material, sem recomeçar do zero.
         </p>
-        <HandoffButtons classId={plan.classId} planId={plan.id} className="mt-4" />
+        <HandoffButtons
+          classId={plan.classId}
+          planId={plan.id}
+          planTitle={plan.identification.title}
+          planSubject={plan.identification.subject}
+          planLevel={plan.identification.level}
+          className="mt-4"
+        />
         {plan.generatedExamId && (
           <p className="mt-3 text-xs text-emerald-700">
             ✓ Já existe uma prova gerada a partir deste plano.

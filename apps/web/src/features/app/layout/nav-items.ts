@@ -21,7 +21,7 @@ export const FERRAMENTAS: SidebarNavItem[] = [
   // "Nova aula" não navega — abre dialog pra escolher a turma e daí vai pro
   // wizard de plano de aula. Ver NewLessonPlanSidebarRow + NewLessonPlanDialog.
   { label: "Nova aula", action: "new-lesson-plan", icon: "book" },
-  { label: "Novo Slide", icon: "presentation", disabled: true },
+  { label: "Apresentações", href: "/app/apresentacoes", icon: "presentation" },
 ];
 
 export const CONTA: SidebarNavItem[] = [

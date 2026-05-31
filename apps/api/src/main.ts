@@ -83,6 +83,23 @@ import { EstimateLessonPlanUseCase } from "@/domains/ai-ops/application/estimate
 import { AiController } from "@/domains/ai-ops/presentation/ai-controller.js";
 import { LessonPlanAiController } from "@/domains/ai-ops/presentation/lesson-plan-ai-controller.js";
 import { makeAiRouter } from "@/domains/ai-ops/presentation/ai-routes.js";
+import { OpenAiSlideDeckGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-slide-deck-generator.js";
+import { PexelsImageProvider } from "@/domains/ai-ops/infrastructure/images/pexels-image-provider.js";
+import { UnavailableImageProvider } from "@/domains/ai-ops/infrastructure/images/unavailable-image-provider.js";
+import { GenerateDeckUseCase } from "@/domains/ai-ops/application/generate-deck.js";
+import { RegenerateSlideUseCase } from "@/domains/ai-ops/application/regenerate-slide.js";
+import { EstimateDeckCreditsUseCase } from "@/domains/ai-ops/application/estimate-deck-credits.js";
+import { SlideDeckAiController } from "@/domains/ai-ops/presentation/slide-deck-ai-controller.js";
+
+import { MongooseSlideDeckRepository } from "@/domains/slide-deck/infrastructure/mongoose-slide-deck-repository.js";
+import { CreateSlideDeckUseCase } from "@/domains/slide-deck/application/create-slide-deck.js";
+import { GetSlideDeckUseCase } from "@/domains/slide-deck/application/get-slide-deck.js";
+import { ListSlideDecksUseCase } from "@/domains/slide-deck/application/list-slide-decks.js";
+import { UpdateSlideDeckUseCase } from "@/domains/slide-deck/application/update-slide-deck.js";
+import { ReorderSlidesUseCase } from "@/domains/slide-deck/application/reorder-slides.js";
+import { DeleteSlideDeckUseCase } from "@/domains/slide-deck/application/delete-slide-deck.js";
+import { SlideDeckController } from "@/domains/slide-deck/presentation/slide-deck-controller.js";
+import { makeSlideDeckRouter } from "@/domains/slide-deck/presentation/slide-deck-routes.js";
 
 import { MongooseLessonPlanRepository } from "@/domains/lesson-plan/infrastructure/mongoose-lesson-plan-repository.js";
 import { DocxLessonPlanBuilderImpl } from "@/domains/lesson-plan/infrastructure/docx-lesson-plan-builder.js";
@@ -569,6 +586,44 @@ export async function buildApp(): Promise<Express> {
       lessonPlanRepository,
       new DocxLessonPlanBuilderImpl(),
     ),
+  });
+
+  // --- slide-deck generation (módulo "Apresentações") ---
+  const slideDeckGenerator = new OpenAiSlideDeckGenerator();
+  // Sem PEXELS_API_KEY, o provider no-op devolve [] e os slides caem pra
+  // tipografia (degradação graciosa — mesmo padrão do UnavailableOmrClient).
+  const imageProvider = env.PEXELS_API_KEY
+    ? new PexelsImageProvider(env.PEXELS_API_KEY)
+    : new UnavailableImageProvider();
+  const slideDeckAiController = new SlideDeckAiController({
+    generateDeck: new GenerateDeckUseCase(
+      extractors,
+      transcriptFetcher,
+      slideDeckGenerator,
+      billingService,
+      imageProvider,
+    ),
+    regenerateSlide: new RegenerateSlideUseCase(
+      extractors,
+      transcriptFetcher,
+      slideDeckGenerator,
+      billingService,
+      imageProvider,
+    ),
+    estimateDeckCredits: new EstimateDeckCreditsUseCase(),
+    lessonPlans: lessonPlanRepository,
+    imageProvider,
+  });
+
+  // --- slide-deck persistence (módulo "Apresentações") ---
+  const slideDeckRepository = new MongooseSlideDeckRepository();
+  const slideDeckController = new SlideDeckController({
+    createSlideDeck: new CreateSlideDeckUseCase(slideDeckRepository),
+    getSlideDeck: new GetSlideDeckUseCase(slideDeckRepository),
+    listSlideDecks: new ListSlideDecksUseCase(slideDeckRepository),
+    updateSlideDeck: new UpdateSlideDeckUseCase(slideDeckRepository),
+    reorderSlides: new ReorderSlidesUseCase(slideDeckRepository),
+    deleteSlideDeck: new DeleteSlideDeckUseCase(slideDeckRepository),
   });
 
   // --- webhook dispatcher (precisa existir antes do submission/scan
@@ -1156,8 +1211,10 @@ export async function buildApp(): Promise<Express> {
       requireAuth,
       controller: aiController,
       lessonPlanController: lessonPlanAiController,
+      slideDeckController: slideDeckAiController,
     }),
     makeLessonPlanRouter({ requireAuth, controller: lessonPlanController }),
+    makeSlideDeckRouter({ requireAuth, controller: slideDeckController }),
     makePublicSubmissionRouter({ controller: submissionController }),
     makeAuthedSubmissionRouter({ requireAuth, controller: submissionController }),
     makeScanRouter({ requireAuth, controller: scanController }),

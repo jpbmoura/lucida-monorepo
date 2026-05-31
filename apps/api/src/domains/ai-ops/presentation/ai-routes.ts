@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import type { AiController } from "./ai-controller.js";
 import type { LessonPlanAiController } from "./lesson-plan-ai-controller.js";
+import type { SlideDeckAiController } from "./slide-deck-ai-controller.js";
 
 // Memory storage — sem temp files, buffers vivem só durante a request.
 // Limite de 25 MB por arquivo, até 10 arquivos simultâneos.
@@ -17,10 +18,12 @@ export function makeAiRouter({
   requireAuth,
   controller,
   lessonPlanController,
+  slideDeckController,
 }: {
   requireAuth: RequestHandler;
   controller: AiController;
   lessonPlanController: LessonPlanAiController;
+  slideDeckController: SlideDeckAiController;
 }): Router {
   const router = Router();
   router.post(
@@ -88,5 +91,26 @@ export function makeAiRouter({
     upload.array("files"),
     lessonPlanController.estimateLessonPlan,
   );
+
+  // --- Apresentações / slides (módulo "Apresentações") ---
+  router.post(
+    "/v1/ai/generate-deck",
+    requireAuth,
+    upload.array("files"),
+    slideDeckController.generateDeck,
+  );
+  router.post(
+    "/v1/ai/regenerate-slide",
+    requireAuth,
+    upload.array("files"),
+    slideDeckController.regenerateSlide,
+  );
+  router.post(
+    "/v1/ai/estimate-deck",
+    requireAuth,
+    upload.array("files"),
+    slideDeckController.estimateDeck,
+  );
+  router.get("/v1/ai/images", requireAuth, slideDeckController.searchImages);
   return router;
 }

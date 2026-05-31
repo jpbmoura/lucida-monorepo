@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileQuestion, Sparkles } from "lucide-react";
+import { FileQuestion, Presentation, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,10 @@ interface HandoffButtonsProps {
   /** Compacto pros cards da biblioteca; padrão pra tela final do plano. */
   size?: "sm" | "md";
   className?: string;
+  /** Quando presente, mostra "Gerar apresentação" (handoff pro módulo Slides). */
+  planTitle?: string;
+  planSubject?: string;
+  planLevel?: string;
 }
 
 // Handoff Plano → ecossistema. "Gerar prova" leva ao wizard de provas
@@ -21,7 +25,16 @@ export function HandoffButtons({
   planId,
   size = "md",
   className,
+  planTitle,
+  planSubject,
+  planLevel,
 }: HandoffButtonsProps) {
+  const slidesHref = planTitle
+    ? `/app/apresentacoes/nova?lessonPlanId=${planId}&title=${encodeURIComponent(planTitle)}` +
+      (planSubject ? `&subject=${encodeURIComponent(planSubject)}` : "") +
+      (planLevel ? `&gradeLevel=${encodeURIComponent(planLevel)}` : "")
+    : null;
+
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <Button asChild variant="primary" size={size}>
@@ -30,6 +43,14 @@ export function HandoffButtons({
           Gerar prova
         </Link>
       </Button>
+      {slidesHref && (
+        <Button asChild variant="outline" size={size}>
+          <Link href={slidesHref}>
+            <Presentation className="size-4" />
+            Gerar apresentação
+          </Link>
+        </Button>
+      )}
       <Button
         variant="outline"
         size={size}

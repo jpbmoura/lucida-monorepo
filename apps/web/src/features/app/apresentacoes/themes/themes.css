@@ -1,0 +1,128 @@
+/* Bundles de design tokens dos 5 temas de slide. Conteúdo × aparência são
+   desacoplados: os componentes de layout leem estas CSS vars; trocar o tema é
+   trocar a classe .deck-theme-* no container. Nenhuma marca Lucida aqui. */
+
+.deck-canvas {
+  /* Tipografia auto-escala via container query units (cqi) — nunca estoura
+     nem aperta, em qualquer tamanho. */
+  container-type: size;
+  background-color: var(--deck-bg);
+  background-image: var(--deck-pattern, none);
+  color: var(--deck-ink);
+  font-family: var(--deck-body);
+  /* Imprime as cores do tema (PPTX/PDF fiéis). */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Raiz de fit: 1em == 1cqi quando --deck-fit=1. O AutoFit reduz --deck-fit até
+   o conteúdo caber no quadro (garante que nunca corta). Como tudo é em (relativo
+   a cqi), o fator é invariante ao tamanho — vale em miniatura, preview e print. */
+.deck-fit-root {
+  font-size: calc(1cqi * var(--deck-fit, 1));
+}
+
+.deck-canvas .deck-display {
+  font-family: var(--deck-display);
+}
+.deck-canvas .deck-mono {
+  font-family: var(--deck-mono, var(--font-jetbrains-mono), monospace);
+}
+
+/* ───────── papel — exatas e ciências (sóbrio, foco em fórmula) ───────── */
+.deck-theme-papel {
+  --deck-bg: #f4efe3;
+  --deck-surface: #fbf7ee;
+  --deck-ink: #1b2a24;
+  --deck-muted: #5c6b62;
+  --deck-accent: #0e8c6f;
+  --deck-accent-2: #e1683a;
+  --deck-on-accent: #ffffff;
+  --deck-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --deck-body: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --deck-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --deck-radius: 0.9cqi;
+  --deck-shadow: 0 1.2cqi 3cqi -1cqi rgb(27 42 36 / 0.18);
+  --deck-pattern: linear-gradient(rgb(27 42 36 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(27 42 36 / 0.04) 1px, transparent 1px);
+  --deck-pattern-size: 4cqi 4cqi;
+}
+
+/* ───────── minimo — ensino médio / conteúdo denso (tipográfico) ───────── */
+.deck-theme-minimo {
+  --deck-bg: #fbfaf7;
+  --deck-surface: #ffffff;
+  --deck-ink: #15161a;
+  --deck-muted: #6c6e78;
+  --deck-accent: #8a8d94;
+  --deck-accent-2: #b0542e;
+  --deck-on-accent: #ffffff;
+  --deck-display: var(--font-newsreader), ui-serif, Georgia, serif;
+  --deck-body: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --deck-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --deck-radius: 0.4cqi;
+  --deck-shadow: none;
+  --deck-pattern: none;
+}
+
+/* ───────── lousa — faculdade / sala escura (fundo escuro, pontos) ───────── */
+.deck-theme-lousa {
+  --deck-bg: #13171b;
+  --deck-surface: #1b2127;
+  --deck-ink: #e9eef2;
+  --deck-muted: #97a4ae;
+  --deck-accent: #2dd4bf;
+  --deck-accent-2: #f2b33d;
+  --deck-on-accent: #06231f;
+  --deck-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --deck-body: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --deck-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --deck-radius: 0.7cqi;
+  --deck-shadow: none;
+  --deck-pattern: radial-gradient(rgb(233 238 242 / 0.07) 1px, transparent 1px);
+  --deck-pattern-size: 3cqi 3cqi;
+}
+
+/* ───────── ludico — anos iniciais (formas amigáveis, cantos grandes) ───── */
+.deck-theme-ludico {
+  --deck-bg: #fff7e8;
+  --deck-surface: #ffffff;
+  --deck-ink: #2a2140;
+  --deck-muted: #6b6385;
+  --deck-accent: #ff8a3d;
+  --deck-accent-2: #3da5ff;
+  --deck-on-accent: #ffffff;
+  --deck-display: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --deck-body: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --deck-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --deck-radius: 2.4cqi;
+  --deck-shadow: 0 1.6cqi 4cqi -1cqi rgb(42 33 64 / 0.16);
+  --deck-pattern: none;
+}
+
+/* ───────── vivido — humanas e línguas (ousado, keynote) ───────── */
+.deck-theme-vivido {
+  --deck-bg: #f6f7fb;
+  --deck-surface: #ffffff;
+  --deck-ink: #0e1a2b;
+  --deck-muted: #5a6678;
+  --deck-accent: #2348f0;
+  --deck-accent-2: #ff4d6d;
+  --deck-on-accent: #ffffff;
+  --deck-display: var(--font-unbounded), ui-sans-serif, system-ui, sans-serif;
+  --deck-body: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --deck-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --deck-radius: 1.3cqi;
+  --deck-shadow: 0 2cqi 5cqi -1.5cqi rgb(14 26 43 / 0.22);
+  --deck-pattern: none;
+}
+
+.deck-canvas {
+  background-size: var(--deck-pattern-size, auto);
+}
+
+/* KaTeX herda a cor do tema (em vez do preto padrão). */
+.deck-canvas .katex {
+  color: var(--deck-ink);
+  font-size: 1em;
+}
