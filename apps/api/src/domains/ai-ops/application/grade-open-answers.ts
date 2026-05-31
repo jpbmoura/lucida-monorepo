@@ -9,10 +9,7 @@ import {
   type OpenGradeCriterionResult,
 } from "@/domains/submission/domain/open-grade.js";
 import type { BillingService } from "@/domains/billing/application/billing-service.js";
-import {
-  priceGradeAnswer,
-  type GradeAnswerCost,
-} from "../domain/grading-pricing.js";
+import { priceGradeAnswer } from "../domain/grading-pricing.js";
 import type { OpenAnswerGrader } from "../domain/grading-types.js";
 
 export interface GradingProgress {
@@ -41,7 +38,6 @@ interface WorkItem {
   rubric: Rubric;
   answer: string;
   blank: boolean;
-  cost: GradeAnswerCost;
 }
 
 /**
@@ -89,20 +85,13 @@ export class GradeOpenAnswersUseCase {
         if (!q || q.type !== "open" || !q.rubric) continue;
         const answer = sub.textAnswers[qi] ?? "";
         const blank = answer.trim() === "";
-        const cost: GradeAnswerCost = {
-          criteriaCount: q.rubric.criteria.length,
-          answerChars: answer.length,
-          rubricChars: JSON.stringify(q.rubric.toJSON()).length,
-          referenceChars: q.referenceAnswer?.length ?? 0,
-        };
-        if (!blank) totalEstimate += priceGradeAnswer(cost);
+        if (!blank) totalEstimate += priceGradeAnswer();
         items.push({
           questionIndex: qi,
           question: q,
           rubric: q.rubric,
           answer,
           blank,
-          cost,
         });
       }
       if (items.length > 0) {
@@ -166,7 +155,7 @@ export class GradeOpenAnswersUseCase {
         await this.billing.debit({
           userId: input.ownerId,
           activeOrganizationId: input.activeOrganizationId,
-          amount: priceGradeAnswer(item.cost),
+          amount: priceGradeAnswer(),
           reason: "ai_consumption",
           relatedAction: "grade_open_answer",
           tokensUsed: result.inputTokens + result.outputTokens,
@@ -177,7 +166,7 @@ export class GradeOpenAnswersUseCase {
             ...(isImpersonating && { impersonatedBy: input.actorRealUserId }),
           },
         });
-        creditsSpent += priceGradeAnswer(item.cost);
+        creditsSpent += priceGradeAnswer();
         gradedAnswers++;
       }
 

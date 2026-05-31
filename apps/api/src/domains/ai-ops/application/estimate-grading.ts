@@ -2,10 +2,7 @@ import { ExamId } from "@/domains/exam/domain/exam-id.js";
 import { ExamNotFoundError } from "@/domains/exam/domain/exam-errors.js";
 import type { ExamRepository } from "@/domains/exam/domain/exam-repository.js";
 import type { SubmissionRepository } from "@/domains/submission/domain/submission-repository.js";
-import {
-  priceGradeBatch,
-  type GradeAnswerCost,
-} from "../domain/grading-pricing.js";
+import { priceGradeBatch } from "../domain/grading-pricing.js";
 
 interface Input {
   examId: string;
@@ -48,19 +45,10 @@ export class EstimateGradingUseCase {
       return { estimatedCredits: 0, totalAnswers: 0, perStudent: [] };
     }
 
-    // Metadados de custo por questão discursiva (rubrica + resposta-modelo).
-    const meta = new Map<
-      number,
-      { criteriaCount: number; rubricChars: number; referenceChars: number }
-    >();
+    // Índices das questões discursivas (com rubrica) — preço é fixo por questão.
+    const openIndices = new Set<number>();
     exam.questions.forEach((q, i) => {
-      if (q.type === "open" && q.rubric) {
-        meta.set(i, {
-          criteriaCount: q.rubric.criteria.length,
-          rubricChars: JSON.stringify(q.rubric.toJSON()).length,
-          referenceChars: q.referenceAnswer?.length ?? 0,
-        });
-      }
+      if (q.type === "open" && q.rubric) openIndices.add(i);
     });
 
     const filter = input.submissionIds
@@ -78,28 +66,22 @@ export class EstimateGradingUseCase {
 
     for (const sub of subs) {
       const graded = new Set(sub.openGrades.map((g) => g.questionIndex));
-      const costs: GradeAnswerCost[] = [];
+      let count = 0;
       for (const qi of sub.openQuestionIndices) {
         if (graded.has(qi)) continue; // já corrigida (rascunho ou aprovada)
-        const m = meta.get(qi);
-        if (!m) continue;
+        if (!openIndices.has(qi)) continue;
         const answer = sub.textAnswers[qi] ?? "";
         if (answer.trim() === "") continue; // branco é corrigido de graça (0)
-        costs.push({
-          criteriaCount: m.criteriaCount,
-          answerChars: answer.length,
-          rubricChars: m.rubricChars,
-          referenceChars: m.referenceChars,
-        });
+        count++;
       }
-      if (costs.length === 0) continue;
-      totalAnswers += costs.length;
+      if (count === 0) continue;
+      totalAnswers += count;
       perStudent.push({
         submissionId: sub.id.toString(),
         studentName: sub.studentName,
         studentCode: sub.studentCode,
-        answers: costs.length,
-        credits: priceGradeBatch(costs),
+        answers: count,
+        credits: priceGradeBatch(count),
       });
     }
 

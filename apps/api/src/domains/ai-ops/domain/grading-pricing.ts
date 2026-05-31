@@ -1,45 +1,24 @@
-// Preço da CORREÇÃO de discursivas por IA.
+// Preço da CORREÇÃO de discursivas por IA — valor FIXO por questão corrigida.
 //
-// Diferente da geração (tabelada por estilo×qtd), a correção é N chamadas — uma
-// por resposta de aluno — e cada uma carrega rubrica + resposta-modelo + resposta
-// do aluno no input. O custo varia com o TAMANHO da resposta, então estimamos
-// contra o consumo real: como as respostas já estão no banco, dá pra prever o
-// custo antes de rodar e cobrar exatamente o estimado (estimativa == débito).
+// Tabelado e determinístico (igual à geração de provas): o custo é uma função
+// pura da QUANTIDADE de respostas corrigidas, independente do tamanho da
+// resposta ou da rubrica. Como a mesma quantidade gera o mesmo preço na
+// cotação, no pré-check e no débito, o valor cobrado é EXATAMENTE o estimado.
 //
-// Mantém a régua histórica de 1 crédito a cada 5,5 tokens (estimate-credits.ts).
+// Respostas em branco NÃO pagam — não há chamada de IA (nível 0 direto).
+// Cobrança por questão efetivamente corrigida.
+//
+// Único lugar onde o preço da correção mora — qualquer recalibração mexe só aqui.
 
-const TOKENS_PER_CREDIT = 5.5;
-const CHARS_PER_TOKEN = 4;
-/** Overhead fixo do prompt (persona + injection defense + instruções). */
-const PROMPT_OVERHEAD_TOKENS = 350;
-/** Saída por critério: nível + justificativa curta + feedback. */
-const OUTPUT_TOKENS_PER_CRITERION = 70;
-const MIN_CREDITS_PER_ANSWER = 1;
+/** Custo fixo, em créditos, por questão discursiva corrigida pela IA. */
+export const CREDITS_PER_GRADED_ANSWER = 30;
 
-export interface GradeAnswerCost {
-  criteriaCount: number;
-  answerChars: number;
-  rubricChars: number;
-  referenceChars?: number;
+/** Preço de corrigir UMA resposta (não-branca). */
+export function priceGradeAnswer(): number {
+  return CREDITS_PER_GRADED_ANSWER;
 }
 
-/** Preço exato de corrigir UMA resposta (estimativa == débito). */
-export function priceGradeAnswer(input: GradeAnswerCost): number {
-  const inputTokens =
-    PROMPT_OVERHEAD_TOKENS +
-    Math.ceil(
-      (input.rubricChars + input.answerChars + (input.referenceChars ?? 0)) /
-        CHARS_PER_TOKEN,
-    );
-  const outputTokens =
-    OUTPUT_TOKENS_PER_CRITERION * Math.max(1, input.criteriaCount);
-  return Math.max(
-    MIN_CREDITS_PER_ANSWER,
-    Math.ceil((inputTokens + outputTokens) / TOKENS_PER_CREDIT),
-  );
-}
-
-/** Preço total de corrigir um lote de respostas. */
-export function priceGradeBatch(answers: GradeAnswerCost[]): number {
-  return answers.reduce((sum, a) => sum + priceGradeAnswer(a), 0);
+/** Preço de corrigir um lote de N respostas (não-brancas). */
+export function priceGradeBatch(answerCount: number): number {
+  return CREDITS_PER_GRADED_ANSWER * Math.max(0, answerCount);
 }
