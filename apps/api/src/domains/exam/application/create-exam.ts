@@ -5,6 +5,7 @@ import {
   type SecurityLevel,
 } from "../domain/exam.js";
 import { Question, type QuestionDifficulty, type QuestionType } from "../domain/question.js";
+import type { RubricData } from "../domain/rubric.js";
 import type { ExamRepository } from "../domain/exam-repository.js";
 import { ClassId } from "@/domains/class/domain/class-id.js";
 import { ClassNotFoundError } from "@/domains/class/domain/class-errors.js";
@@ -22,10 +23,12 @@ export interface CreateExamInput {
     type: QuestionType;
     statement: string;
     context?: string | null;
-    options: string[];
-    correctAnswer: number;
+    options?: string[];
+    correctAnswer?: number;
     explanation?: string;
     difficulty: QuestionDifficulty;
+    rubric?: RubricData | null;
+    referenceAnswer?: string | null;
   }>;
   usage?: ExamUsage | null;
 }
@@ -56,6 +59,8 @@ export class CreateExamUseCase {
         correctAnswer: q.correctAnswer,
         explanation: q.explanation ?? "",
         difficulty: q.difficulty,
+        rubric: q.rubric ?? null,
+        referenceAnswer: q.referenceAnswer ?? null,
       }),
     );
 

@@ -102,22 +102,57 @@ export function StepConfig({ onGenerate }: StepConfigProps) {
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="flex flex-col gap-3">
-          <Label htmlFor="question-count">Quantidade de questões</Label>
-          <div className="flex items-center gap-3">
-            <input
-              id="question-count"
-              type="range"
-              min={1}
-              max={50}
-              value={config.questionCount}
-              onChange={(e) => setConfig({ questionCount: Number(e.target.value) })}
-              className="flex-1 accent-brand-primary"
-            />
-            <span className="w-10 text-right text-lg font-medium tabular-nums text-ink">
-              {config.questionCount}
-            </span>
-          </div>
+        <div className="flex flex-col gap-4">
+          {(config.questionTypes.multipleChoice ||
+            config.questionTypes.trueFalse) && (
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="question-count">Quantidade de objetivas</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="question-count"
+                  type="range"
+                  min={1}
+                  max={50}
+                  value={config.questionCount}
+                  onChange={(e) =>
+                    setConfig({ questionCount: Number(e.target.value) })
+                  }
+                  className="flex-1 accent-brand-primary"
+                />
+                <span className="w-10 text-right text-lg font-medium tabular-nums text-ink">
+                  {config.questionCount}
+                </span>
+              </div>
+            </div>
+          )}
+          {config.questionTypes.open && (
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="open-count">Quantidade de discursivas</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="open-count"
+                  type="range"
+                  min={1}
+                  max={30}
+                  value={config.openQuestionCount}
+                  onChange={(e) =>
+                    setConfig({ openQuestionCount: Number(e.target.value) })
+                  }
+                  className="flex-1 accent-brand-primary"
+                />
+                <span className="w-10 text-right text-lg font-medium tabular-nums text-ink">
+                  {config.openQuestionCount}
+                </span>
+              </div>
+            </div>
+          )}
+          {!config.questionTypes.multipleChoice &&
+            !config.questionTypes.trueFalse &&
+            !config.questionTypes.open && (
+              <p className="text-xs text-gray-400">
+                Selecione ao menos um tipo de questão.
+              </p>
+            )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -163,6 +198,16 @@ export function StepConfig({ onGenerate }: StepConfigProps) {
               }
               label="Verdadeiro ou falso"
               hint="Resposta binária"
+            />
+            <TypeCheckbox
+              checked={config.questionTypes.open}
+              onChange={(v) =>
+                setConfig({
+                  questionTypes: { ...config.questionTypes, open: v },
+                })
+              }
+              label="Discursiva (com rubrica)"
+              hint="Resposta escrita; a IA gera a rubrica de correção"
             />
           </div>
         </div>

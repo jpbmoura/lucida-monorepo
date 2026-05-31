@@ -36,3 +36,20 @@ export function priceExam(config: Pick<GenerationConfig, "style" | "questionCoun
 export function priceRegenerate(config: Pick<GenerationConfig, "style">): number {
   return PER_QUESTION[config.style];
 }
+
+/**
+ * Custo por questão discursiva gerada. Mais caro que objetiva: a saída carrega
+ * enunciado + resposta-modelo + rubrica inteira (critérios × níveis), bem mais
+ * verbosa. Independe do estilo das objetivas.
+ */
+const PER_OPEN_QUESTION = 60;
+
+/** Preço exato de gerar uma prova de N questões discursivas + rubrica. */
+export function priceOpenExam(questionCount: number): number {
+  return BASE_CREDITS + PER_OPEN_QUESTION * questionCount;
+}
+
+/** Preço de regerar 1 questão discursiva — só o custo marginal, sem base. */
+export function priceRegenerateOpen(): number {
+  return PER_OPEN_QUESTION;
+}

@@ -1,24 +1,27 @@
 "use client";
 
-import { CheckCircle2, XCircle, MinusCircle, Trophy } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, Trophy, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RichText } from "@/components/rich-text";
-import type { PublicExamDTO, SubmitExamResponse } from "../types";
+import type { PublicExamDTO, ResultView } from "../types";
 
 interface ResultScreenProps {
   exam: PublicExamDTO;
   studentName: string;
   answers: Array<number | null>;
-  result: SubmitExamResponse;
+  textAnswers: Array<string | null>;
+  result: ResultView;
 }
 
 export function ResultScreen({
   exam,
   studentName,
   answers,
+  textAnswers,
   result,
 }: ResultScreenProps) {
   const percentage = Math.round((result.correctCount / result.questionCount) * 100);
+  const awaitingGrading = result.gradingStatus === "pending";
 
   return (
     <div className="flex flex-col gap-10 pb-16">
@@ -49,6 +52,13 @@ export function ResultScreen({
         <p className="text-xs text-gray-500">
           {result.correctCount} de {result.questionCount} · {percentage}% de acerto
         </p>
+
+        {awaitingGrading && (
+          <p className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+            <Clock className="size-3.5" />
+            Nota parcial — questões discursivas aguardando correção do professor.
+          </p>
+        )}
       </header>
 
       <section className="flex flex-col gap-3">
@@ -57,6 +67,96 @@ export function ResultScreen({
         </div>
         <ol className="flex flex-col gap-3">
           {exam.questions.map((q, i) => {
+            const qType = result.questionResults[i]?.type ?? q.type;
+
+            // Discursiva: mostra a resposta digitada. Se já corrigida, mostra a
+            // rubrica (nível + feedback por critério) e a fração obtida (P-B);
+            // senão, selo de pendência.
+            if (qType === "open") {
+              const typed = textAnswers[i];
+              const hasAnswer =
+                typeof typed === "string" && typed.trim().length > 0;
+              const grade = result.questionResults[i]?.grade ?? null;
+              const pct =
+                grade && grade.max > 0
+                  ? Math.round((grade.earned / grade.max) * 100)
+                  : 0;
+              return (
+                <li
+                  key={i}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-2xl border bg-white p-5",
+                    grade ? "border-emerald-200" : "border-amber-200",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-6 place-items-center rounded-lg bg-gray-50 font-serif text-xs italic text-gray-500">
+                      {i + 1}
+                    </span>
+                    {grade ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-emerald-700">
+                        <CheckCircle2 className="size-3" />
+                        Corrigida · {grade.earned}/{grade.max} ({pct}%)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-amber-700">
+                        <Clock className="size-3" />
+                        Aguardando correção
+                      </span>
+                    )}
+                  </div>
+
+                  {q.context && (
+                    <p className="rounded-xl border border-gray-100 bg-gray-50/60 px-3.5 py-2.5 text-sm leading-relaxed text-gray-600">
+                      <RichText text={q.context} />
+                    </p>
+                  )}
+                  <p className="text-sm font-medium leading-relaxed text-ink">
+                    <RichText text={q.statement} />
+                  </p>
+
+                  <div className="rounded-xl border border-gray-100 bg-gray-50/40 px-3.5 py-3 text-[13px] leading-relaxed">
+                    <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                      Sua resposta
+                    </div>
+                    {hasAnswer ? (
+                      <p className="whitespace-pre-wrap text-gray-700">{typed}</p>
+                    ) : (
+                      <p className="italic text-gray-400">Em branco</p>
+                    )}
+                  </div>
+
+                  {grade && grade.criteria.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                        Correção por critério
+                      </div>
+                      {grade.criteria.map((c, ci) => (
+                        <div
+                          key={ci}
+                          className="rounded-xl border border-gray-100 px-3.5 py-2.5"
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-[13px] font-medium text-ink">
+                              {c.name}
+                            </span>
+                            <span className="shrink-0 text-[11px] tabular-nums text-gray-500">
+                              {c.levelLabel} · {c.points}/{c.maxPoints}
+                            </span>
+                          </div>
+                          {c.feedback && (
+                            <p className="mt-1 text-[13px] leading-relaxed text-gray-600">
+                              {c.feedback}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            }
+
             const studentAnswer = answers[i];
             const correct = result.questionResults[i]?.correctAnswer;
             const explanation = result.questionResults[i]?.explanation;

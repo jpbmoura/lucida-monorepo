@@ -13,6 +13,8 @@ import type {
   IntegrityFlags,
   PreviousSubmissionDTO,
   PublicExamDTO,
+  PublicResultDTO,
+  ResultView,
   SubmissionEndReason,
   SubmitExamResponse,
 } from "./types";
@@ -56,6 +58,7 @@ interface PublicExamProps {
 
 interface SubmitPayload {
   answers: Array<number | null>;
+  textAnswers: Array<string | null>;
   endReason: SubmissionEndReason;
   integrityFlags: IntegrityFlags;
 }
@@ -87,7 +90,8 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
         : null,
     );
   const [answers, setAnswers] = useState<Array<number | null>>([]);
-  const [result, setResult] = useState<SubmitExamResponse | null>(null);
+  const [textAnswers, setTextAnswers] = useState<Array<string | null>>([]);
+  const [result, setResult] = useState<ResultView | null>(null);
 
   async function handleCodeSubmit(code: string) {
     const data = await runBegin({
@@ -141,6 +145,7 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
         body: JSON.stringify({
           submissionId: session.submissionId,
           answers: payload.answers,
+          textAnswers: payload.textAnswers,
           endReason: payload.endReason,
           integrityFlags: payload.integrityFlags,
         }),
@@ -152,6 +157,27 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
     }
     const { data } = (await res.json()) as { data: SubmitExamResponse };
     setAnswers(payload.answers);
+    setTextAnswers(payload.textAnswers);
+    setResult(data);
+    setStep("result");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Revisita: busca o resultado completo (inclui a correção das discursivas,
+  // se já feita) e mostra a tela de resultado.
+  async function handleViewResult(submissionId: string) {
+    const res = await fetch(
+      `/v1/public/exams/${encodeURIComponent(exam.shareId)}/result/${encodeURIComponent(
+        submissionId,
+      )}`,
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message ?? "Não foi possível carregar o resultado.");
+    }
+    const { data } = (await res.json()) as { data: PublicResultDTO };
+    setAnswers(data.answers);
+    setTextAnswers(data.textAnswers);
     setResult(data);
     setStep("result");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -205,6 +231,7 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
         examTitle={exam.title}
         studentName={studentName}
         submission={previousSubmission}
+        onViewResult={() => handleViewResult(previousSubmission.id)}
       />
     );
   }
@@ -226,6 +253,7 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
         exam={exam}
         studentName={studentName}
         answers={answers}
+        textAnswers={textAnswers}
         result={result}
       />
     );

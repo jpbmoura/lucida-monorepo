@@ -1,5 +1,6 @@
 import { ExamId } from "../domain/exam-id.js";
 import { ExamNotFoundError } from "../domain/exam-errors.js";
+import type { QuestionSnapshot } from "../domain/question.js";
 import type { ExamRepository } from "../domain/exam-repository.js";
 
 interface Input {
@@ -16,15 +17,7 @@ export interface GetExamOutput {
   duration: number;
   securityLevel: "off" | "strict";
   shareId: string;
-  questions: Array<{
-    type: "multipleChoice" | "trueFalse";
-    statement: string;
-    context: string | null;
-    options: string[];
-    correctAnswer: number;
-    explanation: string;
-    difficulty: "fácil" | "médio" | "difícil";
-  }>;
+  questions: QuestionSnapshot[];
   usage: { inputTokens: number; outputTokens: number; credits: number } | null;
   createdAt: Date;
   updatedAt: Date;

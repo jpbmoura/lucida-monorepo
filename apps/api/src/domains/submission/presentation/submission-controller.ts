@@ -4,25 +4,40 @@ import {
   beginExamByEmailBody,
   beginExamFromTokenBody,
   examIdParam,
+  gradeOpenAnswersBody,
+  gradingParam,
+  publicResultParam,
   shareIdParam,
   submitExamBody,
 } from "./submission-schemas.js";
 import type { GetPublicExamUseCase } from "../application/get-public-exam.js";
+import type { GetPublicResultUseCase } from "../application/get-public-result.js";
 import type { BeginExamUseCase } from "../application/begin-exam.js";
 import type { BeginExamByEmailUseCase } from "../application/begin-exam-by-email.js";
 import type { BeginExamFromTokenUseCase } from "../application/begin-exam-from-token.js";
 import type { ResolveExamLinkTokenUseCase } from "../application/resolve-exam-link-token.js";
 import type { SubmitExamUseCase } from "../application/submit-exam.js";
 import type { ListSubmissionsByExamUseCase } from "../application/list-submissions-by-exam.js";
+import type { GetSubmissionForGradingUseCase } from "../application/get-submission-for-grading.js";
+import type { GradeOpenAnswersManuallyUseCase } from "../application/grade-open-answers-manually.js";
+import type { ApproveOpenGradesUseCase } from "../application/approve-open-grades.js";
+import type { CountPendingCorrectionsUseCase } from "../application/count-pending-corrections.js";
+import type { ListGradingQueueUseCase } from "../application/list-grading-queue.js";
 
 interface Deps {
   getPublicExam: GetPublicExamUseCase;
+  getPublicResult: GetPublicResultUseCase;
   beginExam: BeginExamUseCase;
   beginExamByEmail: BeginExamByEmailUseCase;
   beginExamFromToken: BeginExamFromTokenUseCase;
   resolveExamLinkToken: ResolveExamLinkTokenUseCase;
   submitExam: SubmitExamUseCase;
   listSubmissionsByExam: ListSubmissionsByExamUseCase;
+  getSubmissionForGrading: GetSubmissionForGradingUseCase;
+  gradeOpenAnswersManually: GradeOpenAnswersManuallyUseCase;
+  approveOpenGrades: ApproveOpenGradesUseCase;
+  countPendingCorrections: CountPendingCorrectionsUseCase;
+  listGradingQueue: ListGradingQueueUseCase;
   /**
    * Secret usado pra verificar a assinatura do token. Vem do
    * `AUTH_SECRET` do api — controller é instanciado pelo composition
@@ -40,6 +55,19 @@ export class SubmissionController {
     try {
       const { shareId } = shareIdParam.parse(req.params);
       const data = await this.deps.getPublicExam.execute({ shareId });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getPublicResult: RequestHandler = async (req, res, next) => {
+    try {
+      const { shareId, submissionId } = publicResultParam.parse(req.params);
+      const data = await this.deps.getPublicResult.execute({
+        shareId,
+        submissionId,
+      });
       res.json({ data });
     } catch (err) {
       next(err);
@@ -113,6 +141,7 @@ export class SubmissionController {
         shareId,
         submissionId: body.submissionId,
         answers: body.answers,
+        textAnswers: body.textAnswers,
         endReason: body.endReason,
         integrityFlags: body.integrityFlags,
       });
@@ -129,6 +158,69 @@ export class SubmissionController {
       const { examId } = examIdParam.parse(req.params);
       const data = await this.deps.listSubmissionsByExam.execute({
         examId,
+        ownerId: req.auth!.userId,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getSubmissionForGrading: RequestHandler = async (req, res, next) => {
+    try {
+      const { submissionId } = gradingParam.parse(req.params);
+      const data = await this.deps.getSubmissionForGrading.execute({
+        submissionId,
+        ownerId: req.auth!.userId,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  gradeOpenAnswers: RequestHandler = async (req, res, next) => {
+    try {
+      const { submissionId } = gradingParam.parse(req.params);
+      const body = gradeOpenAnswersBody.parse(req.body);
+      const data = await this.deps.gradeOpenAnswersManually.execute({
+        submissionId,
+        ownerId: req.auth!.userId,
+        grades: body.grades,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  approveGrades: RequestHandler = async (req, res, next) => {
+    try {
+      const { submissionId } = gradingParam.parse(req.params);
+      const data = await this.deps.approveOpenGrades.execute({
+        submissionId,
+        ownerId: req.auth!.userId,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  pendingCorrections: RequestHandler = async (req, res, next) => {
+    try {
+      const data = await this.deps.countPendingCorrections.execute({
+        ownerId: req.auth!.userId,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  gradingQueue: RequestHandler = async (req, res, next) => {
+    try {
+      const data = await this.deps.listGradingQueue.execute({
         ownerId: req.auth!.userId,
       });
       res.json({ data });

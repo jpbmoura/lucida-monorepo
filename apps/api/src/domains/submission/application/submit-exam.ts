@@ -1,7 +1,9 @@
 import type { ExamRepository } from "@/domains/exam/domain/exam-repository.js";
+import type { QuestionType } from "@/domains/exam/domain/question.js";
 import type { SubmissionRepository } from "../domain/submission-repository.js";
 import { SubmissionId } from "../domain/submission-id.js";
 import type {
+  GradingStatus,
   IntegrityFlags,
   Submission,
   SubmissionEndReason,
@@ -30,6 +32,8 @@ interface Input {
   shareId: string;
   submissionId: string;
   answers: Array<number | null>;
+  /** Respostas digitadas das discursivas, alinhadas por índice de questão. */
+  textAnswers?: Array<string | null>;
   endReason: SubmissionEndReason;
   integrityFlags?: Partial<IntegrityFlags>;
 }
@@ -40,7 +44,13 @@ export interface SubmitExamOutput {
   correctCount: number;
   questionCount: number;
   endReason: SubmissionEndReason;
-  questionResults: Array<{ correctAnswer: number; explanation: string }>;
+  /** "pending" quando há discursivas aguardando correção. */
+  gradingStatus: GradingStatus;
+  questionResults: Array<{
+    type: QuestionType;
+    correctAnswer: number;
+    explanation: string;
+  }>;
 }
 
 /**
@@ -93,9 +103,14 @@ export class SubmitExamUseCase {
     }
 
     const correctAnswers = exam.questions.map((q) => q.correctAnswer);
+    const openQuestionIndices = exam.questions
+      .map((q, i) => (q.type === "open" ? i : -1))
+      .filter((i) => i >= 0);
     submission.finalize({
       answers: input.answers,
+      textAnswers: input.textAnswers,
       correctAnswers,
+      openQuestionIndices,
       endReason: finalEndReason,
       integrityFlags: input.integrityFlags,
     });
@@ -104,7 +119,9 @@ export class SubmitExamUseCase {
 
     // Fire-and-forget: erros do dispatcher não devem afetar a resposta
     // ao aluno. O dispatcher loga internamente.
-    if (this.dispatcher) {
+    // Só dispara `submission.completed` quando a nota é final — provas com
+    // discursivas ainda pendentes disparam após a aprovação da correção (Fase 2).
+    if (this.dispatcher && submission.gradingStatus !== "pending") {
       this.dispatcher.dispatch(submission).catch(() => undefined);
     }
 
@@ -114,7 +131,9 @@ export class SubmitExamUseCase {
       correctCount: submission.correctCount,
       questionCount: submission.questionCount,
       endReason: finalEndReason,
+      gradingStatus: submission.gradingStatus,
       questionResults: exam.questions.map((q) => ({
+        type: q.type,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation,
       })),

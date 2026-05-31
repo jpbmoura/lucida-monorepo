@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Users,
   TrendingUp,
@@ -9,10 +10,14 @@ import {
   CheckCircle2,
   ScanLine,
   Globe,
+  PencilLine,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { AiGradingPanel } from "../grading/ai-grading-panel";
 import type {
+  GradingStatus,
   IntegrityFlags,
   SubmissionEndReason,
   SubmissionSource,
@@ -30,6 +35,8 @@ export interface SubmissionItem {
   source: SubmissionSource;
   endReason: SubmissionEndReason;
   integrityFlags: IntegrityFlags;
+  gradingStatus: GradingStatus;
+  hasAiDraft: boolean;
 }
 
 export interface SubmissionsStats {
@@ -44,9 +51,22 @@ export interface SubmissionsStats {
 interface SubmissionsSectionProps {
   items: SubmissionItem[];
   stats: SubmissionsStats;
+  examId: string;
 }
 
-export function SubmissionsSection({ items, stats }: SubmissionsSectionProps) {
+export function SubmissionsSection({
+  items,
+  stats,
+  examId,
+}: SubmissionsSectionProps) {
+  const hasGrading = items.some((i) => i.gradingStatus !== "not_required");
+  const pendingGrading = items.filter(
+    (i) => i.gradingStatus === "pending" || i.gradingStatus === "partially_graded",
+  ).length;
+  const draftSubmissionIds = items
+    .filter((i) => i.hasAiDraft)
+    .map((i) => i.id);
+  const showAiPanel = pendingGrading > 0 || draftSubmissionIds.length > 0;
   if (items.length === 0) {
     return (
       <section className="mt-12">
@@ -67,6 +87,21 @@ export function SubmissionsSection({ items, stats }: SubmissionsSectionProps) {
   return (
     <section className="mt-12">
       <SectionHeader total={stats.total} inProgress={stats.inProgress} />
+
+      {pendingGrading > 0 && (
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <PencilLine className="size-4 shrink-0" />
+          {pendingGrading}{" "}
+          {pendingGrading === 1
+            ? "submissão com discursiva aguardando correção"
+            : "submissões com discursivas aguardando correção"}
+          .
+        </div>
+      )}
+
+      {showAiPanel && (
+        <AiGradingPanel examId={examId} draftSubmissionIds={draftSubmissionIds} />
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 md:grid-cols-4">
         <StatCell
@@ -109,6 +144,9 @@ export function SubmissionsSection({ items, stats }: SubmissionsSectionProps) {
               <th className="hidden px-4 py-3 md:table-cell">Código</th>
               <th className="px-4 py-3 text-right">Nota</th>
               <th className="hidden px-4 py-3 md:table-cell">Acertos</th>
+              {hasGrading && (
+                <th className="px-4 py-3">Correção</th>
+              )}
               <th className="hidden px-4 py-3 md:table-cell">Finalização</th>
               <th className="px-4 py-3 text-right md:px-6">Enviado</th>
             </tr>
@@ -141,6 +179,16 @@ export function SubmissionsSection({ items, stats }: SubmissionsSectionProps) {
                     {item.correctCount}/{item.questionCount}
                   </span>
                 </td>
+                {hasGrading && (
+                  <td className="px-4 py-3">
+                    <GradingBadge
+                      examId={examId}
+                      submissionId={item.id}
+                      status={item.gradingStatus}
+                      hasAiDraft={item.hasAiDraft}
+                    />
+                  </td>
+                )}
                 <td className="hidden px-4 py-3 md:table-cell">
                   <EndReasonBadge
                     endReason={item.endReason}
@@ -251,6 +299,60 @@ function EndReasonBadge({
     <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
       Abandonada
     </span>
+  );
+}
+
+function GradingBadge({
+  examId,
+  submissionId,
+  status,
+  hasAiDraft,
+}: {
+  examId: string;
+  submissionId: string;
+  status: GradingStatus;
+  hasAiDraft: boolean;
+}) {
+  if (status === "not_required") {
+    return <span className="text-xs text-gray-300">—</span>;
+  }
+
+  const href = `/app/provas/${examId}/corrigir/${submissionId}`;
+
+  if (status === "graded") {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100"
+      >
+        <CheckCircle2 className="size-3" />
+        Corrigida
+      </Link>
+    );
+  }
+
+  // Há rascunho da IA aguardando revisão — destaca como "Revisar IA".
+  if (hasAiDraft) {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-800 hover:bg-violet-200"
+      >
+        <Sparkles className="size-3" />
+        Revisar IA
+      </Link>
+    );
+  }
+
+  const label = status === "partially_graded" ? "Continuar" : "Corrigir";
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200"
+    >
+      <PencilLine className="size-3" />
+      {label}
+    </Link>
   );
 }
 

@@ -8,6 +8,27 @@ export interface IntegrityFlagsDoc {
   violationCount: number;
 }
 
+export interface OpenGradeCriterionDoc {
+  criterionId: string;
+  levelId: string;
+  points: number;
+  justification: string;
+  feedback: string;
+}
+
+export interface OpenGradeDoc {
+  questionIndex: number;
+  criteria: OpenGradeCriterionDoc[];
+  earned: number;
+  max: number;
+  overriddenFraction: number | null;
+  source: "manual" | "ai";
+  status: "ai_suggested" | "approved";
+  gradedByUserId: string | null;
+  aiModel: string | null;
+  gradedAt: Date;
+}
+
 export interface SubmissionDoc {
   _id: string;
   examId: string;
@@ -21,6 +42,7 @@ export interface SubmissionDoc {
   source: "online" | "scanner";
   status: "in_progress" | "submitted";
   answers: Array<number | null>;
+  textAnswers: Array<string | null>;
   correctCount: number;
   questionCount: number;
   score: number;
@@ -28,6 +50,9 @@ export interface SubmissionDoc {
   submittedAt: Date | null;
   endReason: "submitted" | "time_expired" | "violation" | "abandoned" | null;
   integrityFlags: IntegrityFlagsDoc;
+  openQuestionIndices: number[];
+  openGrades: OpenGradeDoc[];
+  gradingStatus: "not_required" | "pending" | "partially_graded" | "graded";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +64,37 @@ const integrityFlagsSchema = new Schema<IntegrityFlagsDoc>(
     copyAttempts: { type: Number, default: 0 },
     rightClickAttempts: { type: Number, default: 0 },
     violationCount: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
+const openGradeCriterionSchema = new Schema<OpenGradeCriterionDoc>(
+  {
+    criterionId: { type: String, required: true },
+    levelId: { type: String, default: "" },
+    points: { type: Number, default: 0 },
+    justification: { type: String, default: "" },
+    feedback: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
+const openGradeSchema = new Schema<OpenGradeDoc>(
+  {
+    questionIndex: { type: Number, required: true },
+    criteria: { type: [openGradeCriterionSchema], default: [] },
+    earned: { type: Number, default: 0 },
+    max: { type: Number, default: 0 },
+    overriddenFraction: { type: Number, default: null },
+    source: { type: String, enum: ["manual", "ai"], required: true },
+    status: {
+      type: String,
+      enum: ["ai_suggested", "approved"],
+      required: true,
+    },
+    gradedByUserId: { type: String, default: null },
+    aiModel: { type: String, default: null },
+    gradedAt: { type: Date, required: true },
   },
   { _id: false },
 );
@@ -66,6 +122,7 @@ const submissionSchema = new Schema<SubmissionDoc>(
       default: "in_progress",
     },
     answers: { type: [Schema.Types.Mixed], required: true },
+    textAnswers: { type: [Schema.Types.Mixed], default: [] },
     correctCount: { type: Number, default: 0 },
     questionCount: { type: Number, required: true },
     score: { type: Number, default: 0 },
@@ -77,6 +134,13 @@ const submissionSchema = new Schema<SubmissionDoc>(
       default: null,
     },
     integrityFlags: { type: integrityFlagsSchema, default: () => ({}) },
+    openQuestionIndices: { type: [Number], default: [] },
+    openGrades: { type: [openGradeSchema], default: [] },
+    gradingStatus: {
+      type: String,
+      enum: ["not_required", "pending", "partially_graded", "graded"],
+      default: "not_required",
+    },
   },
   {
     collection: "submissions",

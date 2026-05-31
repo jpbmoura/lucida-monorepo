@@ -164,6 +164,11 @@ export class Exam {
     this.props.updatedAt = now;
   }
 
+  /** True se a prova tem ao menos uma questão discursiva (exige correção). */
+  hasOpenQuestions(): boolean {
+    return this.props.questions.some((q) => q.type === "open");
+  }
+
   isOwnedBy(ownerId: string): boolean {
     return this.props.ownerId === ownerId;
   }

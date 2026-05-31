@@ -14,6 +14,7 @@ import type {
 
 interface SubmitPayload {
   answers: Array<number | null>;
+  textAnswers: Array<string | null>;
   endReason: SubmissionEndReason;
   integrityFlags: IntegrityFlags;
 }
@@ -46,6 +47,9 @@ export function ExamTaking({
   const [answers, setAnswers] = useState<Array<number | null>>(() =>
     exam.questions.map(() => null),
   );
+  const [textAnswers, setTextAnswers] = useState<Array<string | null>>(() =>
+    exam.questions.map(() => null),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUnansweredWarn, setShowUnansweredWarn] = useState(false);
@@ -58,12 +62,16 @@ export function ExamTaking({
   );
 
   const answersRef = useRef(answers);
+  const textAnswersRef = useRef(textAnswers);
   const flagsRef = useRef(flags);
   const submittedRef = useRef(false);
 
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+  useEffect(() => {
+    textAnswersRef.current = textAnswers;
+  }, [textAnswers]);
   useEffect(() => {
     flagsRef.current = flags;
   }, [flags]);
@@ -76,6 +84,7 @@ export function ExamTaking({
       try {
         await onSubmit({
           answers: answersRef.current,
+          textAnswers: textAnswersRef.current,
           endReason,
           integrityFlags: flagsRef.current,
         });
@@ -196,13 +205,22 @@ export function ExamTaking({
   }, [strict, registerViolation]);
 
   const answeredCount = useMemo(
-    () => answers.filter((a) => a !== null).length,
-    [answers],
+    () =>
+      exam.questions.filter((q, i) =>
+        q.type === "open"
+          ? (textAnswers[i]?.trim().length ?? 0) > 0
+          : answers[i] !== null,
+      ).length,
+    [answers, textAnswers, exam.questions],
   );
   const unanswered = exam.questions.length - answeredCount;
 
   function setAnswer(qIndex: number, optIndex: number) {
     setAnswers((prev) => prev.map((a, i) => (i === qIndex ? optIndex : a)));
+  }
+
+  function setTextAnswer(qIndex: number, value: string) {
+    setTextAnswers((prev) => prev.map((t, i) => (i === qIndex ? value : t)));
   }
 
   async function handleSubmit() {
@@ -269,44 +287,54 @@ export function ExamTaking({
               </div>
             </div>
 
-            <ul className="flex flex-col gap-2">
-              {q.options.map((opt, j) => {
-                const selected = answers[i] === j;
-                return (
-                  <li key={j}>
-                    <button
-                      type="button"
-                      onClick={() => setAnswer(i, j)}
-                      className={cn(
-                        "flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors",
-                        selected
-                          ? "border-brand-primary bg-brand-primary/5 text-ink"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
-                      )}
-                    >
-                      <span
+            {q.type === "open" ? (
+              <textarea
+                value={textAnswers[i] ?? ""}
+                onChange={(e) => setTextAnswer(i, e.target.value)}
+                placeholder="Digite sua resposta..."
+                rows={6}
+                className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm leading-relaxed text-ink placeholder:text-gray-400 focus:border-brand-primary focus:outline-none"
+              />
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {q.options.map((opt, j) => {
+                  const selected = answers[i] === j;
+                  return (
+                    <li key={j}>
+                      <button
+                        type="button"
+                        onClick={() => setAnswer(i, j)}
                         className={cn(
-                          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2",
+                          "flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors",
                           selected
-                            ? "border-brand-primary bg-brand-primary"
-                            : "border-gray-300 bg-white",
+                            ? "border-brand-primary bg-brand-primary/5 text-ink"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300",
                         )}
                       >
-                        {selected && (
-                          <span className="size-1.5 rounded-full bg-white" />
-                        )}
-                      </span>
-                      <span className="flex-1">
-                        <span className="mr-2 font-medium text-gray-400">
-                          {String.fromCharCode(65 + j)})
+                        <span
+                          className={cn(
+                            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2",
+                            selected
+                              ? "border-brand-primary bg-brand-primary"
+                              : "border-gray-300 bg-white",
+                          )}
+                        >
+                          {selected && (
+                            <span className="size-1.5 rounded-full bg-white" />
+                          )}
                         </span>
-                        <RichText text={opt} />
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                        <span className="flex-1">
+                          <span className="mr-2 font-medium text-gray-400">
+                            {String.fromCharCode(65 + j)})
+                          </span>
+                          <RichText text={opt} />
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </li>
         ))}
       </ol>

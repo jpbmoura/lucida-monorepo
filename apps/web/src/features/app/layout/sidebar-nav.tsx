@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ScanLine,
   FolderOpen,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const ICONS = {
   help: HelpCircle,
   scan: ScanLine,
   folder: FolderOpen,
+  "clipboard-check": ClipboardCheck,
 } as const;
 
 export type SidebarIcon = keyof typeof ICONS;

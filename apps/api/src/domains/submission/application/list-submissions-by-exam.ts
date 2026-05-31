@@ -3,6 +3,7 @@ import { ExamNotFoundError } from "@/domains/exam/domain/exam-errors.js";
 import type { ExamRepository } from "@/domains/exam/domain/exam-repository.js";
 import type { SubmissionRepository } from "../domain/submission-repository.js";
 import type {
+  GradingStatus,
   IntegrityFlags,
   SubmissionEndReason,
   SubmissionSource,
@@ -25,6 +26,9 @@ export interface ListSubmissionsItem {
   source: SubmissionSource;
   endReason: SubmissionEndReason;
   integrityFlags: IntegrityFlags;
+  gradingStatus: GradingStatus;
+  /** Tem rascunho(s) de correção por IA aguardando revisão/aprovação. */
+  hasAiDraft: boolean;
 }
 
 export interface ListSubmissionsOutput {
@@ -69,6 +73,8 @@ export class ListSubmissionsByExamUseCase {
         source: s.source,
         endReason: s.endReason,
         integrityFlags: s.integrityFlags,
+        gradingStatus: s.gradingStatus,
+        hasAiDraft: s.openGrades.some((g) => g.status === "ai_suggested"),
       }))
       .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
 

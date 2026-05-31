@@ -1,14 +1,20 @@
 import Link from "next/link";
-import { ArrowRight, AlertCircle, Sparkles } from "lucide-react";
+import { ArrowRight, AlertCircle, Sparkles, PencilLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OverviewDTO } from "@/features/app/analises/data";
 
 interface LuluSuggestionProps {
   atRiskStudents: OverviewDTO["atRiskStudents"];
+  /** Submissões com discursivas aguardando correção do professor. */
+  pendingCorrections: number;
 }
 
-export function LuluSuggestion({ atRiskStudents }: LuluSuggestionProps) {
+export function LuluSuggestion({
+  atRiskStudents,
+  pendingCorrections,
+}: LuluSuggestionProps) {
   const hasAtRisk = atRiskStudents.length > 0;
+  const hasPending = pendingCorrections > 0;
   const preview = atRiskStudents.slice(0, 3);
 
   return (
@@ -22,7 +28,51 @@ export function LuluSuggestion({ atRiskStudents }: LuluSuggestionProps) {
           <span className="h-px flex-1 bg-brand-light/20" />
         </div>
 
-        {hasAtRisk ? (
+        {hasPending ? (
+          <>
+            <p className="font-serif text-[24px] leading-[1.25] tracking-tight">
+              Você tem{" "}
+              <span className="italic text-brand-light">
+                {pendingCorrections}{" "}
+                {pendingCorrections === 1
+                  ? "correção pendente"
+                  : "correções pendentes"}
+              </span>
+              . Os alunos das discursivas estão esperando o feedback.
+            </p>
+            {hasAtRisk && (
+              <ul className="mt-5 flex flex-col gap-1">
+                {preview.map((s, i) => (
+                  <li key={s.studentId}>
+                    <Link
+                      href={`/app/analises/alunos/${s.studentId}`}
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-lg py-2 transition-colors hover:bg-white/5",
+                        i < preview.length - 1 && "border-b border-white/5",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-white">
+                          {s.studentName}
+                        </div>
+                        <div className="truncate text-[11px] text-white/50">
+                          {s.className}
+                          <span className="mx-1.5 text-white/20">·</span>
+                          <span className="italic">{s.lastExamTitle}</span>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-md bg-red-500/15 px-2 py-0.5 text-[13px] font-semibold tabular-nums text-red-200">
+                        {s.lastScore.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 1,
+                        })}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : hasAtRisk ? (
           <>
             <p className="font-serif text-[24px] leading-[1.25] tracking-tight">
               Você tem{" "}
@@ -72,10 +122,17 @@ export function LuluSuggestion({ atRiskStudents }: LuluSuggestionProps) {
       </div>
 
       <Link
-        href={hasAtRisk ? "/app/analises" : "/app/cursos"}
+        href={
+          hasPending ? "/app/turmas" : hasAtRisk ? "/app/analises" : "/app/cursos"
+        }
         className="relative z-10 mt-6 inline-flex w-fit items-center gap-2 rounded-pill bg-brand-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white hover:text-ink"
       >
-        {hasAtRisk ? (
+        {hasPending ? (
+          <>
+            Corrigir provas
+            <PencilLine className="size-3.5" strokeWidth={2.5} />
+          </>
+        ) : hasAtRisk ? (
           <>
             Ver todos os alunos
             <AlertCircle className="size-3.5" strokeWidth={2.5} />

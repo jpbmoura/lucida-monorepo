@@ -45,6 +45,30 @@ export function makeAiRouter({
     controller.estimateExam,
   );
 
+  // --- Geração de prova DISCURSIVA por IA (form-data com material) ---
+  router.post(
+    "/v1/ai/generate-open-exam",
+    requireAuth,
+    upload.array("files"),
+    controller.generateOpenExam,
+  );
+  router.post(
+    "/v1/ai/estimate-open",
+    requireAuth,
+    upload.array("files"),
+    controller.estimateOpenExam,
+  );
+  router.post(
+    "/v1/ai/regenerate-open-question",
+    requireAuth,
+    upload.array("files"),
+    controller.regenerateOpenQuestion,
+  );
+
+  // --- Correção de discursivas por IA (body JSON, sem arquivos) ---
+  router.post("/v1/ai/grading/estimate", requireAuth, controller.estimateGrading);
+  router.post("/v1/ai/grading/run", requireAuth, controller.gradeOpenAnswers);
+
   // --- Planos de aula (módulo "Aulas") ---
   router.post(
     "/v1/ai/generate-lesson-plan",

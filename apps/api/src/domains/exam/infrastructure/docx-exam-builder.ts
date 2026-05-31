@@ -125,6 +125,19 @@ function renderQuestion(q: Question, number: number): Paragraph[] {
     }),
   );
 
+  if (q.type === "open") {
+    // Discursiva: sem alternativas, linhas em branco pra resposta.
+    for (let k = 0; k < 4; k++) {
+      out.push(
+        new Paragraph({
+          spacing: { after: 80 },
+          children: [new TextRun({ text: "_".repeat(70), size: 22 })],
+        }),
+      );
+    }
+    return out;
+  }
+
   q.options.forEach((opt, i) => {
     out.push(
       new Paragraph({
@@ -168,6 +181,11 @@ function renderAnswerKey(exam: Exam): Paragraph[] {
   );
 
   exam.questions.forEach((q, i) => {
+    if (q.type === "open") {
+      out.push(...renderOpenAnswerKey(q, i + 1));
+      return;
+    }
+
     const letter = letterFor(q.correctAnswer);
     const correctOption = q.options[q.correctAnswer] ?? "";
 
@@ -202,6 +220,56 @@ function renderAnswerKey(exam: Exam): Paragraph[] {
       );
     }
   });
+
+  return out;
+}
+
+// Gabarito da discursiva: resposta de referência + rubrica (critério → níveis).
+function renderOpenAnswerKey(q: Question, number: number): Paragraph[] {
+  const out: Paragraph[] = [];
+
+  out.push(
+    new Paragraph({
+      spacing: { before: 200, after: 80 },
+      children: [
+        new TextRun({ text: `${number}. `, bold: true, size: 24 }),
+        new TextRun({ text: "Questão discursiva", bold: true, size: 22 }),
+      ],
+    }),
+  );
+
+  if (q.referenceAnswer) {
+    out.push(
+      new Paragraph({
+        indent: { left: 360 },
+        spacing: { after: 80 },
+        children: [
+          new TextRun({ text: "Resposta de referência: ", italics: true, size: 20 }),
+          new TextRun({ text: q.referenceAnswer, size: 20 }),
+        ],
+      }),
+    );
+  }
+
+  const rubric = q.rubric;
+  if (rubric) {
+    for (const c of rubric.criteria) {
+      const max = Math.max(...c.levels.map((l) => l.points));
+      out.push(
+        new Paragraph({
+          indent: { left: 360 },
+          spacing: { after: 40 },
+          children: [
+            new TextRun({ text: `• ${c.name} (até ${max} pts): `, bold: true, size: 20 }),
+            new TextRun({
+              text: c.levels.map((l) => `${l.label} (${l.points})`).join("; "),
+              size: 20,
+            }),
+          ],
+        }),
+      );
+    }
+  }
 
   return out;
 }

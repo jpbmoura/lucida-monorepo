@@ -24,6 +24,10 @@ export function makePublicSubmissionRouter({
     controller.beginFromToken,
   );
   router.post("/v1/public/exams/:shareId/submissions", controller.submit);
+  router.get(
+    "/v1/public/exams/:shareId/result/:submissionId",
+    controller.getPublicResult,
+  );
   return router;
 }
 
@@ -36,6 +40,27 @@ export function makeAuthedSubmissionRouter({
   controller: SubmissionController;
 }): Router {
   const router = Router();
+  router.get(
+    "/v1/grading/pending-count",
+    requireAuth,
+    controller.pendingCorrections,
+  );
+  router.get("/v1/grading/queue", requireAuth, controller.gradingQueue);
   router.get("/v1/exams/:examId/submissions", requireAuth, controller.listByExam);
+  router.get(
+    "/v1/exams/:examId/submissions/:submissionId/grading",
+    requireAuth,
+    controller.getSubmissionForGrading,
+  );
+  router.post(
+    "/v1/exams/:examId/submissions/:submissionId/grade-open",
+    requireAuth,
+    controller.gradeOpenAnswers,
+  );
+  router.post(
+    "/v1/exams/:examId/submissions/:submissionId/approve-grades",
+    requireAuth,
+    controller.approveGrades,
+  );
   return router;
 }

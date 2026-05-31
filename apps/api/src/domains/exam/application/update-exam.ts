@@ -1,6 +1,7 @@
 import { ExamId } from "../domain/exam-id.js";
 import { ExamNotFoundError } from "../domain/exam-errors.js";
 import { Question, type QuestionDifficulty, type QuestionType } from "../domain/question.js";
+import type { RubricData } from "../domain/rubric.js";
 import type { SecurityLevel } from "../domain/exam.js";
 import type { ExamRepository } from "../domain/exam-repository.js";
 
@@ -15,10 +16,12 @@ interface Input {
     type: QuestionType;
     statement: string;
     context?: string | null;
-    options: string[];
-    correctAnswer: number;
+    options?: string[];
+    correctAnswer?: number;
     explanation?: string;
     difficulty: QuestionDifficulty;
+    rubric?: RubricData | null;
+    referenceAnswer?: string | null;
   }>;
 }
 
@@ -46,6 +49,8 @@ export class UpdateExamUseCase {
           correctAnswer: q.correctAnswer,
           explanation: q.explanation ?? "",
           difficulty: q.difficulty,
+          rubric: q.rubric ?? null,
+          referenceAnswer: q.referenceAnswer ?? null,
         }),
       );
       exam.replaceQuestions(questions, now);

@@ -55,3 +55,19 @@ export class SubmissionSessionExpiredError extends DomainError {
     super("Tempo da prova esgotado.");
   }
 }
+
+export class OpenGradeInvalidError extends DomainError {
+  readonly code = "OPEN_GRADE_INVALID";
+  readonly statusCode = 400;
+  constructor(reason: string) {
+    super(reason);
+  }
+}
+
+export class NotAnOpenQuestionError extends DomainError {
+  readonly code = "NOT_AN_OPEN_QUESTION";
+  readonly statusCode = 400;
+  constructor() {
+    super("Só questões discursivas podem ser corrigidas manualmente.");
+  }
+}

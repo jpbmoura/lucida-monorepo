@@ -77,6 +77,7 @@ interface WizardState {
   replaceQuestion: (index: number, question: GeneratedQuestion) => void;
   removeQuestion: (index: number) => void;
   addQuestion: () => void;
+  addOpenQuestion: () => void;
   reset: () => void;
 }
 
@@ -85,9 +86,10 @@ function defaultConfig(): WizardConfig {
     title: "",
     description: "",
     questionCount: 10,
+    openQuestionCount: 3,
     difficulty: "médio",
     style: "simple",
-    questionTypes: { multipleChoice: true, trueFalse: false },
+    questionTypes: { multipleChoice: true, trueFalse: false, open: false },
     language: "pt-BR",
     duration: 0,
     securityLevel: "off",
@@ -129,6 +131,36 @@ function defaultQuestion(config: WizardConfig): GeneratedQuestion {
 
 function newId(): string {
   return `mf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Discursiva manual: começa com 1 critério e 3 níveis (0/1/2 pts), pronto pro
+// professor editar. Ids estáveis pra correção referenciar por id, não posição.
+function defaultOpenQuestion(config: WizardConfig): GeneratedQuestion {
+  const difficulty = config.difficulty === "misto" ? "médio" : config.difficulty;
+  return {
+    type: "open",
+    statement: "",
+    context: config.style !== "simple" ? "" : null,
+    options: [],
+    correctAnswer: -1,
+    explanation: "",
+    difficulty,
+    referenceAnswer: "",
+    rubric: {
+      criteria: [
+        {
+          id: newId(),
+          name: "Critério 1",
+          description: null,
+          levels: [
+            { id: newId(), label: "Insuficiente", points: 0, descriptor: "" },
+            { id: newId(), label: "Parcial", points: 1, descriptor: "" },
+            { id: newId(), label: "Completo", points: 2, descriptor: "" },
+          ],
+        },
+      ],
+    },
+  };
 }
 
 export const useWizardStore = create<WizardState>((set, get) => ({
@@ -274,6 +306,11 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       questions: [...s.questions, defaultQuestion(s.config)],
     })),
 
+  addOpenQuestion: () =>
+    set((s) => ({
+      questions: [...s.questions, defaultOpenQuestion(s.config)],
+    })),
+
   reset: () =>
     set({
       step: "material",
@@ -330,8 +367,16 @@ export function canProceedToConfig(
 export function canGenerate(state: Pick<WizardState, "config">): boolean {
   const { config } = state;
   if (config.title.trim().length < 2) return false;
-  if (config.questionCount < 1 || config.questionCount > 50) return false;
-  if (!config.questionTypes.multipleChoice && !config.questionTypes.trueFalse) return false;
+  const wantObjective =
+    config.questionTypes.multipleChoice || config.questionTypes.trueFalse;
+  const wantOpen = config.questionTypes.open;
+  if (!wantObjective && !wantOpen) return false;
+  if (wantObjective && (config.questionCount < 1 || config.questionCount > 50)) {
+    return false;
+  }
+  if (wantOpen && (config.openQuestionCount < 1 || config.openQuestionCount > 30)) {
+    return false;
+  }
   return true;
 }
 

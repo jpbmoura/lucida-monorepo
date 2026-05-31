@@ -34,6 +34,8 @@ import { cn } from "@/lib/utils";
 import type { ExamDetailDTO, ExamSubmissionsResult } from "./data";
 import type { GeneratedQuestion } from "./types";
 import { QuestionEditor } from "./components/question-editor";
+import { OpenQuestionEditor } from "./components/open-question-editor";
+import { rubricMaxPoints } from "./components/rubric-editor";
 import { StudentPreview } from "./components/student-preview";
 import { ExamMetadataDialog } from "./components/exam-metadata-dialog";
 import { DeleteExamDialog } from "./components/delete-exam-dialog";
@@ -94,15 +96,27 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
     setSaving(true);
     try {
       const result = await updateExamAction(exam.id, exam.classId, {
-        questions: draft.map((q) => ({
-          type: q.type,
-          statement: q.statement,
-          context: q.context,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
-          difficulty: q.difficulty,
-        })),
+        questions: draft.map((q) =>
+          q.type === "open"
+            ? {
+                type: q.type,
+                statement: q.statement,
+                context: q.context,
+                explanation: q.explanation,
+                difficulty: q.difficulty,
+                rubric: q.rubric,
+                referenceAnswer: q.referenceAnswer ?? null,
+              }
+            : {
+                type: q.type,
+                statement: q.statement,
+                context: q.context,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation,
+                difficulty: q.difficulty,
+              },
+        ),
       });
       if (!result.ok) {
         setSaveError(result.error?.message ?? "Não foi possível salvar.");
@@ -183,6 +197,7 @@ export function ExamDetail({ exam, turmaName, submissions }: ExamDetailProps) {
             <SubmissionsSection
               items={submissions.items}
               stats={submissions.stats}
+              examId={exam.id}
             />
           </>
         ) : (
@@ -568,7 +583,11 @@ function ReadOnlyQuestion({ index, question }: ReadOnlyQuestionProps) {
           {question.difficulty}
         </span>
         <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
-          {question.type === "multipleChoice" ? "múltipla" : "V/F"}
+          {question.type === "multipleChoice"
+            ? "múltipla"
+            : question.type === "trueFalse"
+              ? "V/F"
+              : "discursiva"}
         </span>
       </header>
 
@@ -581,42 +600,87 @@ function ReadOnlyQuestion({ index, question }: ReadOnlyQuestionProps) {
         {question.statement}
       </p>
 
-      <ul className="mb-4 flex flex-col gap-1.5">
-        {question.options.map((opt, j) => {
-          const correct = j === question.correctAnswer;
-          return (
-            <li
-              key={j}
-              className={cn(
-                "flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm",
-                correct
-                  ? "border-brand-primary/30 bg-brand-primary/5 text-brand-primary"
-                  : "border-gray-100 text-gray-600",
-              )}
-            >
-              <span
-                className={cn(
-                  "grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-medium",
-                  correct ? "bg-brand-primary text-white" : "bg-gray-50 text-gray-400",
-                )}
-              >
-                {String.fromCharCode(65 + j)}
-              </span>
-              {opt}
-            </li>
-          );
-        })}
-      </ul>
+      {question.type === "open" ? (
+        <OpenQuestionView question={question} />
+      ) : (
+        <>
+          <ul className="mb-4 flex flex-col gap-1.5">
+            {question.options.map((opt, j) => {
+              const correct = j === question.correctAnswer;
+              return (
+                <li
+                  key={j}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm",
+                    correct
+                      ? "border-brand-primary/30 bg-brand-primary/5 text-brand-primary"
+                      : "border-gray-100 text-gray-600",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-medium",
+                      correct ? "bg-brand-primary text-white" : "bg-gray-50 text-gray-400",
+                    )}
+                  >
+                    {String.fromCharCode(65 + j)}
+                  </span>
+                  {opt}
+                </li>
+              );
+            })}
+          </ul>
 
-      {question.explanation && (
-        <div className="rounded-xl border border-gray-100 bg-gray-50/50 px-3.5 py-3 text-[13px] leading-relaxed text-gray-600">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
-            Gabarito comentado
-          </div>
-          {question.explanation}
-        </div>
+          {question.explanation && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 px-3.5 py-3 text-[13px] leading-relaxed text-gray-600">
+              <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                Gabarito comentado
+              </div>
+              {question.explanation}
+            </div>
+          )}
+        </>
       )}
     </article>
+  );
+}
+
+function OpenQuestionView({ question }: { question: GeneratedQuestion }) {
+  const rubric = question.rubric;
+  return (
+    <div className="flex flex-col gap-3">
+      {question.referenceAnswer && (
+        <div className="rounded-xl border border-sky-100 bg-sky-50/40 px-3.5 py-3 text-[13px] leading-relaxed text-gray-600">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-sky-500">
+            Resposta de referência
+          </div>
+          {question.referenceAnswer}
+        </div>
+      )}
+      {rubric && rubric.criteria.length > 0 && (
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 px-3.5 py-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+              Rubrica
+            </span>
+            <span className="text-[11px] tabular-nums text-gray-500">
+              Nota máxima: {rubricMaxPoints(rubric)} pts
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {rubric.criteria.map((c) => (
+              <div key={c.id} className="text-[13px]">
+                <span className="font-medium text-ink">{c.name}</span>
+                <span className="text-gray-500">
+                  {" — "}
+                  {c.levels.map((l) => `${l.label} (${l.points})`).join("; ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -651,6 +715,10 @@ function EditMode({
     setDraft([...draft, blank]);
     setLastAddedIndex(draft.length);
   }
+  function addOpenQuestion() {
+    setDraft([...draft, blankOpenQuestion(style)]);
+    setLastAddedIndex(draft.length);
+  }
 
   return (
     <section className="mx-auto flex max-w-3xl flex-col gap-3 pb-24">
@@ -663,29 +731,85 @@ function EditMode({
           A prova precisa ter ao menos 1 questão. Adicione uma abaixo.
         </div>
       )}
-      {draft.map((question, i) => (
-        <QuestionEditor
-          key={i}
-          index={i}
-          question={question}
-          onChange={(patch) => updateQuestion(i, patch)}
-          onRemove={() => removeQuestion(i)}
-          defaultExpanded={i === lastAddedIndex}
-        />
-      ))}
+      {draft.map((question, i) =>
+        question.type === "open" ? (
+          <OpenQuestionEditor
+            key={i}
+            index={i}
+            question={question}
+            onChange={(patch) => updateQuestion(i, patch)}
+            onRemove={() => removeQuestion(i)}
+          />
+        ) : (
+          <QuestionEditor
+            key={i}
+            index={i}
+            question={question}
+            onChange={(patch) => updateQuestion(i, patch)}
+            onRemove={() => removeQuestion(i)}
+            defaultExpanded={i === lastAddedIndex}
+          />
+        ),
+      )}
 
-      <button
-        type="button"
-        onClick={addQuestion}
-        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-brand-primary hover:bg-brand-primary/5 hover:text-brand-primary"
-      >
-        <Plus className="size-4" strokeWidth={2.5} />
-        Adicionar questão manualmente
-      </button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={addQuestion}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-brand-primary hover:bg-brand-primary/5 hover:text-brand-primary"
+        >
+          <Plus className="size-4" strokeWidth={2.5} />
+          Adicionar objetiva
+        </button>
+        <button
+          type="button"
+          onClick={addOpenQuestion}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+        >
+          <PencilLine className="size-4" strokeWidth={2.5} />
+          Adicionar discursiva
+        </button>
+      </div>
     </section>
   );
 }
 
+function rid(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function blankOpenQuestion(style: ExamDetailDTO["style"]): GeneratedQuestion {
+  return {
+    type: "open",
+    statement: "",
+    context: style !== "simple" ? "" : null,
+    options: [],
+    correctAnswer: -1,
+    explanation: "",
+    difficulty: "médio",
+    rubric: {
+      criteria: [
+        {
+          id: rid(),
+          name: "Critério 1",
+          description: null,
+          levels: [
+            { id: rid(), label: "Insuficiente", points: 0, descriptor: "" },
+            { id: rid(), label: "Parcial", points: 1, descriptor: "" },
+            { id: rid(), label: "Completo", points: 2, descriptor: "" },
+          ],
+        },
+      ],
+    },
+    referenceAnswer: "",
+  };
+}
+
+// Ordem das chaves espelha o QuestionSnapshot do backend (type…difficulty,
+// rubric, referenceAnswer) — o check de `dirty` compara JSON.stringify, então
+// a ordem precisa bater pra prova não nascer "suja".
 function cloneQuestion(q: GeneratedQuestion): GeneratedQuestion {
   return {
     type: q.type,
@@ -695,6 +819,15 @@ function cloneQuestion(q: GeneratedQuestion): GeneratedQuestion {
     correctAnswer: q.correctAnswer,
     explanation: q.explanation,
     difficulty: q.difficulty,
+    rubric: q.rubric
+      ? {
+          criteria: q.rubric.criteria.map((c) => ({
+            ...c,
+            levels: c.levels.map((l) => ({ ...l })),
+          })),
+        }
+      : null,
+    referenceAnswer: q.referenceAnswer ?? null,
   };
 }
 

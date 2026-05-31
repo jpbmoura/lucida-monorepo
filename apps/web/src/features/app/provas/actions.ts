@@ -4,15 +4,59 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
-const questionSchema = z.object({
-  type: z.enum(["multipleChoice", "trueFalse"]),
+const difficultyEnum = z.enum(["fácil", "médio", "difícil"]);
+
+const rubricSchema = z.object({
+  criteria: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        description: z.string().nullable().optional(),
+        levels: z
+          .array(
+            z.object({
+              id: z.string().min(1),
+              label: z.string().min(1),
+              points: z.number().nonnegative(),
+              descriptor: z.string().optional().default(""),
+            }),
+          )
+          .min(2),
+      }),
+    )
+    .min(1),
+});
+
+const objectiveBase = {
   statement: z.string().min(3),
   context: z.string().nullable(),
-  options: z.array(z.string()).min(2).max(6),
   correctAnswer: z.number().int().nonnegative(),
   explanation: z.string(),
-  difficulty: z.enum(["fácil", "médio", "difícil"]),
-});
+  difficulty: difficultyEnum,
+};
+
+const questionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("multipleChoice"),
+    options: z.array(z.string()).min(2).max(6),
+    ...objectiveBase,
+  }),
+  z.object({
+    type: z.literal("trueFalse"),
+    options: z.array(z.string()).length(2),
+    ...objectiveBase,
+  }),
+  z.object({
+    type: z.literal("open"),
+    statement: z.string().min(3),
+    context: z.string().nullable(),
+    explanation: z.string(),
+    difficulty: difficultyEnum,
+    rubric: rubricSchema,
+    referenceAnswer: z.string().nullable().optional(),
+  }),
+]);
 
 const usageSchema = z
   .object({
@@ -119,6 +163,50 @@ export async function copyExamToClassAction(
       { method: "POST", body },
     );
     revalidatePath(`/app/turmas/${targetClassId}`);
+    return { ok: true, data: response.data };
+  } catch (err) {
+    return { ok: false, error: toError(err) };
+  }
+}
+
+// ───── Correção manual de discursivas ───────────────────────
+
+const gradeOpenAnswersSchema = z.object({
+  grades: z
+    .array(
+      z.object({
+        questionIndex: z.number().int().nonnegative(),
+        criteria: z.array(
+          z.object({
+            criterionId: z.string().min(1),
+            levelId: z.string().min(1),
+            justification: z.string().optional(),
+            feedback: z.string().optional(),
+          }),
+        ),
+        overrideFraction: z.number().min(0).max(1).nullable().optional(),
+      }),
+    )
+    .min(1),
+});
+
+export async function gradeOpenAnswersAction(
+  examId: string,
+  submissionId: string,
+  input: unknown,
+): Promise<ActionResult<{ score: number; gradingStatus: string }>> {
+  try {
+    const body = gradeOpenAnswersSchema.parse(input);
+    const response = await apiFetch<{
+      data: { score: number; gradingStatus: string };
+    }>(
+      `/v1/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(
+        submissionId,
+      )}/grade-open`,
+      { method: "POST", body },
+    );
+    revalidatePath(`/app/provas/${examId}`);
+    revalidatePath(`/app/provas/${examId}/corrigir/${submissionId}`);
     return { ok: true, data: response.data };
   } catch (err) {
     return { ok: false, error: toError(err) };

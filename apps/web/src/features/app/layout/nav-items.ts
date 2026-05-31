@@ -16,6 +16,7 @@ export const FERRAMENTAS: SidebarNavItem[] = [
   // "Scanner" também não navega — abre dialog pra escolher turma → prova
   // e daí vai pra /app/provas/:id/scanner.
   { label: "Scanner", action: "scanner", icon: "scan" },
+  { label: "Corrigir Provas", href: "/app/corrigir-provas", icon: "clipboard-check" },
   { label: "Análises", href: "/app/analises", icon: "chart" },
   // "Nova aula" não navega — abre dialog pra escolher a turma e daí vai pro
   // wizard de plano de aula. Ver NewLessonPlanSidebarRow + NewLessonPlanDialog.

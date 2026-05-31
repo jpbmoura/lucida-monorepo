@@ -1,19 +1,38 @@
 "use client";
 
+import { useState } from "react";
 import { Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { PreviousSubmissionDTO } from "../types";
 
 interface AlreadySubmittedProps {
   examTitle: string;
   studentName: string;
   submission: PreviousSubmissionDTO;
+  onViewResult: () => Promise<void>;
 }
 
 export function AlreadySubmitted({
   examTitle,
   studentName,
   submission,
+  onViewResult,
 }: AlreadySubmittedProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleView() {
+    setLoading(true);
+    setError(null);
+    try {
+      await onViewResult();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const percentage = Math.round(
     (submission.correctCount / submission.questionCount) * 100,
   );
@@ -52,6 +71,19 @@ export function AlreadySubmitted({
         <p className="text-xs text-gray-500">
           {submission.correctCount} de {submission.questionCount} · {percentage}% de acerto
         </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={handleView}
+          disabled={loading}
+        >
+          {loading ? "Carregando..." : "Ver resultado e correção"}
+        </Button>
+        {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
 
       <p className="text-center text-sm text-gray-500">

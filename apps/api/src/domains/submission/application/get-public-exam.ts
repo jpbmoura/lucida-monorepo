@@ -6,9 +6,11 @@ interface Input {
 }
 
 export interface PublicQuestionDTO {
-  type: "multipleChoice" | "trueFalse";
+  type: "multipleChoice" | "trueFalse" | "open";
   statement: string;
   context: string | null;
+  // Discursiva (`open`) não tem opções (array vazio). A rubrica NÃO é exposta
+  // ao aluno enquanto responde — só no resultado, após a correção.
   options: string[];
 }
 

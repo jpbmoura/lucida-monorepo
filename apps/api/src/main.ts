@@ -65,6 +65,13 @@ import { DocxExtractor } from "@/domains/ai-ops/infrastructure/extractors/docx-e
 import { TextExtractor } from "@/domains/ai-ops/infrastructure/extractors/text-extractor.js";
 import { YoutubeTranscriptFetcher } from "@/domains/ai-ops/infrastructure/extractors/youtube-transcript-fetcher.js";
 import { OpenAiQuestionGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-question-generator.js";
+import { OpenAiAnswerGrader } from "@/domains/ai-ops/infrastructure/openai/open-answer-grader.js";
+import { OpenAiOpenQuestionGenerator } from "@/domains/ai-ops/infrastructure/openai/openai-open-question-generator.js";
+import { EstimateGradingUseCase } from "@/domains/ai-ops/application/estimate-grading.js";
+import { GradeOpenAnswersUseCase } from "@/domains/ai-ops/application/grade-open-answers.js";
+import { GenerateOpenQuestionsUseCase } from "@/domains/ai-ops/application/generate-open-questions.js";
+import { EstimateOpenGenerationUseCase } from "@/domains/ai-ops/application/estimate-open-generation.js";
+import { RegenerateOpenQuestionUseCase } from "@/domains/ai-ops/application/regenerate-open-question.js";
 import { AnswerExplanationVerifier } from "@/domains/ai-ops/infrastructure/openai/answer-explanation-verifier.js";
 import { GenerateExamQuestionsUseCase } from "@/domains/ai-ops/application/generate-exam-questions.js";
 import { RegenerateQuestionUseCase } from "@/domains/ai-ops/application/regenerate-question.js";
@@ -92,12 +99,18 @@ import { makeLessonPlanRouter } from "@/domains/lesson-plan/presentation/lesson-
 
 import { MongooseSubmissionRepository } from "@/domains/submission/infrastructure/mongoose-submission-repository.js";
 import { GetPublicExamUseCase } from "@/domains/submission/application/get-public-exam.js";
+import { GetPublicResultUseCase } from "@/domains/submission/application/get-public-result.js";
 import { BeginExamUseCase } from "@/domains/submission/application/begin-exam.js";
 import { BeginExamByEmailUseCase } from "@/domains/submission/application/begin-exam-by-email.js";
 import { BeginExamFromTokenUseCase } from "@/domains/submission/application/begin-exam-from-token.js";
 import { ResolveExamLinkTokenUseCase } from "@/domains/submission/application/resolve-exam-link-token.js";
 import { SubmitExamUseCase } from "@/domains/submission/application/submit-exam.js";
 import { ListSubmissionsByExamUseCase } from "@/domains/submission/application/list-submissions-by-exam.js";
+import { GetSubmissionForGradingUseCase } from "@/domains/submission/application/get-submission-for-grading.js";
+import { GradeOpenAnswersManuallyUseCase } from "@/domains/submission/application/grade-open-answers-manually.js";
+import { ApproveOpenGradesUseCase } from "@/domains/submission/application/approve-open-grades.js";
+import { CountPendingCorrectionsUseCase } from "@/domains/submission/application/count-pending-corrections.js";
+import { ListGradingQueueUseCase } from "@/domains/submission/application/list-grading-queue.js";
 import { SubmissionController } from "@/domains/submission/presentation/submission-controller.js";
 import {
   makePublicSubmissionRouter,
@@ -474,6 +487,8 @@ export async function buildApp(): Promise<Express> {
   const extractors = [new PdfExtractor(), new DocxExtractor(), new TextExtractor()];
   const transcriptFetcher = new YoutubeTranscriptFetcher();
   const questionGenerator = new OpenAiQuestionGenerator();
+  const openQuestionGenerator = new OpenAiOpenQuestionGenerator();
+  const openAnswerGrader = new OpenAiAnswerGrader();
   // R2 telemetria — só atua com R2_VERIFY=1 (gate dentro do use case).
   const answerExplanationVerifier = new AnswerExplanationVerifier();
   const aiController = new AiController({
@@ -491,6 +506,29 @@ export async function buildApp(): Promise<Express> {
       billingService,
     ),
     estimateExamGeneration: new EstimateExamGenerationUseCase(),
+    generateOpenQuestions: new GenerateOpenQuestionsUseCase(
+      extractors,
+      transcriptFetcher,
+      openQuestionGenerator,
+      billingService,
+    ),
+    estimateOpenGeneration: new EstimateOpenGenerationUseCase(),
+    regenerateOpenQuestion: new RegenerateOpenQuestionUseCase(
+      extractors,
+      transcriptFetcher,
+      openQuestionGenerator,
+      billingService,
+    ),
+    estimateGrading: new EstimateGradingUseCase(
+      examRepository,
+      submissionRepository,
+    ),
+    gradeOpenAnswers: new GradeOpenAnswersUseCase(
+      examRepository,
+      submissionRepository,
+      billingService,
+      openAnswerGrader,
+    ),
   });
 
   // --- lesson-plan generation (módulo "Aulas") ---
@@ -550,6 +588,10 @@ export async function buildApp(): Promise<Express> {
   // --- submission domain ---
   const submissionController = new SubmissionController({
     getPublicExam: new GetPublicExamUseCase(examRepository),
+    getPublicResult: new GetPublicResultUseCase(
+      examRepository,
+      submissionRepository,
+    ),
     beginExam: new BeginExamUseCase(
       examRepository,
       studentRepository,
@@ -580,6 +622,28 @@ export async function buildApp(): Promise<Express> {
     listSubmissionsByExam: new ListSubmissionsByExamUseCase(
       examRepository,
       submissionRepository,
+    ),
+    getSubmissionForGrading: new GetSubmissionForGradingUseCase(
+      examRepository,
+      submissionRepository,
+    ),
+    gradeOpenAnswersManually: new GradeOpenAnswersManuallyUseCase(
+      examRepository,
+      submissionRepository,
+      submissionCompletedDispatcher,
+    ),
+    approveOpenGrades: new ApproveOpenGradesUseCase(
+      submissionRepository,
+      submissionCompletedDispatcher,
+    ),
+    countPendingCorrections: new CountPendingCorrectionsUseCase(
+      submissionRepository,
+    ),
+    listGradingQueue: new ListGradingQueueUseCase(
+      submissionRepository,
+      examRepository,
+      classRepository,
+      courseRepository,
     ),
   });
 

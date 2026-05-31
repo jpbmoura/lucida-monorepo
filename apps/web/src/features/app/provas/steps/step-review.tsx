@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Sparkles, Save, Plus } from "lucide-react";
+import { ArrowLeft, Sparkles, Save, Plus, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuestionEditor } from "../components/question-editor";
+import { OpenQuestionEditor } from "../components/open-question-editor";
 import { StudentPreview } from "../components/student-preview";
 import { useWizardStore } from "../wizard-store";
 import { createExamAction } from "../actions";
@@ -14,6 +15,9 @@ import type { GeneratedQuestion } from "../types";
 interface StepReviewProps {
   classId: string;
   onRegenerate: (avoidStatements: string[]) => Promise<GeneratedQuestion | null>;
+  onRegenerateOpen: (
+    avoidStatements: string[],
+  ) => Promise<GeneratedQuestion | null>;
   /** Handoff: id do plano de aula que originou esta prova (back-reference). */
   fromLessonPlanId?: string;
 }
@@ -21,6 +25,7 @@ interface StepReviewProps {
 export function StepReview({
   classId,
   onRegenerate,
+  onRegenerateOpen,
   fromLessonPlanId,
 }: StepReviewProps) {
   const router = useRouter();
@@ -36,6 +41,7 @@ export function StepReview({
   const replaceQuestion = useWizardStore((s) => s.replaceQuestion);
   const removeQuestion = useWizardStore((s) => s.removeQuestion);
   const addQuestion = useWizardStore((s) => s.addQuestion);
+  const addOpenQuestion = useWizardStore((s) => s.addOpenQuestion);
   const setStep = useWizardStore((s) => s.setStep);
   const reset = useWizardStore((s) => s.reset);
 
@@ -53,17 +59,39 @@ export function StepReview({
     }
   }
 
+  async function handleRegenerateOpenAt(index: number) {
+    setRegenError(null);
+    const others = questions
+      .filter((_, i) => i !== index)
+      .map((q) => q.statement)
+      .filter((s) => s.trim().length > 0);
+    try {
+      const result = await onRegenerateOpen(others);
+      if (result) replaceQuestion(index, result);
+    } catch (err) {
+      setRegenError((err as Error).message ?? "Erro ao regerar a questão.");
+    }
+  }
+
   async function handleSave() {
     if (questions.length === 0) {
       setSaveError("Adicione ao menos uma questão antes de salvar.");
       return;
     }
-    const hasEmpty = questions.some(
-      (q) => q.statement.trim().length < 3 || q.options.some((o) => !o.trim()),
-    );
+    const hasEmpty = questions.some((q) => {
+      if (q.statement.trim().length < 3) return true;
+      if (q.type === "open") {
+        const r = q.rubric;
+        if (!r || r.criteria.length === 0) return true;
+        return r.criteria.some(
+          (c) => c.name.trim().length === 0 || c.levels.length < 2,
+        );
+      }
+      return q.options.some((o) => !o.trim());
+    });
     if (hasEmpty) {
       setSaveError(
-        "Tem questão incompleta (enunciado curto ou alternativa vazia). Preencha antes de salvar.",
+        "Tem questão incompleta (enunciado curto, alternativa vazia ou rubrica sem critério/níveis). Preencha antes de salvar.",
       );
       return;
     }
@@ -77,15 +105,27 @@ export function StepReview({
         style: config.style,
         duration: config.duration,
         securityLevel: config.securityLevel,
-        questions: questions.map((q) => ({
-          type: q.type,
-          statement: q.statement,
-          context: q.context,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
-          difficulty: q.difficulty,
-        })),
+        questions: questions.map((q) =>
+          q.type === "open"
+            ? {
+                type: q.type,
+                statement: q.statement,
+                context: q.context,
+                explanation: q.explanation,
+                difficulty: q.difficulty,
+                rubric: q.rubric,
+                referenceAnswer: q.referenceAnswer ?? null,
+              }
+            : {
+                type: q.type,
+                statement: q.statement,
+                context: q.context,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation,
+                difficulty: q.difficulty,
+              },
+        ),
         usage,
       });
       if (!result.ok) {
@@ -142,26 +182,47 @@ export function StepReview({
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="flex flex-col gap-3">
-          {questions.map((question, i) => (
-            <QuestionEditor
-              key={i}
-              index={i}
-              question={question}
-              onChange={(patch) => updateQuestion(i, patch)}
-              onRemove={() => removeQuestion(i)}
-              onRegenerate={() => handleRegenerateAt(i)}
-              alwaysExpanded
-            />
-          ))}
+          {questions.map((question, i) =>
+            question.type === "open" ? (
+              <OpenQuestionEditor
+                key={i}
+                index={i}
+                question={question}
+                onChange={(patch) => updateQuestion(i, patch)}
+                onRemove={() => removeQuestion(i)}
+                onRegenerate={() => handleRegenerateOpenAt(i)}
+              />
+            ) : (
+              <QuestionEditor
+                key={i}
+                index={i}
+                question={question}
+                onChange={(patch) => updateQuestion(i, patch)}
+                onRemove={() => removeQuestion(i)}
+                onRegenerate={() => handleRegenerateAt(i)}
+                alwaysExpanded
+              />
+            ),
+          )}
 
-          <button
-            type="button"
-            onClick={addQuestion}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-brand-primary hover:bg-brand-primary/5 hover:text-brand-primary"
-          >
-            <Plus className="size-4" strokeWidth={2.5} />
-            Adicionar questão manualmente
-          </button>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-brand-primary hover:bg-brand-primary/5 hover:text-brand-primary"
+            >
+              <Plus className="size-4" strokeWidth={2.5} />
+              Adicionar objetiva
+            </button>
+            <button
+              type="button"
+              onClick={addOpenQuestion}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-5 text-sm font-medium text-gray-500 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+            >
+              <PenLine className="size-4" strokeWidth={2.5} />
+              Adicionar discursiva
+            </button>
+          </div>
         </section>
 
         <aside className="xl:sticky xl:top-[88px] xl:self-start xl:h-[calc(100vh-120px)]">

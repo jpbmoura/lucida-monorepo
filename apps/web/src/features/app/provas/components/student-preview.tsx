@@ -72,24 +72,30 @@ export function StudentPreview({
                     </div>
                   </div>
 
-                  <ul className="ml-8 flex flex-col gap-2">
-                    {q.options.map((opt, j) => (
-                      <li
-                        key={j}
-                        className={cn(
-                          "flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm",
-                        )}
-                      >
-                        <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border border-gray-300" />
-                        <span className="flex-1 text-gray-700">
-                          <span className="mr-2 font-medium text-gray-400">
-                            {String.fromCharCode(65 + j)})
+                  {q.type === "open" ? (
+                    <div className="ml-8 rounded-xl border border-dashed border-gray-300 bg-white px-3.5 py-6 text-sm text-gray-400">
+                      Espaço para resposta escrita…
+                    </div>
+                  ) : (
+                    <ul className="ml-8 flex flex-col gap-2">
+                      {q.options.map((opt, j) => (
+                        <li
+                          key={j}
+                          className={cn(
+                            "flex items-start gap-2.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm",
+                          )}
+                        >
+                          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border border-gray-300" />
+                          <span className="flex-1 text-gray-700">
+                            <span className="mr-2 font-medium text-gray-400">
+                              {String.fromCharCode(65 + j)})
+                            </span>
+                            <RichText text={opt} />
                           </span>
-                          <RichText text={opt} />
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ol>

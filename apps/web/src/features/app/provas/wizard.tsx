@@ -11,6 +11,7 @@ import type {
   GeneratedQuestion,
   GenerationResult,
   GenerationUsage,
+  OpenGenerationResult,
 } from "./types";
 import { GenerateConfirmDialog } from "@/features/app/billing/components/generate-confirm-dialog";
 import { notifyBalanceChanged } from "@/features/app/billing/components/balance-widget";
@@ -70,62 +71,169 @@ export function Wizard({ classId, turmaName, seed, fromLessonPlanId }: WizardPro
     setEstimateLoading(true);
     setConfirmOpen(true);
 
-    const formData = new FormData();
-    formData.append(
-      "config",
-      JSON.stringify({
-        style: config.style,
-        questionCount: config.questionCount,
-      }),
-    );
+    // Prova pode ser mista — soma o custo das objetivas + das discursivas.
+    const wantObjective =
+      config.questionTypes.multipleChoice || config.questionTypes.trueFalse;
+    const wantOpen = config.questionTypes.open;
 
-    fetch("/v1/ai/estimate", { method: "POST", body: formData })
-      .then(async (r) => {
-        if (!r.ok) return null;
-        const body = (await r.json()) as {
-          data?: { estimatedCredits?: number };
-        };
-        return body.data?.estimatedCredits ?? null;
-      })
-      .catch(() => null)
-      .then((value) => {
-        setEstimate(value);
-        setEstimateLoading(false);
-      });
+    const tasks: Promise<number | null>[] = [];
+    if (wantObjective) {
+      const fd = new FormData();
+      fd.append(
+        "config",
+        JSON.stringify({
+          style: config.style,
+          questionCount: config.questionCount,
+        }),
+      );
+      tasks.push(
+        fetch("/v1/ai/estimate", { method: "POST", body: fd })
+          .then(parseEstimate)
+          .catch(() => null),
+      );
+    }
+    if (wantOpen) {
+      const fd = new FormData();
+      fd.append(
+        "config",
+        JSON.stringify({ questionCount: config.openQuestionCount }),
+      );
+      tasks.push(
+        fetch("/v1/ai/estimate-open", { method: "POST", body: fd })
+          .then(parseEstimate)
+          .catch(() => null),
+      );
+    }
+
+    Promise.all(tasks).then((vals) => {
+      const known = vals.filter((v): v is number => v !== null);
+      setEstimate(known.length > 0 ? known.reduce((a, b) => a + b, 0) : null);
+      setEstimateLoading(false);
+    });
   }
 
   async function doGenerate() {
     setStep("generating");
     try {
       const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
-      const formData = new FormData();
-      formData.append(
-        "config",
-        JSON.stringify({
-          questionCount: config.questionCount,
-          difficulty: config.difficulty,
-          style: config.style,
-          questionTypes: config.questionTypes,
-          language: config.language,
-          pastedText: combinedText,
-          youtubeUrls,
-        }),
-      );
+      const wantObjective =
+        config.questionTypes.multipleChoice || config.questionTypes.trueFalse;
+      const wantOpen = config.questionTypes.open;
 
-      // SSE: api manda heartbeat enquanto a OpenAI roda, evita o ECONNRESET
-      // do edge proxy (Fastly) por idle timeout de ~60s.
-      const data = await postSseExpectingResult<GenerationResult>(
-        "/v1/ai/generate-exam",
-        { method: "POST", body: formData },
-        { onProgress: setGenerationProgress },
-      );
-      setGenerationResult(data.questions, data.usage);
+      let merged: GeneratedQuestion[] = [];
+      let usage: GenerationUsage = {
+        inputTokens: 0,
+        outputTokens: 0,
+        credits: 0,
+      };
+
+      // Objetivas — gerador clássico. SSE com heartbeat contra ECONNRESET do edge.
+      if (wantObjective) {
+        const fd = new FormData();
+        fd.append(
+          "config",
+          JSON.stringify({
+            questionCount: config.questionCount,
+            difficulty: config.difficulty,
+            style: config.style,
+            questionTypes: {
+              multipleChoice: config.questionTypes.multipleChoice,
+              trueFalse: config.questionTypes.trueFalse,
+            },
+            language: config.language,
+            pastedText: combinedText,
+            youtubeUrls,
+          }),
+        );
+        const data = await postSseExpectingResult<GenerationResult>(
+          "/v1/ai/generate-exam",
+          { method: "POST", body: fd },
+          { onProgress: setGenerationProgress },
+        );
+        merged = merged.concat(data.questions);
+        usage = sumUsage(usage, data.usage);
+      }
+
+      // Discursivas — endpoint próprio; mapeadas pra questões type "open".
+      if (wantOpen) {
+        const fd = new FormData();
+        fd.append(
+          "config",
+          JSON.stringify({
+            questionCount: config.openQuestionCount,
+            difficulty: config.difficulty,
+            style: config.style,
+            language: config.language,
+            pastedText: combinedText,
+            youtubeUrls,
+          }),
+        );
+        const data = await postSseExpectingResult<OpenGenerationResult>(
+          "/v1/ai/generate-open-exam",
+          { method: "POST", body: fd },
+          { onProgress: setGenerationProgress },
+        );
+        merged = merged.concat(data.questions.map(mapOpenQuestion));
+        usage = sumUsage(usage, data.usage);
+      }
+
+      setGenerationResult(merged, usage);
       notifyBalanceChanged();
     } catch (err) {
       const message = mapGenerationError(err);
       setGenerationError(message);
     }
   }
+
+  // Regerar uma DISCURSIVA: endpoint próprio, evita os enunciados existentes.
+  const handleRegenerateOpen = useCallback(
+    async (avoidStatements: string[]): Promise<GeneratedQuestion | null> => {
+      const combinedText = buildCombinedPastedText({ materialFiles, pastedText });
+      const fd = new FormData();
+      fd.append(
+        "config",
+        JSON.stringify({
+          difficulty: config.difficulty,
+          style: config.style,
+          language: config.language,
+          pastedText: combinedText,
+          youtubeUrls,
+          avoidStatements,
+        }),
+      );
+
+      const response = await fetch("/v1/ai/regenerate-open-question", {
+        method: "POST",
+        body: fd,
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => null)) as
+          | { code?: string; message?: string }
+          | null;
+        if (response.status === 402) {
+          if (err?.code === "INSTITUTION_OUT_OF_CREDITS") {
+            throw new Error(
+              "Sua instituição está sem créditos. Fale com o administrador pra reabastecer.",
+            );
+          }
+          throw new Error(
+            err?.message ?? "Sem créditos pra regerar. Compre mais pra continuar.",
+          );
+        }
+        throw new Error(err?.message ?? "Falha ao regerar a questão.");
+      }
+      const { data } = (await response.json()) as {
+        data: {
+          question: OpenGenerationResult["questions"][number];
+          usage: GenerationUsage;
+        };
+      };
+      addUsage(data.usage);
+      notifyBalanceChanged();
+      return mapOpenQuestion(data.question);
+    },
+    [materialFiles, pastedText, youtubeUrls, config, addUsage],
+  );
 
   // Passada como prop pro StepReview. Manda o mesmo texto combinado da
   // geração inicial + as questões existentes como "evite". Retorna a nova
@@ -201,6 +309,7 @@ export function Wizard({ classId, turmaName, seed, fromLessonPlanId }: WizardPro
         <StepReview
           classId={classId}
           onRegenerate={handleRegenerate}
+          onRegenerateOpen={handleRegenerateOpen}
           fromLessonPlanId={fromLessonPlanId}
         />
       )}
@@ -214,6 +323,36 @@ export function Wizard({ classId, turmaName, seed, fromLessonPlanId }: WizardPro
       />
     </div>
   );
+}
+
+async function parseEstimate(r: Response): Promise<number | null> {
+  if (!r.ok) return null;
+  const body = (await r.json()) as { data?: { estimatedCredits?: number } };
+  return body.data?.estimatedCredits ?? null;
+}
+
+function sumUsage(a: GenerationUsage, b: GenerationUsage): GenerationUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    credits: a.credits + b.credits,
+  };
+}
+
+function mapOpenQuestion(
+  q: OpenGenerationResult["questions"][number],
+): GeneratedQuestion {
+  return {
+    type: "open",
+    statement: q.statement,
+    context: q.context,
+    options: [],
+    correctAnswer: -1,
+    explanation: "",
+    difficulty: q.difficulty,
+    rubric: q.rubric,
+    referenceAnswer: q.referenceAnswer,
+  };
 }
 
 // Mapeia erro do generate (SSE ou HTTP) pra mensagem mostrada ao usuário.

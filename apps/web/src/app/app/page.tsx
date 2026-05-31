@@ -6,6 +6,7 @@ import {
   fetchOverview,
   type OverviewPeriod,
 } from "@/features/app/analises/data";
+import { fetchPendingCorrectionsCount } from "@/features/app/provas/data";
 import { PageHeader } from "@/features/app/dashboard/sections/page-header";
 import { KpiGrid } from "@/features/app/dashboard/sections/kpi-grid";
 import { PerformanceChart } from "@/features/app/dashboard/sections/performance-chart";
@@ -33,7 +34,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     email: effective.email,
   });
 
-  const overview = await fetchOverview(period);
+  const [overview, pendingCorrections] = await Promise.all([
+    fetchOverview(period),
+    fetchPendingCorrectionsCount(),
+  ]);
   const hasActivity = overview.summary.submissionsReceived > 0;
 
   return (
@@ -51,7 +55,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
         <ExamsList exams={overview.lowPerformanceExams} />
-        <LuluSuggestion atRiskStudents={overview.atRiskStudents} />
+        <LuluSuggestion
+          atRiskStudents={overview.atRiskStudents}
+          pendingCorrections={pendingCorrections}
+        />
       </div>
     </div>
   );
