@@ -35,6 +35,17 @@ export interface StudentProps {
   name: string;
   matricula: string;
   email: string | null;
+  /**
+   * Id do aluno no roster do Google Classroom (userId do profile). `null`
+   * para alunos cadastrados direto na Lucida. Usado pra detectar quem saiu
+   * do Classroom numa reconciliação.
+   */
+  classroomUserId: string | null;
+  /**
+   * Marca de quando o aluno sumiu do roster do Classroom. `null` enquanto
+   * presente. NÃO apagamos o aluno (pode ter provas feitas) — só sinalizamos.
+   */
+  classroomRemovedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +63,7 @@ export class Student {
     name: string;
     matricula: string;
     email?: string | null;
+    classroomUserId?: string | null;
     now?: Date;
   }): Student {
     const name = validateName(input.name);
@@ -68,6 +80,8 @@ export class Student {
       name,
       matricula,
       email,
+      classroomUserId: input.classroomUserId ?? null,
+      classroomRemovedAt: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -138,6 +152,12 @@ export class Student {
   get email(): string | null {
     return this.props.email;
   }
+  get classroomUserId(): string | null {
+    return this.props.classroomUserId;
+  }
+  get classroomRemovedAt(): Date | null {
+    return this.props.classroomRemovedAt;
+  }
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -157,6 +177,33 @@ export class Student {
 
   updateEmail(newEmail: string | null, now: Date = new Date()): void {
     this.props.email = normalizeEmail(newEmail);
+    this.props.updatedAt = now;
+  }
+
+  /**
+   * Vincula o aluno ao seu userId no Google Classroom. Limpa qualquer
+   * marca de saída anterior (reapareceu no roster).
+   */
+  linkClassroomUser(classroomUserId: string, now: Date = new Date()): void {
+    this.props.classroomUserId = classroomUserId;
+    this.props.classroomRemovedAt = null;
+    this.props.updatedAt = now;
+  }
+
+  /**
+   * Sinaliza que o aluno sumiu do roster do Classroom. Idempotente — não
+   * mexe na marca se já estava marcado. Nunca apaga o aluno.
+   */
+  markDepartedFromClassroom(now: Date = new Date()): void {
+    if (this.props.classroomRemovedAt !== null) return;
+    this.props.classroomRemovedAt = now;
+    this.props.updatedAt = now;
+  }
+
+  /** Limpa a marca de saída (aluno voltou ao roster). */
+  restoreFromClassroom(now: Date = new Date()): void {
+    if (this.props.classroomRemovedAt === null) return;
+    this.props.classroomRemovedAt = null;
     this.props.updatedAt = now;
   }
 

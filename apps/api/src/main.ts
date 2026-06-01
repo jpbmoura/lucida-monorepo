@@ -48,6 +48,28 @@ import { DeleteStudentUseCase } from "@/domains/student/application/delete-stude
 import { StudentController } from "@/domains/student/presentation/student-controller.js";
 import { makeStudentRouter } from "@/domains/student/presentation/student-routes.js";
 
+import type { ClassroomOAuthClient } from "@/domains/classroom/application/ports/classroom-oauth-client.js";
+import type { ClassroomApiClient } from "@/domains/classroom/application/ports/classroom-api-client.js";
+import type { TokenCipher } from "@/domains/classroom/application/ports/token-cipher.js";
+import { AesGcmTokenCipher } from "@/domains/classroom/infrastructure/aes-gcm-token-cipher.js";
+import { GoogleClassroomOAuthClient } from "@/domains/classroom/infrastructure/google-classroom-oauth-client.js";
+import { GoogleClassroomApiClient } from "@/domains/classroom/infrastructure/google-classroom-api-client.js";
+import { UnavailableClassroomOAuthClient } from "@/domains/classroom/infrastructure/unavailable-classroom-oauth-client.js";
+import { UnavailableClassroomApiClient } from "@/domains/classroom/infrastructure/unavailable-classroom-api-client.js";
+import { UnavailableTokenCipher } from "@/domains/classroom/infrastructure/unavailable-token-cipher.js";
+import { MongooseClassroomCredentialRepository } from "@/domains/classroom/infrastructure/mongoose-classroom-credential-repository.js";
+import { EnsureFreshCredentialService } from "@/domains/classroom/application/ensure-fresh-credential.js";
+import { GetConnectionStatusUseCase } from "@/domains/classroom/application/get-connection-status.js";
+import { BuildAuthorizeUrlUseCase } from "@/domains/classroom/application/build-authorize-url.js";
+import { CompleteOAuthUseCase } from "@/domains/classroom/application/complete-oauth.js";
+import { DisconnectClassroomUseCase } from "@/domains/classroom/application/disconnect-classroom.js";
+import { ListClassroomCoursesUseCase } from "@/domains/classroom/application/list-classroom-courses.js";
+import { ImportClassroomCourseUseCase } from "@/domains/classroom/application/import-classroom-course.js";
+import { ReconcileStudentsUseCase } from "@/domains/classroom/application/reconcile-students.js";
+import { ClassroomController } from "@/domains/classroom/presentation/classroom-controller.js";
+import { makeClassroomRouter } from "@/domains/classroom/presentation/classroom-routes.js";
+import { makeClassroomOAuthRouter } from "@/domains/classroom/presentation/classroom-oauth-routes.js";
+
 import { MongooseExamRepository } from "@/domains/exam/infrastructure/mongoose-exam-repository.js";
 import { DocxExamBuilderImpl } from "@/domains/exam/infrastructure/docx-exam-builder.js";
 import { CreateExamUseCase } from "@/domains/exam/application/create-exam.js";
@@ -480,6 +502,70 @@ export async function buildApp(): Promise<Express> {
     listStudentsByClass: new ListStudentsByClassUseCase(studentRepository, classRepository),
     updateStudent: new UpdateStudentUseCase(studentRepository),
     deleteStudent: new DeleteStudentUseCase(studentRepository),
+  });
+
+  // --- classroom integration (Google Classroom) ---
+  // Plugin opcional: sem as envs CLASSROOM_OAUTH_*/ENC_KEY, injetamos stubs
+  // que devolvem 503 — o card aparece indisponível e o resto da Lucida segue.
+  const classroomEnabled = Boolean(
+    env.CLASSROOM_OAUTH_CLIENT_ID &&
+      env.CLASSROOM_OAUTH_CLIENT_SECRET &&
+      env.CLASSROOM_TOKEN_ENC_KEY,
+  );
+  const classroomRedirectUri =
+    env.CLASSROOM_OAUTH_REDIRECT_URI ??
+    `${env.AUTH_BASE_URL}/v1/integrations/classroom/oauth/callback`;
+  const classroomOAuth: ClassroomOAuthClient = classroomEnabled
+    ? new GoogleClassroomOAuthClient(
+        env.CLASSROOM_OAUTH_CLIENT_ID!,
+        env.CLASSROOM_OAUTH_CLIENT_SECRET!,
+        classroomRedirectUri,
+      )
+    : new UnavailableClassroomOAuthClient();
+  const classroomApi: ClassroomApiClient = classroomEnabled
+    ? new GoogleClassroomApiClient()
+    : new UnavailableClassroomApiClient();
+  const classroomCipher: TokenCipher = classroomEnabled
+    ? new AesGcmTokenCipher(env.CLASSROOM_TOKEN_ENC_KEY!)
+    : new UnavailableTokenCipher();
+
+  const classroomCredentialRepository = new MongooseClassroomCredentialRepository(
+    classroomCipher,
+  );
+  const ensureFreshCredential = new EnsureFreshCredentialService(
+    classroomOAuth,
+    classroomCredentialRepository,
+  );
+  const reconcileStudentsUseCase = new ReconcileStudentsUseCase(
+    classroomCredentialRepository,
+    ensureFreshCredential,
+    classroomApi,
+    classRepository,
+    studentRepository,
+  );
+  const classroomController = new ClassroomController({
+    getStatus: new GetConnectionStatusUseCase(classroomCredentialRepository),
+    buildAuthorizeUrl: new BuildAuthorizeUrlUseCase(classroomOAuth, env.AUTH_SECRET),
+    completeOAuth: new CompleteOAuthUseCase(
+      classroomOAuth,
+      classroomCredentialRepository,
+      env.AUTH_SECRET,
+    ),
+    disconnect: new DisconnectClassroomUseCase(classroomCredentialRepository),
+    listCourses: new ListClassroomCoursesUseCase(
+      classroomCredentialRepository,
+      ensureFreshCredential,
+      classroomApi,
+      classRepository,
+    ),
+    importCourse: new ImportClassroomCourseUseCase(
+      classroomCredentialRepository,
+      courseRepository,
+      new CreateCourseUseCase(courseRepository),
+      classRepository,
+      reconcileStudentsUseCase,
+    ),
+    reconcile: reconcileStudentsUseCase,
   });
 
   // --- exam domain ---
@@ -1206,6 +1292,10 @@ export async function buildApp(): Promise<Express> {
     makeCourseRouter({ requireAuth, controller: courseController }),
     makeClassRouter({ requireAuth, controller: classController }),
     makeStudentRouter({ requireAuth, controller: studentController }),
+    makeClassroomRouter({ requireAuth, controller: classroomController }),
+    // Callback OAuth do Classroom — público (state assinado), sem raw body,
+    // então fica nos routers normais (depois do express.json).
+    makeClassroomOAuthRouter({ controller: classroomController }),
     makeExamRouter({ requireAuth, controller: examController }),
     makeAiRouter({
       requireAuth,

@@ -23,6 +23,8 @@ export class MongooseStudentRepository implements StudentRepository {
           name: student.name,
           matricula: student.matricula,
           email: student.email,
+          classroomUserId: student.classroomUserId,
+          classroomRemovedAt: student.classroomRemovedAt,
         },
         $setOnInsert: {
           _id: student.id.toString(),
@@ -165,6 +167,8 @@ function toEntity(doc: StudentDoc): Student {
     name: doc.name,
     matricula: doc.matricula,
     email: doc.email ?? null,
+    classroomUserId: doc.classroomUserId ?? null,
+    classroomRemovedAt: doc.classroomRemovedAt ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   });

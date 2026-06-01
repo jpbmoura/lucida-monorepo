@@ -49,6 +49,7 @@ Domínios já migrados:
 | `slide-deck` | **Apresentações** (módulo Lucida Learning) — decks de slides gerados por IA a partir de um plano de aula ou de material; editor com reordenação (dnd-kit), imagens de stock (Pexels), export PPTX/PDF e modo apresentação. Status `DRAFT/READY/ERROR`. |
 | `ai-ops` | Geração/regeneração via OpenAI: questões **objetivas + abertas**, planos de aula e **slides**; **correção de respostas abertas por IA**; provas em **pt-BR / inglês / espanhol**; extractors PDF/DOCX/text/YouTube; imagens via Pexels (`PEXELS_API_KEY`, opcional). |
 | `scan` | OMR (folha de respostas) — proxy para serviço Python externo. |
+| `classroom` | **Integração Google Classroom** (v1, só provas online). OAuth próprio (separado do BetterAuth, `access_type=offline`+`prompt=consent`), tokens cifrados em repouso (AES-256-GCM). Importa turmas/alunos com **reconciliação por e-mail**; vínculo em `class.classroomCourseId`. Fases 2 (envio da prova → `exam.courseWorkId`) e 3 (passback de nota) engatilhadas, não implementadas. Doc de setup GCP em [`docs/INTEGRACAO_GOOGLE_CLASSROOM.md`](docs/INTEGRACAO_GOOGLE_CLASSROOM.md). |
 | `billing` | Créditos, ledger, débito atômico, assinaturas Stripe + top-ups + webhook. |
 | `invoicing` | Emissão de NFS-e via NFE.io — disparada por transações de billing; webhook de provider (`NFEIO_*`). |
 | `finance` | Dashboard financeiro staff-only — despesas operacionais, categorização, histórico por competência. |
@@ -93,7 +94,7 @@ Topologia de rotas — usa route groups e folders top-level pra separar layouts:
 |---|---|
 | `(marketing)` | Landing pública (`/`, `/precos`, `/contact`, `/privacidade`, `/termos`). |
 | `(auth)` | `/sign-in`, `/sign-up`, `/organizacoes/*` (login institucional). |
-| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]` (+ `/corrigir`, `/scanner`), `/app/corrigir-provas` (fila de correção), `/app/apresentacoes` (decks de slides), `/app/turmas`, `/app/cursos`, `/app/aulas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/ajuda`, `/app/analises`. |
+| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]` (+ `/corrigir`, `/scanner`), `/app/corrigir-provas` (fila de correção), `/app/apresentacoes` (decks de slides), `/app/turmas`, `/app/cursos`, `/app/aulas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/integracoes` (+ `/classroom`), `/app/ajuda`, `/app/analises`. |
 | `analytics/` | Dashboard de organização (admin de instituição) — `professores`, `desenvolvedores`, `notificacoes`, `configuracoes`, `ajuda`. |
 | `kintal/` | Backoffice interno (staff-only) — `(app)` + `entrar`. |
 | `auxiliar/` | Seletor de conta pra atendentes/assistentes (`auxiliar/escolher`) — atuar em nome de um professor supervisionado. |
@@ -123,7 +124,9 @@ Path alias `@/*` → `src/*` (configurado em [`apps/web/tsconfig.json`](apps/web
   `OMR_SERVICE_URL` (scan), `STRIPE_*` (checkout/portal), `ABACATEPAY_*` (PIX top-up),
   `CRON_SECRET` (expiração de wallets), `TICKETS_INBOUND_SECRET` (Resend Inbound),
   `NFEIO_*` (emissão de NFS-e), `PEXELS_API_KEY` (imagens de stock nas apresentações —
-  sem ela os slides caem pra tipografia/tema).
+  sem ela os slides caem pra tipografia/tema), `CLASSROOM_OAUTH_CLIENT_ID/SECRET` +
+  `CLASSROOM_TOKEN_ENC_KEY` (integração Google Classroom — sem elas o card fica
+  indisponível; ver [`docs/INTEGRACAO_GOOGLE_CLASSROOM.md`](docs/INTEGRACAO_GOOGLE_CLASSROOM.md)).
 
 ## Comandos
 
@@ -164,6 +167,7 @@ Vivem em [`apps/api/scripts/`](apps/api/scripts/) e rodam via `pnpm --filter @lu
 | `seed:roadmap` | Popula itens iniciais do roadmap. |
 | `backfill:student-org` / `backfill:class-org` | Preenche `organizationId` retroativo. |
 | `backfill:courses` | Preenche dados de curso retroativos em turmas/provas. |
+| `backfill:classroom-fields` | Normaliza campos da integração Classroom (`classroomCourseId`/`courseWorkId`/`classroomUserId`/`classroomRemovedAt`) em docs antigos. |
 | `billing:add-org-credits` | Concede créditos manuais para uma org. |
 | `eval:generation` | Roda avaliação (eval) da geração de questões do `ai-ops`. |
 

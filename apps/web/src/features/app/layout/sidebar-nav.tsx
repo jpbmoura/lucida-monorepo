@@ -15,6 +15,7 @@ import {
   ScanLine,
   FolderOpen,
   ClipboardCheck,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ const ICONS = {
   scan: ScanLine,
   folder: FolderOpen,
   "clipboard-check": ClipboardCheck,
+  plug: Plug,
 } as const;
 
 export type SidebarIcon = keyof typeof ICONS;

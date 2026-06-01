@@ -31,6 +31,7 @@ export class MongooseExamRepository implements ExamRepository {
           questions: exam.questions.map((q) => q.toJSON()),
           shareId: exam.shareId,
           usage: exam.usage,
+          courseWorkId: exam.courseWorkId,
         },
         $setOnInsert: {
           _id: exam.id.toString(),
@@ -134,6 +135,7 @@ function toEntity(doc: ExamDoc): Exam {
     ),
     shareId: doc.shareId,
     usage: doc.usage,
+    courseWorkId: doc.courseWorkId ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   });

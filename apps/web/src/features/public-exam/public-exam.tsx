@@ -183,6 +183,11 @@ export function PublicExam({ exam, prefilledFromToken }: PublicExamProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // TODO(fase-3 — Google Classroom): quando a prova for vinculada ao Classroom
+  // (exam.courseWorkId != null), trocar esta entrada por e-mail livre por uma
+  // SELEÇÃO DE NOME a partir do roster importado (casamento garantido pelo
+  // student.classroomUserId), reaproveitando o exam-link-token pra ligar a
+  // sessão ao aluno. Só então o passback de nota da fase 3 funciona.
   if (step === "emailEntry") {
     return (
       <EmailEntry

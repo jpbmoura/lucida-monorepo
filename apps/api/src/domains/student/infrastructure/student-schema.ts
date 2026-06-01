@@ -15,6 +15,10 @@ export interface StudentDoc {
   name: string;
   matricula: string;
   email: string | null;
+  /** userId do aluno no Google Classroom. Null se não veio de lá. */
+  classroomUserId: string | null;
+  /** Quando sumiu do roster do Classroom. Null = presente. */
+  classroomRemovedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +34,8 @@ const studentSchema = new Schema<StudentDoc>(
     name: { type: String, required: true, trim: true },
     matricula: { type: String, required: true, trim: true },
     email: { type: String, default: null, lowercase: true, trim: true },
+    classroomUserId: { type: String, default: null },
+    classroomRemovedAt: { type: Date, default: null },
   },
   {
     collection: "students",

@@ -52,6 +52,12 @@ export interface ExamDoc {
   questions: QuestionDoc[];
   shareId: string;
   usage: ExamUsageDoc | null;
+  /**
+   * Id da atividade no Google Classroom (FASE 2). Null enquanto não
+   * enviada. Habilita o passback de notas. Backfill em
+   * `scripts/backfill-classroom-fields/`.
+   */
+  courseWorkId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -136,6 +142,7 @@ const examSchema = new Schema<ExamDoc>(
     questions: { type: [questionSchema], default: [] },
     shareId: { type: String, required: true },
     usage: { type: usageSchema, default: null },
+    courseWorkId: { type: String, default: null, index: true },
   },
   {
     collection: "exams",

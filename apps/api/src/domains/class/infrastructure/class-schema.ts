@@ -16,6 +16,12 @@ export interface ClassDoc {
    * `scripts/backfill-courses/` garantiu o populamento das turmas legacy.
    */
   courseId: string;
+  /**
+   * Id da turma de origem no Google Classroom — `null` para turmas criadas
+   * direto na Lucida. Garante idempotência do import. Backfill em
+   * `scripts/backfill-classroom-fields/`.
+   */
+  classroomCourseId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +36,7 @@ const classSchema = new Schema<ClassDoc>(
     ownerId: { type: String, required: true, index: true },
     organizationId: { type: String, default: null, index: true },
     courseId: { type: String, required: true, index: true },
+    classroomCourseId: { type: String, default: null, index: true },
   },
   {
     collection: "classes",
@@ -45,6 +52,13 @@ classSchema.index({ ownerId: 1, createdAt: -1 });
 classSchema.index({ organizationId: 1, createdAt: -1, _id: -1 });
 // Listagem de turmas por curso — ordenada por createdAt desc.
 classSchema.index({ courseId: 1, createdAt: -1 });
+// Lookup do vínculo Classroom → turma Lucida do professor. Partial filter
+// ignora turmas sem vínculo (a maioria). Não-único: uma mesma turma do
+// Classroom pode, em teoria, ter sido importada por contas distintas.
+classSchema.index(
+  { ownerId: 1, classroomCourseId: 1 },
+  { partialFilterExpression: { classroomCourseId: { $type: "string" } } },
+);
 
 export const ClassModel: Model<ClassDoc> =
   (mongoose.models.Class as Model<ClassDoc> | undefined) ??

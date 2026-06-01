@@ -36,6 +36,14 @@ export interface ClassProps {
    * um curso "Geral" antes deste deploy.
    */
   courseId: string;
+  /**
+   * Vínculo com a turma de origem no Google Classroom. `null` para turmas
+   * criadas direto na Lucida. Quando preenchido, garante idempotência do
+   * import (reconectar/reimportar não duplica) e libera o botão de
+   * "Importar alunos do Classroom" só nas turmas vinculadas. Segue o
+   * precedente de `stripeSubscriptionId` (id externo, string, indexado).
+   */
+  classroomCourseId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +60,7 @@ export class Class {
     ownerId: string;
     organizationId?: string | null;
     courseId: string;
+    classroomCourseId?: string | null;
     now?: Date;
   }): Class {
     const name = validateName(input.name);
@@ -68,6 +77,7 @@ export class Class {
       ownerId: input.ownerId,
       organizationId: input.organizationId ?? null,
       courseId: input.courseId,
+      classroomCourseId: input.classroomCourseId ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -109,6 +119,15 @@ export class Class {
     return this.props.courseId;
   }
 
+  get classroomCourseId(): string | null {
+    return this.props.classroomCourseId;
+  }
+
+  /** True se a turma está vinculada a uma turma do Google Classroom. */
+  get isLinkedToClassroom(): boolean {
+    return this.props.classroomCourseId !== null;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -143,6 +162,18 @@ export class Class {
    */
   moveToCourse(newCourseId: string, now: Date = new Date()): void {
     this.props.courseId = newCourseId;
+    this.props.updatedAt = now;
+  }
+
+  /** Vincula a turma a um curso do Google Classroom (id externo). */
+  linkToClassroom(classroomCourseId: string, now: Date = new Date()): void {
+    this.props.classroomCourseId = classroomCourseId;
+    this.props.updatedAt = now;
+  }
+
+  /** Remove o vínculo com o Google Classroom (mantém alunos/provas). */
+  unlinkFromClassroom(now: Date = new Date()): void {
+    this.props.classroomCourseId = null;
     this.props.updatedAt = now;
   }
 

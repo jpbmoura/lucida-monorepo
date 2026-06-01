@@ -25,6 +25,15 @@ export interface ClassRepository {
   findByOwner(ownerId: string): Promise<Class[]>;
   /** Lista turmas do curso. Ordem: createdAt desc. */
   findByCourse(courseId: string): Promise<Class[]>;
+  /**
+   * Busca a turma do professor vinculada a um curso do Google Classroom.
+   * Base da idempotência do import (reimportar não duplica). `null` se
+   * ainda não importada.
+   */
+  findByOwnerAndClassroomCourseId(
+    ownerId: string,
+    classroomCourseId: string,
+  ): Promise<Class | null>;
   /** Conta turmas no curso. Usado pelo guard de delete em Fase 4. */
   countByCourse(courseId: string): Promise<number>;
   /**

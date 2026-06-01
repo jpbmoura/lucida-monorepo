@@ -22,6 +22,7 @@
     "backfill:student-org": "tsx scripts/backfill-student-org/index.ts",
     "backfill:class-org": "tsx scripts/backfill-class-org/index.ts",
     "backfill:courses": "tsx scripts/backfill-courses/index.ts",
+    "backfill:classroom-fields": "tsx scripts/backfill-classroom-fields/index.ts",
     "billing:add-org-credits": "tsx scripts/add-org-credits/index.ts",
     "eval:generation": "tsx scripts/eval-generation/index.ts"
   },

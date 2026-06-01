@@ -26,6 +26,11 @@ export const FERRAMENTAS: SidebarNavItem[] = [
 
 export const CONTA: SidebarNavItem[] = [
   {
+    label: "Integrações",
+    href: "/app/integracoes",
+    icon: "plug",
+  },
+  {
     label: "Ajuda e suporte",
     href: "/app/ajuda",
     icon: "help",

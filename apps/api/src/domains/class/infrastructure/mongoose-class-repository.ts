@@ -25,6 +25,7 @@ export class MongooseClassRepository implements ClassRepository {
           ownerId: cls.ownerId,
           organizationId: cls.organizationId,
           courseId: cls.courseId,
+          classroomCourseId: cls.classroomCourseId,
         },
         $setOnInsert: {
           _id: cls.id.toString(),
@@ -58,6 +59,16 @@ export class MongooseClassRepository implements ClassRepository {
 
   async countByCourse(courseId: string): Promise<number> {
     return ClassModel.countDocuments({ courseId }).exec();
+  }
+
+  async findByOwnerAndClassroomCourseId(
+    ownerId: string,
+    classroomCourseId: string,
+  ): Promise<Class | null> {
+    const doc = await ClassModel.findOne({ ownerId, classroomCourseId })
+      .lean<ClassDoc>()
+      .exec();
+    return doc ? toEntity(doc) : null;
   }
 
   async findByOrganizationPaginated(
@@ -124,6 +135,7 @@ function toEntity(doc: ClassDoc): Class {
     // indica backfill incompleto — o save vai falhar pelo `required: true`
     // e expor o problema. Fallback "" só pra atravessar leitura sem crash.
     courseId: doc.courseId ?? "",
+    classroomCourseId: doc.classroomCourseId ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   });

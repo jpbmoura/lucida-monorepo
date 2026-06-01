@@ -42,6 +42,16 @@ export interface ExamProps {
   questions: Question[];
   shareId: string;
   usage: ExamUsage | null;
+  /**
+   * Id da atividade (courseWork) criada no Google Classroom quando a prova
+   * é enviada pra lá (FASE 2). `null` enquanto não enviada.
+   *
+   * INVARIANTE: o passback de notas (FASE 3) só funciona se a atividade
+   * tiver sido criada PELA Lucida — só então este campo está preenchido e
+   * o Classroom aceita a escrita de nota via PATCH. Não tente lançar nota
+   * em atividade que não saiu daqui.
+   */
+  courseWorkId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,6 +72,7 @@ export class Exam {
     questions: Question[];
     shareId: string;
     usage?: ExamUsage | null;
+    courseWorkId?: string | null;
     now?: Date;
   }): Exam {
     const title = validateTitle(input.title);
@@ -84,6 +95,7 @@ export class Exam {
       questions: input.questions,
       shareId: input.shareId,
       usage: input.usage ?? null,
+      courseWorkId: input.courseWorkId ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -129,6 +141,13 @@ export class Exam {
   get usage(): ExamUsage | null {
     return this.props.usage;
   }
+  get courseWorkId(): string | null {
+    return this.props.courseWorkId;
+  }
+  /** True se a prova já foi enviada como atividade pro Google Classroom. */
+  get isLinkedToClassroom(): boolean {
+    return this.props.courseWorkId !== null;
+  }
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -167,6 +186,16 @@ export class Exam {
   /** True se a prova tem ao menos uma questão discursiva (exige correção). */
   hasOpenQuestions(): boolean {
     return this.props.questions.some((q) => q.type === "open");
+  }
+
+  /**
+   * Registra o id da atividade criada no Google Classroom (FASE 2). É o
+   * que habilita o passback de notas da FASE 3 — ver invariante em
+   * `ExamProps.courseWorkId`.
+   */
+  linkToCourseWork(courseWorkId: string, now: Date = new Date()): void {
+    this.props.courseWorkId = courseWorkId;
+    this.props.updatedAt = now;
   }
 
   isOwnedBy(ownerId: string): boolean {

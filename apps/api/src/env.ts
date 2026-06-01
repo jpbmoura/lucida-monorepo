@@ -95,6 +95,21 @@ const envSchema = z.object({
   // Sem isso, a rota POST /v1/invoicing/webhook devolve 503 — não dá pra
   // confiar em webhook não-assinado.
   NFEIO_WEBHOOK_HMAC_SECRET: z.string().min(16).optional(),
+
+  // Google Classroom — OAuth PRÓPRIO da integração, separado do login
+  // Better Auth (não reusa o token de auth). Todas opcionais: sem elas a
+  // tela de Integrações mostra o card como indisponível e o resto da Lucida
+  // segue funcionando (degradação graciosa, igual Stripe/OMR/Pexels).
+  CLASSROOM_OAUTH_CLIENT_ID: z.string().optional(),
+  CLASSROOM_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // redirect_uri registrado no Google. Default derivado de AUTH_BASE_URL
+  // (`${AUTH_BASE_URL}/v1/integrations/classroom/oauth/callback`); só
+  // precisa setar pra sobrescrever (ex.: domínio diferente da API).
+  CLASSROOM_OAUTH_REDIRECT_URI: z.string().url().optional(),
+  // Chave AES-256-GCM (≥ 32 chars) pra cifrar access/refresh token em
+  // repouso. Gere com `openssl rand -base64 32`. Sem ela, a integração
+  // fica indisponível (não guardamos token de longa duração em texto puro).
+  CLASSROOM_TOKEN_ENC_KEY: z.string().min(32).optional(),
 });
 
 export const env = envSchema.parse(process.env);
