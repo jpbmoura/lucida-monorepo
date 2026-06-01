@@ -1,7 +1,8 @@
 # Lucida — Briefing de Contexto
 
 > Documento de contexto para assistentes de chat (produto, negócio, marketing e
-> estratégia). **Não** é documentação técnica. Última revisão: maio/2026.
+> estratégia). **Não** é documentação técnica. Última revisão: maio/2026 (rev. 2 —
+> Apresentações em beta, questões abertas + correção por IA, provas multi-idioma).
 
 ---
 
@@ -26,8 +27,8 @@ Três produtos sob a mesma conta/plataforma:
 
 | Produto | O que faz |
 |---|---|
-| **Lucida Exam** (azul `#007AFF`) | Geração de provas, listas e simulados a partir do material do professor. Escolhe disciplina, série e estilo de questão; a IA monta. Correção automática online e em papel (OMR — leitura de folha de respostas). Banco de questões reutilizável. |
-| **Lucida Learning** (planejamento) | Planos de aula alinhados à **BNCC**, sequências didáticas e materiais de apoio/slides gerados por IA a partir de um tema. **Em construção:** a base (planos de aula) já existe; a geração de material a partir do plano ("Gerar material") ainda está desabilitada. |
+| **Lucida Exam** (azul `#007AFF`) | Geração de provas, listas e simulados a partir do material do professor. Escolhe disciplina, série e estilo de questão; a IA monta. Suporta **questões objetivas e abertas (dissertativas)**, com **correção das abertas por IA** (rubrica + revisão/aprovação do professor). Provas em **português, inglês e espanhol**. Correção automática online e em papel (OMR — leitura de folha de respostas). Banco de questões reutilizável. |
+| **Lucida Learning** (planejamento) | Planos de aula alinhados à **BNCC**, sequências didáticas e **apresentações (slides) geradas por IA** a partir do plano de aula ou de material. Os slides têm editor (reordenar, trocar imagens), export para **PPTX/PDF** e modo apresentação. **Em beta:** a geração de slides ("Apresentações") já está no ar; segue calibrando preço e qualidade. |
 | **Lucida Analytics** (roxo `#6C3CFB`) | Acompanhamento de desempenho por turma e aluno, lacunas de aprendizagem por habilidade, decisões baseadas em dados. Tem visão **institucional** (coordenadores/diretores) com créditos compartilhados. |
 
 A IA da plataforma é personificada como **"Lulu"** (a assistente que "monta tudo").
@@ -72,9 +73,9 @@ legados (`lucida-api-v2`, `lucida-api`, `lucida-client`/`lucida`, `lucida-lp`).
 - Frontend fala com o backend via rewrites; o aluno nunca acessa o backend direto.
 - Há `packages/` reservado para código compartilhado (ainda vazio).
 
-Integrações externas principais: **OpenAI** (geração), **Stripe** (pagamentos),
-**Resend** (e-mails), **NFE.io** (NFS-e), serviço Python externo de **OMR** (correção de
-papel).
+Integrações externas principais: **OpenAI** (geração e correção), **Stripe** (pagamentos),
+**Resend** (e-mails), **NFE.io** (NFS-e), **Pexels** (imagens de stock nos slides), serviço
+Python externo de **OMR** (correção de papel).
 
 ---
 
@@ -103,6 +104,15 @@ papel).
 
 ## 5. Em aberto / em andamento
 
+- **Apresentações (slides) em beta** — a geração já está no ar (a partir do plano de aula
+  ou de material), com editor, export PPTX/PDF e modo apresentação. Preço (`slide-pricing`)
+  ainda é **provisório**, em calibração. Imagens vêm do **Pexels** (stock); sem a chave, os
+  slides caem pra tipografia/tema. [VERIFICAR] preço final e limites.
+- **Questões abertas + correção por IA** — provas agora aceitam questões dissertativas;
+  a IA corrige por rubrica e o professor revisa/aprova numa fila de correção. Consome
+  créditos (precificação `grading`). Calibração de qualidade em andamento.
+- **Provas em inglês e espanhol** — geração multi-idioma já disponível (output no idioma
+  escolhido; instruções internas seguem em pt-BR).
 - **Plano anual e pacotes de créditos avulsos** — existem no billing, mas a vitrine pública
   e os valores finais ainda não estão 100% definidos. [VERIFICAR]
 - **API pública para parceiros** (`/v1/public/*`, com API keys e webhooks) e sua documentação
@@ -120,6 +130,11 @@ papel).
 - **Lulu** — a assistente de IA da Lucida (personificação da geração).
 - **Crédito** — unidade de consumo de IA; debitada por ação, varia com a complexidade.
 - **Exam / Learning / Analytics** — os três produtos da suíte (provas / planejamento / análise).
+- **Apresentações (slides)** — decks de slides gerados por IA dentro do Lucida Learning, a
+  partir do plano de aula ou de material; com editor, export PPTX/PDF e modo apresentação.
+- **Questão aberta / dissertativa** — questão sem alternativas, corrigida por IA via rubrica
+  e revisada pelo professor (distinta da objetiva, corrigida por gabarito).
+- **Rubrica** — critérios de correção de uma questão aberta; a IA pontua por critério.
 - **OMR** — *Optical Mark Recognition*; leitura automática de folha de respostas em papel.
 - **BNCC** — Base Nacional Comum Curricular; referência de habilidades nos planos/provas.
 - **ENEM / ENADE** — exames brasileiros usados como referência de estilo de questão

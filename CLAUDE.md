@@ -43,10 +43,11 @@ Domínios já migrados:
 | Domínio | Função |
 |---|---|
 | `iam` | Auth via **BetterAuth** (Google OAuth + email/senha + organization plugin). |
-| `class` / `student` / `exam` / `submission` | Núcleo pedagógico — turmas, alunos, provas, respostas. |
+| `class` / `student` / `exam` / `submission` | Núcleo pedagógico — turmas, alunos, provas, respostas. `submission` cobre também a **correção de questões abertas** (IA + manual): fila de correção, rubricas, notas por critério e aprovação do professor. |
 | `course` | Catálogo de cursos do professor — agrupam turmas/provas; CRUD por dono ou organização. |
-| `lesson-plan` | Planos de aula — criação/edição, snapshots de turma/curso/disciplina, skills BNCC, exportação DOCX, duplicação/arquivo, integração com geração de provas. |
-| `ai-ops` | Geração e regeneração de questões via OpenAI; extractors PDF/DOCX/text/YouTube. |
+| `lesson-plan` | Planos de aula — criação/edição, snapshots de turma/curso/disciplina, skills BNCC, exportação DOCX, duplicação/arquivo, integração com geração de provas e de apresentações. |
+| `slide-deck` | **Apresentações** (módulo Lucida Learning) — decks de slides gerados por IA a partir de um plano de aula ou de material; editor com reordenação (dnd-kit), imagens de stock (Pexels), export PPTX/PDF e modo apresentação. Status `DRAFT/READY/ERROR`. |
+| `ai-ops` | Geração/regeneração via OpenAI: questões **objetivas + abertas**, planos de aula e **slides**; **correção de respostas abertas por IA**; provas em **pt-BR / inglês / espanhol**; extractors PDF/DOCX/text/YouTube; imagens via Pexels (`PEXELS_API_KEY`, opcional). |
 | `scan` | OMR (folha de respostas) — proxy para serviço Python externo. |
 | `billing` | Créditos, ledger, débito atômico, assinaturas Stripe + top-ups + webhook. |
 | `invoicing` | Emissão de NFS-e via NFE.io — disparada por transações de billing; webhook de provider (`NFEIO_*`). |
@@ -64,7 +65,8 @@ Domínios já migrados:
 | `tickets` | Suporte por email — inbound via Resend Inbound (`TICKETS_INBOUND_SECRET`), threading, fila staff no Kintal (distinto do form simples de `support`). |
 
 Stack: `express` 5, `mongoose` 8, `better-auth`, `zod`, `stripe`, `openai`, `resend`,
-`multer`, `pdf-parse`, `mammoth`, `docx`, `youtube-transcript`, `cors`. Dev: `tsx`, `tsc-alias`, `vitest`.
+`multer`, `pdf-parse`, `mammoth`, `docx`, `youtube-transcript`, `cors`. Geração de IA
+faz streaming via SSE (`shared/http/sse.ts`). Dev: `tsx`, `tsc-alias`, `vitest`.
 Path alias `@/*` → `src/*` (resolvido em build pelo `tsc-alias`).
 
 ### `apps/web` — `@lucida/web`
@@ -79,7 +81,8 @@ Defaults:
 - **react-hook-form + Zod** para forms.
 - **Zustand** para estado global de UI; **Recharts** para gráficos; **dnd-kit** para drag-and-drop;
   **motion** (Framer) para animação; **Shiki** para syntax highlighting nos docs; **KaTeX** para
-  fórmulas matemáticas; **pdfjs-dist** para render/extração de PDF no client.
+  fórmulas matemáticas; **pdfjs-dist** para render/extração de PDF no client; **pptxgenjs**
+  para export de apresentações em PPTX (stubado no bundle do browser — ver `next.config.ts`).
 
 Tokens da marca (azul `#007AFF`, Poppins + Instrument Serif) em
 [`apps/web/src/styles/globals.css`](apps/web/src/styles/globals.css) via `@theme` do Tailwind v4.
@@ -90,13 +93,13 @@ Topologia de rotas — usa route groups e folders top-level pra separar layouts:
 |---|---|
 | `(marketing)` | Landing pública (`/`, `/precos`, `/contact`, `/privacidade`, `/termos`). |
 | `(auth)` | `/sign-in`, `/sign-up`, `/organizacoes/*` (login institucional). |
-| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]`, `/app/turmas`, `/app/cursos`, `/app/aulas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/ajuda`, `/app/analises`. |
+| `app/` | SaaS autenticado do professor — `/app`, `/app/provas/[id]` (+ `/corrigir`, `/scanner`), `/app/corrigir-provas` (fila de correção), `/app/apresentacoes` (decks de slides), `/app/turmas`, `/app/cursos`, `/app/aulas`, `/app/billing`, `/app/notificacoes`, `/app/configuracoes`, `/app/ajuda`, `/app/analises`. |
 | `analytics/` | Dashboard de organização (admin de instituição) — `professores`, `desenvolvedores`, `notificacoes`, `configuracoes`, `ajuda`. |
 | `kintal/` | Backoffice interno (staff-only) — `(app)` + `entrar`. |
 | `auxiliar/` | Seletor de conta pra atendentes/assistentes (`auxiliar/escolher`) — atuar em nome de um professor supervisionado. |
 | `roadmap/` | Roadmap público com voting. |
 | `exam/[shareId]` | Página pública pra aluno responder a prova. |
-| `print/exams/[id]` | Versão imprimível da prova. |
+| `print/exams/[id]` / `print/lesson-plans/[id]` / `print/slides/[id]` | Versões imprimíveis de prova, plano de aula e apresentação. |
 | `docs/` | Documentação da Public API — `quickstart`, `autenticacao`, `api`, `webhooks`, `erros`. |
 | `accept-invite/` | Aceite de convite pra organização. |
 
@@ -119,7 +122,8 @@ Path alias `@/*` → `src/*` (configurado em [`apps/web/tsconfig.json`](apps/web
 - Opcionais — sem eles, a feature correspondente devolve 503/502 mas o resto continua:
   `OMR_SERVICE_URL` (scan), `STRIPE_*` (checkout/portal), `ABACATEPAY_*` (PIX top-up),
   `CRON_SECRET` (expiração de wallets), `TICKETS_INBOUND_SECRET` (Resend Inbound),
-  `NFEIO_*` (emissão de NFS-e).
+  `NFEIO_*` (emissão de NFS-e), `PEXELS_API_KEY` (imagens de stock nas apresentações —
+  sem ela os slides caem pra tipografia/tema).
 
 ## Comandos
 

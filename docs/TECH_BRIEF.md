@@ -1,7 +1,8 @@
 # Lucida — Briefing Técnico
 
 > Visão técnica da aplicação: stack, arquitetura, integrações e convenções.
-> Última revisão: maio/2026.
+> Última revisão: maio/2026 (rev. 2 — módulo Apresentações, questões abertas,
+> correção por IA e provas multi-idioma).
 
 ---
 
@@ -73,10 +74,19 @@ presentation/  billing.routes, billing.controller, billing-webhook.controller, d
 
 ### Domínios (`src/domains/`)
 
-`iam`, `class`, `student`, `exam`, `submission`, `course`, `lesson-plan`, `ai-ops`,
-`scan`, `billing`, `invoicing`, `finance`, `analytics`, `api-access`, `public-api`,
-`webhook-dispatch`, `kintal`, `kanban`, `notifications`, `organization-preferences`,
-`roadmap`, `support`, `tickets`.
+`iam`, `class`, `student`, `exam`, `submission`, `course`, `lesson-plan`, `slide-deck`,
+`ai-ops`, `scan`, `billing`, `invoicing`, `finance`, `analytics`, `api-access`,
+`public-api`, `webhook-dispatch`, `kintal`, `kanban`, `notifications`,
+`organization-preferences`, `roadmap`, `support`, `tickets`.
+
+- **`slide-deck`** — módulo **Apresentações** (Lucida Learning). Decks com slides
+  polimórficos (blocos/colunas via `Schema.Types.Mixed`), status `DRAFT/READY/ERROR`,
+  reordenação, e imagens guardadas só como URL+crédito do fotógrafo (Pexels) — o binário
+  é baixado e embutido só no export PPTX/PDF (não há object storage no projeto).
+- **`submission`** — além do fluxo de resposta, cobre **correção de questões abertas**:
+  fila de correção (`list-grading-queue`), correção por IA (`grade-open-answers`) e manual
+  (`grade-open-answers-manually`), notas por critério de rubrica (`open-grade`) e aprovação
+  (`approve-open-grades`).
 
 ### Infra/shared transversal
 
@@ -88,20 +98,37 @@ presentation/  billing.routes, billing.controller, billing-webhook.controller, d
 
 ### `ai-ops` — o coração de IA (destaque)
 
-Geração via OpenAI (model default `gpt-4.1-mini`, configurável). Pipeline:
+Geração via OpenAI (model default configurável). Cobre quatro fluxos: **provas** (questões
+objetivas + abertas), **planos de aula**, **apresentações** (slides) e **correção** de
+respostas abertas. Pipeline:
+
 1. **Extractors** (`infrastructure/extractors/`): PDF (`pdf-parse`), DOCX (`mammoth`),
    texto puro e **transcrição de YouTube** → normaliza tudo pra texto-fonte (`collect-sources`).
-2. **Estimativa de custo** antes de gerar (`estimate-credits`, `exam-pricing`,
-   `lesson-plan-pricing`) → cobra créditos proporcionais.
+   Slides têm fonte adicional: `render-lesson-plan-source` renderiza um `LessonPlan` pra texto.
+2. **Estimativa de custo** antes de gerar (`estimate-exam-generation`, `estimate-open-generation`,
+   `estimate-lesson-plan`, `estimate-deck-credits`, `estimate-grading`) → cobra créditos
+   proporcionais. Pricing por domínio: `exam-pricing`, `slide-pricing`, `grading-pricing`.
 3. **Geração** com prompts modulares (`infrastructure/openai/prompts/`):
-   - **estilos**: `simple`, `contextual` (ENEM), `analytical` (ENADE), `reflective`.
-   - **módulos compartilhados**: `golden-rules`, `injection-defense` (defesa contra prompt
-     injection no material do professor), `output-contract`, `distractor-discipline`
-     (qualidade das alternativas erradas), `bloom-calibration`, `math-notation`, `persona`.
+   - **estilos de questão** (`prompts/styles/`): `simple`, `contextual` (ENEM),
+     `analytical` (ENADE), `reflective`.
+   - **módulos compartilhados** (`prompts/shared/`): `golden-rules`, `injection-defense`
+     (defesa contra prompt injection no material do professor), `output-contract`,
+     `distractor-discipline` (qualidade das alternativas erradas), `bloom-calibration`,
+     `math-notation`, `persona`, e **`language`** (provas em **pt-BR / inglês / espanhol** —
+     só o idioma de saída muda; as instruções seguem em pt-BR).
+   - **questões abertas** (`prompts/open-question/`): `guide` — geração e regeneração de
+     questões dissertativas com rubrica.
+   - **correção** (`prompts/grading/`): `system` — correção de respostas abertas por critério.
    - **planos de aula**: prompts por segmento (`fundamental`, `medio`, `faculdade`, `infoprodutor`).
+   - **slides** (`infrastructure/openai/slide-prompts/`): `slide-design` — geração
+     outline-first (1 chamada pro roteiro + 1 por slide, stream slide-a-slide via SSE).
 4. **Pós-processamento**: `normalize-math`, `answer-explanation-verifier` (verifica a
-   explicação da resposta correta).
-5. Regeneração granular: `regenerate-question`, `regenerate-lesson-block`.
+   explicação da resposta correta), `split-overflowing-slides` (divide slides densos em
+   "(cont.)" pra evitar overflow no render), `resolve-slide-images` (busca imagens Pexels).
+5. **Regeneração granular**: `regenerate-question`, `regenerate-open-question`,
+   `regenerate-lesson-block`, `regenerate-slide`.
+6. **Correção**: `generate-open-questions` / `grade-open-answers` (correção em lote por IA
+   com progresso via SSE), feedback por critério de rubrica.
 
 ---
 
@@ -110,7 +137,8 @@ Geração via OpenAI (model default `gpt-4.1-mini`, configurável). Pipeline:
 **Stack:** Next.js 15 (App Router), React 19, TypeScript, Tailwind v4, shadcn/ui
 (Radix), TanStack Query, react-hook-form + Zod, Zustand (estado UI), Recharts
 (gráficos), dnd-kit (drag-and-drop), motion/Framer (animação), Shiki (syntax nos docs),
-KaTeX (fórmulas), pdfjs-dist + mammoth (render/extração de PDF/DOCX no client).
+KaTeX (fórmulas), pdfjs-dist + mammoth (render/extração de PDF/DOCX no client),
+**pptxgenjs** (export de apresentações em PPTX).
 
 ### Padrões
 
@@ -120,7 +148,9 @@ KaTeX (fórmulas), pdfjs-dist + mammoth (render/extração de PDF/DOCX no client
 - Tailwind v4 via `@theme` em `styles/globals.css` (tokens da marca: azul `#007AFF`, Poppins + Instrument Serif).
 - Código de UI organizado por contexto em `src/features/`:
   `marketing`, `auth`, `app`, `analytics`, `kintal`, `notifications`, `public-exam`,
-  `accept-invite`, `docs`, `roadmap`.
+  `accept-invite`, `docs`, `roadmap`. Dentro de `features/app/` ficam os subcontextos
+  pesados — `provas` (inclui `grading/` p/ correção), `apresentacoes` (wizard + editor de
+  slides + export PPTX/PDF + modo apresentação), `aulas`, etc.
 
 ### Organização de `src/`
 
@@ -137,7 +167,9 @@ KaTeX (fórmulas), pdfjs-dist + mammoth (render/extração de PDF/DOCX no client
 
 - `next.config.ts`: rewrites `/api/auth/*` e `/v1/*` → api; redirect `www` → apex;
   Server Actions com `bodySizeLimit: 25mb` (anexar PDF/DOCX ao criar prova);
-  `eslint.ignoreDuringBuilds: true`.
+  `eslint.ignoreDuringBuilds: true`; **`NormalModuleReplacementPlugin(/^node:/)` +
+  `resolve.fallback`** stubando `fs`/`https`/etc no client (o `pptxgenjs` importa
+  `node:fs`/`node:https` e quebraria o bundle do browser sem isso).
 - Auth client (`better-auth/react`) com plugins `organizationClient` + `magicLinkClient`,
   mesma origem (cookie sem CORS, graças ao rewrite).
 
@@ -145,11 +177,11 @@ KaTeX (fórmulas), pdfjs-dist + mammoth (render/extração de PDF/DOCX no client
 
 - `(marketing)` — landing pública (`/`, `/precos`, `/contact`, `/privacidade`, `/termos`)
 - `(auth)` — `/sign-in`, `/sign-up`, `/organizacoes/*`, reset de senha
-- `app/` — SaaS do professor (`/app`, `/provas`, `/turmas`, `/cursos`, `/aulas`, `/billing`, `/analises`, `/notificacoes`, `/configuracoes`, `/ajuda`)
+- `app/` — SaaS do professor (`/app`, `/provas` (+ `/corrigir`, `/scanner`), `/corrigir-provas` (fila de correção), `/apresentacoes`, `/turmas`, `/cursos`, `/aulas`, `/billing`, `/analises`, `/notificacoes`, `/configuracoes`, `/ajuda`)
 - `analytics/` — painel institucional (admin de org)
 - `kintal/` — backoffice interno (staff)
 - `auxiliar/` — seletor de conta para assistentes
-- `exam/[shareId]` — página pública do aluno · `print/exams` e `print/lesson-plans` — versões imprimíveis
+- `exam/[shareId]` — página pública do aluno · `print/exams`, `print/lesson-plans` e `print/slides` — versões imprimíveis
 - `docs/` — documentação da Public API · `roadmap/`, `accept-invite/`
 
 ### Middleware (edge)
@@ -203,6 +235,7 @@ Frontend usa `NEXT_PUBLIC_API_URL` (default `http://localhost:3333`).
 | **AbacatePay** | PIX para top-ups (Stripe não libera PIX na conta) | rota PIX → 503 |
 | **NFE.io** | emissão de NFS-e por transação financeira; default sandbox | invoicing offline |
 | **OMR svc** (Python) | leitura de folha de respostas em papel | `/v1/scan` → 502 |
+| **Pexels** | imagens de stock para slides (`PEXELS_API_KEY`) | slides caem pra tipografia/tema |
 | **CRON** | `POST /v1/internal/expire-credits` (header `CRON_SECRET`) | 503 |
 
 Padrão geral: **degradação graciosa** — falta de env desliga só a feature, o resto da api segue.
