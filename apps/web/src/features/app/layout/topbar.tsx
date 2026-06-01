@@ -30,6 +30,11 @@ interface TopbarProps {
    * professores que ele atende.
    */
   isAssistant: boolean;
+  /**
+   * True quando o user real é staff. Habilita o atalho "Kintal" no menu
+   * de perfil — acesso rápido ao backoffice interno.
+   */
+  isStaff: boolean;
   /** Passado ao drawer mobile pra decidir se mostra o card de upgrade. */
   hasActiveSubscription: boolean;
 }
@@ -43,6 +48,7 @@ export function Topbar({
   isOrgAdmin,
   hideBalance,
   isAssistant,
+  isStaff,
   hasActiveSubscription,
 }: TopbarProps) {
   return (
@@ -70,6 +76,7 @@ export function Topbar({
           email={userEmail}
           initials={initials}
           isAssistant={isAssistant}
+          isStaff={isStaff}
         />
       </div>
     </header>

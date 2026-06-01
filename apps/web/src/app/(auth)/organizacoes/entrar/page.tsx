@@ -5,12 +5,20 @@ import { Eyebrow } from "@/features/marketing/components/eyebrow";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 import { AuthFormSide } from "@/features/auth/components/auth-form-side";
 import { AuthBrandPanel } from "@/features/auth/components/auth-brand-panel";
+import { redirectIfAuthenticated } from "@/lib/redirect-if-authenticated";
 
 export const metadata: Metadata = {
   title: "Entrar · Instituição",
 };
 
-export default function OrganizationSignInPage() {
+export default async function OrganizationSignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  await redirectIfAuthenticated("/analytics", next);
+
   return (
     <>
       <AuthFormSide variant="analytics">

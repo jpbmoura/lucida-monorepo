@@ -4,12 +4,15 @@ import { Eyebrow } from "@/features/marketing/components/eyebrow";
 import { SignUpForm } from "@/features/auth/components/sign-up-form";
 import { AuthFormSide } from "@/features/auth/components/auth-form-side";
 import { AuthBrandPanel } from "@/features/auth/components/auth-brand-panel";
+import { redirectIfAuthenticated } from "@/lib/redirect-if-authenticated";
 
 export const metadata: Metadata = {
   title: "Criar conta",
 };
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  await redirectIfAuthenticated("/app");
+
   return (
     <>
       <AuthFormSide variant="exam">

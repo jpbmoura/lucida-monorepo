@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, LogOut, Map, Repeat, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Map, Repeat, Settings, Sprout } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,13 @@ interface ProfileMenuProps {
    * as contas dos professores que atende.
    */
   isAssistant?: boolean;
+  /**
+   * True quando o user real tem role "staff". Mostra o atalho "Kintal"
+   * — acesso rápido ao backoffice interno. Vem da sessão real (não do
+   * effective user), então persiste mesmo quando o staff impersona um
+   * professor.
+   */
+  isStaff?: boolean;
 }
 
 export function ProfileMenu({
@@ -25,6 +32,7 @@ export function ProfileMenu({
   email,
   initials,
   isAssistant = false,
+  isStaff = false,
 }: ProfileMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -91,6 +99,17 @@ export function ProfileMenu({
               <div className="mt-0.5 truncate text-xs text-gray-500">{email}</div>
             </div>
             <div className="flex flex-col py-1">
+              {isStaff && (
+                <Link
+                  href="/kintal"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm font-medium text-brand-primary hover:bg-gray-50"
+                >
+                  <Sprout className="size-4" />
+                  Kintal
+                </Link>
+              )}
               <Link
                 href="/app/configuracoes"
                 role="menuitem"

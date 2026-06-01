@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/features/app/layout/sidebar";
 import { Topbar } from "@/features/app/layout/topbar";
 import { getEffectiveUser } from "@/lib/get-effective-user";
+import { getServerSession } from "@/lib/get-server-session";
 import { buildDisplayUser } from "@/lib/user-display";
 import {
   fetchActiveOrganization,
@@ -46,16 +47,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Billing + organização ativa + estado de impersonate carregam aqui pra
   // alimentar topbar + alert + banner. Tolera falhas — qualquer endpoint
   // que caia não deve quebrar a UI.
-  const [balance, subscription, activeOrg, impersonate] = await Promise.all([
-    fetchBalance().catch(() => null),
-    fetchCurrentSubscription().catch(() => null),
-    fetchActiveOrganization().catch(() => null),
-    fetchImpersonateState().catch(() => null),
-  ]);
+  const [balance, subscription, activeOrg, impersonate, session] =
+    await Promise.all([
+      fetchBalance().catch(() => null),
+      fetchCurrentSubscription().catch(() => null),
+      fetchActiveOrganization().catch(() => null),
+      fetchImpersonateState().catch(() => null),
+      getServerSession().catch(() => null),
+    ]);
 
   const hasActiveSubscription =
     subscription?.status === "active" || subscription?.status === "past_due";
   const orgPays = isOrgPayingForUser(activeOrg?.billingMode);
+  // Staff vem da sessão real (não do effective user) — assim o atalho
+  // "Kintal" persiste mesmo quando o staff está impersonando um professor.
+  const isStaff = session?.user.role === "staff";
 
   return (
     <div className="flex min-h-screen bg-white">
@@ -91,6 +97,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           }
           hideBalance={orgPays}
           isAssistant={(assistant?.availableTeachers ?? 0) > 0}
+          isStaff={isStaff}
           hasActiveSubscription={hasActiveSubscription}
         />
         {/* LowBalanceAlert é sobre saldo pessoal — some quando a instituição
